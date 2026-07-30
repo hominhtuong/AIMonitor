@@ -33,12 +33,27 @@ jobs:
 
       - name: Đóng gói AIMonitor.exe
         run: |
+          # --paths . là bắt buộc: entry nằm trong windows/ nên PyInstaller không tự thấy
+          # package aimon ở gốc repo. Thiếu nó thì nó BỎ QUA IM LẶNG, exe dựng ra vẫn
+          # "thành công" nhưng rỗng ruột và chỉ chết lúc chạy.
           pyinstaller --noconfirm --clean --onefile --noconsole `
             --name AIMonitor `
             --icon assets/icon.ico `
+            --paths . `
+            --hidden-import aimon.server `
             --add-data "aimon/static;aimon/static" `
             --add-data "pricing.json;." `
             windows/app_win.py
+
+      - name: Xác nhận exe có gói được code vào không
+        shell: pwsh
+        run: |
+          # Bắt lỗi ngay tại đây thay vì để smoke test báo mơ hồ "server không khởi động"
+          $warn = Get-ChildItem build/AIMonitor/warn-AIMonitor.txt -ErrorAction SilentlyContinue
+          if ($warn) {
+            $missing = Select-String -Path $warn.FullName -Pattern 'missing module named aimon'
+            if ($missing) { $missing; throw "PyInstaller không gói được package aimon" }
+          }
 
       - name: Chạy thử bản đã đóng gói
         shell: pwsh
@@ -54,7 +69,13 @@ jobs:
               if ($url) { break }
             }
           }
-          if (-not $url) { Stop-Process -Id $p.Id -Force; throw "Server không khởi động được" }
+          if (-not $url) {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            # exe dựng với --noconsole nên không có stdout; app_win.py ghi lỗi ra file này
+            $log = "$env:TEMP\aimon-startup-error.log"
+            if (Test-Path $log) { Write-Host "--- lỗi khi khởi động ---"; Get-Content $log }
+            throw "Server không khởi động được"
+          }
           $v = Invoke-RestMethod "$url/api/version" -TimeoutSec 5
           Write-Host "version=$($v.version) os=$($v.os)"
           # đọc luôn snapshot: đây mới là chỗ lộ ra nếu đóng gói thiếu pricing.json / static

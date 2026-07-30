@@ -109,5 +109,25 @@ def main() -> int:
     return server.main(argv)
 
 
+def _run() -> int:
+    """Bọc main() để lỗi lúc khởi động còn để lại dấu vết.
+
+    Bản --noconsole không có cửa sổ nào hiện traceback: app cứ thế tắt ngóm, người dùng
+    lẫn CI đều không biết vì sao. Ghi ra file để còn đọc được.
+    """
+    try:
+        return main()
+    except BaseException:
+        import traceback
+
+        try:
+            log = os.path.join(tempfile.gettempdir(), "aimon-startup-error.log")
+            with open(log, "w", encoding="utf-8") as f:
+                traceback.print_exc(file=f)
+        except OSError:
+            pass
+        raise
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_run())
