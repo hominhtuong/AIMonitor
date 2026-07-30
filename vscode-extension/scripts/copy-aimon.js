@@ -9,11 +9,29 @@ fs.rmSync(aimonDest, { recursive: true, force: true });
 fs.cpSync(aimonSrc, aimonDest, { recursive: true });
 console.log(`copied ${aimonSrc} -> ${aimonDest}`);
 
-const iconSrc = path.join(repoRoot, 'aimon', 'static', 'favicon.svg');
+// Icon activity bar PHẢI đơn sắc, không nền tô đầy: VSCode render icon này bằng cách mask
+// theo kênh alpha (bỏ màu, chỉ giữ vùng không-trong-suốt làm silhouette). favicon.svg gốc có
+// nền hình chữ nhật bo góc tô đầy màu, gần kín khung 64x64 - mask ra sẽ chỉ còn 1 khối vuông
+// đặc, không phải hình đường nhịp. Vẽ lại đúng path đường nhịp + chấm tròn từ favicon.svg,
+// bỏ nền, để mask ra đúng hình.
+const ACTIVITY_BAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <path d="M9 40h9l6-19 7 25 6-14h6" fill="none" stroke="#000000" stroke-width="4.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="50" cy="32" r="5.5" fill="#000000"/>
+</svg>
+`;
 const mediaDir = path.join(__dirname, '..', 'media');
 fs.mkdirSync(mediaDir, { recursive: true });
-fs.copyFileSync(iconSrc, path.join(mediaDir, 'icon.svg'));
-console.log(`copied ${iconSrc} -> ${path.join(mediaDir, 'icon.svg')}`);
+fs.writeFileSync(path.join(mediaDir, 'icon.svg'), ACTIVITY_BAR_ICON);
+console.log(`wrote monochrome activity-bar icon -> ${path.join(mediaDir, 'icon.svg')}`);
+
+// Icon marketplace/Extensions panel (package.json "icon") PHẢI là PNG vuông, giữ nguyên màu -
+// dùng lại assets/icon_128.png đã có sẵn ở root repo (cùng logo dùng cho app macOS).
+const galleryIconSrc = path.join(repoRoot, 'assets', 'icon_128.png');
+const imagesDir = path.join(__dirname, '..', 'images');
+fs.mkdirSync(imagesDir, { recursive: true });
+fs.copyFileSync(galleryIconSrc, path.join(imagesDir, 'icon.png'));
+console.log(`copied ${galleryIconSrc} -> ${path.join(imagesDir, 'icon.png')}`);
 
 // pricing.json nằm ở ROOT repo, không nằm trong aimon/. aimon/collectors/claude.py tìm nó
 // ở thư mục CHA của aimon/ (dirname(dirname(dirname(__file__)))) - dưới extension, đó là

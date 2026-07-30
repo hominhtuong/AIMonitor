@@ -4,6 +4,7 @@
   "description": "Monitor AI processes, token usage, and account limits inside VSCode",
   "version": "0.1.0",
   "publisher": "aimonitor",
+  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
