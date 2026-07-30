@@ -11,7 +11,10 @@ Token được gom vào **bucket theo từng giờ** nên tính được:
   - cửa sổ trượt 7 ngày (đối chiếu giới hạn Weekly)
 
 Transcript đọc **tăng dần** (nhớ offset + inode). File của ngày cũ chỉ parse ở chế độ
-nhẹ (chỉ dòng có `usage`) để không tốn thời gian.
+nhẹ (bỏ qua mọi dòng không mang token / tên phiên) để không tốn thời gian.
+
+`history()` quét toàn bộ lịch sử phiên trên máy - dùng cho tab "Lịch sử phiên",
+nơi cần biết từng tác vụ đã ngốn bao nhiêu token và chiếm bao nhiêu phần trăm.
 """
 
 from __future__ import annotations
@@ -19,6 +22,9 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
+import sys
+import threading
 import time
 from datetime import datetime
 
@@ -27,14 +33,31 @@ CLAUDE_DIR = os.path.join(HOME, ".claude")
 PROJECTS_DIR = os.path.join(CLAUDE_DIR, "projects")
 SESSIONS_DIR = os.path.join(CLAUDE_DIR, "sessions")
 
-BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Nơi tìm pricing.json. Bản .exe đóng gói để nó ở gốc thư mục tạm sys._MEIPASS.
+BASE = (
+    sys._MEIPASS
+    if getattr(sys, "frozen", False)
+    else os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 MAX_EVENTS = 60
 AGENT_TOOLS = {"Agent", "Task"}
 
+# Đọc theo khối thay vì nuốt cả file: transcript có file tới 50 MB, đọc một phát
+# làm RAM tiến trình phình lên hàng trăm MB và không trả lại cho OS. Đo trên 800 MB
+# transcript: khối 4 MB tốn 169 MB RSS, khối 1 MB chỉ 109 MB mà tốc độ như nhau.
+CHUNK = 1024 * 1024
+
+# Chế độ nhẹ chỉ quan tâm dòng mang token hoặc nhãn phiên. Một regex thay cho
+# nhiều lần `in` vì bộ lọc này chạy trên từng dòng của gần 1 GB transcript.
+_LIGHT_LINE = re.compile(rb'"(usage|aiTitle|lastPrompt)"')
+
 _PRICING: dict | None = None
 _STATE: dict[str, dict] = {}          # path -> state
+_LOCK = threading.RLock()             # _STATE bị đụng từ nhiều luồng HTTP
 _HOUR = 3600
+RECENT_KEEP = 6 * 3600   # giữ mốc token từng message trong 6 giờ gần nhất
+_RECENT_MAX = 4000       # chặn trên mỗi phiên, phòng phiên chạy liên tục rất dài
 
 
 # ---------------------------------------------------------------- giá & model
@@ -119,6 +142,7 @@ def _new_state(path: str, st: os.stat_result) -> dict:
         "models": {},
         "side_tokens": {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0},
         "hourly": {},          # epoch_hour -> bucket
+        "recent": [],          # [(ts, token)] gần đây, để đo mức dùng theo phút
         "context": 0,
         "context_model": None,
         "assistant_msgs": 0,
@@ -167,21 +191,22 @@ def _process(state: dict, d: dict, light: bool) -> None:
         if not state["first_ts"]:
             state["first_ts"] = ts
 
-    if not light:
-        for key, field in (("cwd", "cwd"), ("gitBranch", "git_branch"), ("version", "version")):
-            if d.get(key):
-                state[field] = d[key]
-        if typ == "ai-title":
-            state["title"] = d.get("aiTitle")
-            return
-        if typ == "last-prompt":
-            prompt = d.get("lastPrompt")
-            if isinstance(prompt, str):
-                state["last_prompt"] = " ".join(prompt.split())[:200]
-            return
-        if typ == "mode":
-            state["mode"] = d.get("mode")
-            return
+    # Metadata rẻ nên lấy cả ở chế độ nhẹ: tab Lịch sử cần tên phiên + thư mục của
+    # những phiên rất cũ, mà những phiên đó không bao giờ được parse đầy đủ.
+    for key, field in (("cwd", "cwd"), ("gitBranch", "git_branch"), ("version", "version")):
+        if d.get(key):
+            state[field] = d[key]
+    if typ == "ai-title":
+        state["title"] = d.get("aiTitle")
+        return
+    if typ == "last-prompt":
+        prompt = d.get("lastPrompt")
+        if isinstance(prompt, str):
+            state["last_prompt"] = " ".join(prompt.split())[:200]
+        return
+    if typ == "mode":
+        state["mode"] = d.get("mode")
+        return
 
     msg = d.get("message")
     if not isinstance(msg, dict):
@@ -230,6 +255,14 @@ def _process(state: dict, d: dict, light: bool) -> None:
         hb["cache_write"] += w5m + w1h
         hb["cost"] += _msg_cost(model, inp, outp, cread, w5m, w1h)
         hb["msgs"] += 1
+
+        # Bucket giờ quá thô để trả lời "đã dùng thêm bao nhiêu từ 13:51:44 tới giờ" - thứ cần
+        # để bù phần % trôi kể từ lần Claude Code làm mới hạn mức. Giữ thêm mốc từng message
+        # trong RECENT_KEEP giờ gần nhất; cắt bớt ngay tại đây nên danh sách luôn bị chặn.
+        state["recent"].append((ts or time.time(), inp + outp + cread + w5m + w1h))
+        if len(state["recent"]) > _RECENT_MAX:
+            floor = time.time() - RECENT_KEEP
+            state["recent"] = [r for r in state["recent"] if r[0] >= floor][-_RECENT_MAX:]
 
         if side:
             s = state["side_tokens"]
@@ -310,23 +343,32 @@ def _read_incremental(path: str, light: bool) -> dict | None:
         try:
             with open(path, "rb") as f:
                 f.seek(state["offset"])
-                data = f.read()
+                pos, tail = state["offset"], b""
+                while True:
+                    block = f.read(CHUNK)
+                    if not block:
+                        break
+                    data = tail + block
+                    cut = data.rfind(b"\n")
+                    if cut < 0:       # chưa gom đủ một dòng trọn vẹn
+                        tail = data
+                        continue
+                    seg, tail = data[: cut + 1], data[cut + 1:]
+                    pos += len(seg)
+                    for raw in seg.splitlines():
+                        if not raw.strip():
+                            continue
+                        if light and not _LIGHT_LINE.search(raw):
+                            continue
+                        try:
+                            d = json.loads(raw)
+                        except Exception:
+                            continue
+                        if isinstance(d, dict):
+                            _process(state, d, light)
+                state["offset"] = pos
         except OSError:
             return state
-        cut = data.rfind(b"\n")
-        if cut >= 0:
-            state["offset"] += cut + 1
-            for raw in data[: cut + 1].splitlines():
-                if not raw.strip():
-                    continue
-                if light and b'"usage"' not in raw:
-                    continue
-                try:
-                    d = json.loads(raw)
-                except Exception:
-                    continue
-                if isinstance(d, dict):
-                    _process(state, d, light)
     return state
 
 
@@ -430,18 +472,126 @@ def scan(live_ids: set[str] | None = None, parse_days: float = 7.0) -> dict[str,
     """
     cutoff = time.time() - parse_days * 86400
     result: dict[str, dict] = {}
-    for path in glob.glob(os.path.join(PROJECTS_DIR, "*", "*.jsonl")):
-        sid = os.path.basename(path)[:-6]
-        try:
-            mtime = os.path.getmtime(path)
-        except OSError:
-            continue
-        if mtime < cutoff:
-            continue
-        state = _read_incremental(path, light=False)
-        if state:
-            result[sid] = _summary(state)
+    with _LOCK:
+        for path in glob.glob(os.path.join(PROJECTS_DIR, "*", "*.jsonl")):
+            sid = os.path.basename(path)[:-6]
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            if mtime < cutoff:
+                continue
+            state = _read_incremental(path, light=False)
+            if state:
+                result[sid] = _summary(state)
     return result
+
+
+# ---------------------------------------------------------------- lịch sử phiên
+
+
+def _history_row(state: dict) -> dict:
+    """Bản rút gọn của một phiên cho bảng lịch sử (phiên cũ chỉ parse ở chế độ nhẹ,
+    nên ở đây chỉ lấy những trường chế độ nhẹ cũng có: token, model, tên, thư mục)."""
+    tot = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+    for b in state["models"].values():
+        tot["input"] += b["input"]
+        tot["output"] += b["output"]
+        tot["cache_read"] += b["cache_read"]
+        tot["cache_write"] += b["cache_write_5m"] + b["cache_write_1h"]
+
+    msgs = sum(b["msgs"] for b in state["hourly"].values())
+    first, last = state["first_ts"], state["last_ts"]
+    return {
+        "session_id": state["session_id"],
+        "project": state["project"],
+        "title": state["title"],
+        "last_prompt": state["last_prompt"],
+        "cwd": (state["cwd"] or "").replace(HOME, "~"),
+        "git_branch": state["git_branch"],
+        "models": sorted(state["models"].keys()),
+        "tokens": tot,
+        "api_total": sum(tot.values()),
+        "cost_usd": _session_cost(state["models"]),
+        "msgs": msgs,
+        "first_ts": first,
+        "last_ts": last,
+        "duration": round(last - first, 1) if first and last > first else 0.0,
+    }
+
+
+def history(days: float | None = None, live_days: float = 7.0) -> dict:
+    """Tổng hợp MỌI phiên Claude còn transcript trên máy này.
+
+    `days=None` là toàn bộ lịch sử. Phiên nằm ngoài `live_days` được parse ở chế độ
+    nhẹ (nhanh hơn ~4 lần, và những phiên đó cũng không cần tool/sự kiện).
+
+    Quét lần đầu tốn ~2s cho 800 MB transcript, các lần sau gần như 0 nhờ đọc tăng dần.
+    Chỉ chạy khi người dùng mở tab Lịch sử, không nằm trong vòng làm mới 3 giây.
+    """
+    t0 = time.time()
+    cutoff = t0 - days * 86400 if days else 0.0
+    live_cutoff = t0 - live_days * 86400
+
+    rows, scanned = [], 0
+    with _LOCK:
+        for path in glob.glob(os.path.join(PROJECTS_DIR, "*", "*.jsonl")):
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            if mtime < cutoff:
+                continue
+            state = _read_incremental(path, light=mtime < live_cutoff)
+            scanned += 1
+            if not state or not state["models"]:
+                continue          # transcript không có lượt gọi API nào
+            row = _history_row(state)
+            # Lọc theo thời điểm hoạt động thật, không theo mtime của file
+            if cutoff and row["last_ts"] and row["last_ts"] < cutoff:
+                continue
+            rows.append(row)
+
+    rows.sort(key=lambda r: -r["cost_usd"])
+    total_cost = sum(r["cost_usd"] for r in rows)
+    total_tok = sum(r["api_total"] for r in rows)
+    for r in rows:
+        r["cost_pct"] = round(r["cost_usd"] / total_cost * 100, 2) if total_cost else 0.0
+
+    projects: dict[str, dict] = {}
+    for r in rows:
+        name = os.path.basename(r["cwd"]) or r["project"]
+        p = projects.setdefault(
+            name, {"name": name, "sessions": 0, "cost_usd": 0.0, "api_total": 0, "msgs": 0, "last_ts": 0.0}
+        )
+        p["sessions"] += 1
+        p["cost_usd"] += r["cost_usd"]
+        p["api_total"] += r["api_total"]
+        p["msgs"] += r["msgs"]
+        p["last_ts"] = max(p["last_ts"], r["last_ts"])
+    for p in projects.values():
+        p["cost_usd"] = round(p["cost_usd"], 4)
+        p["cost_pct"] = round(p["cost_usd"] / total_cost * 100, 2) if total_cost else 0.0
+
+    return {
+        "generated_at": t0,
+        "days": days,
+        "scan_sec": round(time.time() - t0, 3),
+        "scanned_files": scanned,
+        "totals": {
+            "sessions": len(rows),
+            "cost_usd": round(total_cost, 4),
+            "api_total": total_tok,
+            "msgs": sum(r["msgs"] for r in rows),
+            "input": sum(r["tokens"]["input"] for r in rows),
+            "output": sum(r["tokens"]["output"] for r in rows),
+            "cache_read": sum(r["tokens"]["cache_read"] for r in rows),
+            "cache_write": sum(r["tokens"]["cache_write"] for r in rows),
+            "first_ts": min((r["first_ts"] for r in rows if r["first_ts"]), default=0.0),
+        },
+        "projects": sorted(projects.values(), key=lambda p: -p["cost_usd"]),
+        "sessions": rows,
+    }
 
 
 def windows() -> dict:
@@ -460,6 +610,70 @@ def windows() -> dict:
     for k in out:
         out[k]["cost"] = round(out[k]["cost"], 4)
     return out
+
+
+def window_between(since: float, until: float) -> dict:
+    """Token toàn máy trong khoảng [since, until] - dùng để hiệu chỉnh % hạn mức.
+
+    Gộp theo bucket giờ nên biên bị làm tròn tới giờ; đủ chính xác cho việc ước lượng.
+    """
+    agg = _empty_bucket()
+    agg["total"] = 0
+    lo, hi = int(since // _HOUR), int(until // _HOUR)
+    for state in _STATE.values():
+        for hour, b in state["hourly"].items():
+            if hour < lo or hour > hi:
+                continue
+            for k in ("input", "output", "cache_read", "cache_write", "msgs"):
+                agg[k] += b[k]
+            agg["cost"] += b["cost"]
+    agg["cost"] = round(agg["cost"], 4)
+    agg["total"] = agg["input"] + agg["output"] + agg["cache_read"] + agg["cache_write"]
+    return agg
+
+
+def tokens_since(since: float, until: float | None = None) -> int:
+    """Token toàn máy trong khoảng (since, until] - độ chính xác tới từng message.
+
+    Khác `window_between` (gom theo giờ), hàm này dùng cho khoảng vài phút: bù phần hạn
+    mức đã trôi kể từ lần Claude Code làm mới `cachedUsageUtilization`.
+    Chỉ có dữ liệu trong `RECENT_KEEP` giờ gần nhất.
+    """
+    hi = until if until is not None else time.time()
+    with _LOCK:
+        return sum(
+            tok
+            for state in _STATE.values()
+            for ts, tok in state["recent"]
+            if since < ts <= hi
+        )
+
+
+def recent_span() -> float | None:
+    """Mốc sớm nhất còn giữ mốc token theo message - để biết `tokens_since` có phủ đủ không."""
+    with _LOCK:
+        marks = [state["recent"][0][0] for state in _STATE.values() if state["recent"]]
+    return min(marks) if marks else None
+
+
+def activity_hours() -> list[int]:
+    """Các mốc giờ (epoch // 3600) toàn máy có ít nhất 1 lượt gọi API, đã sắp xếp.
+
+    Dùng để dựng lại mốc bắt đầu cửa sổ hạn mức: cửa sổ 5 giờ của Claude neo vào lần
+    dùng đầu tiên sau khi cửa sổ trước hết hạn, không phải cửa sổ trượt.
+    """
+    hours: set[int] = set()
+    for state in _STATE.values():
+        for hour, b in state["hourly"].items():
+            if b["msgs"]:
+                hours.add(hour)
+    return sorted(hours)
+
+
+def history_start() -> float | None:
+    """Mốc thời gian sớm nhất còn dữ liệu transcript - để biết ước lượng có đủ nền hay không."""
+    hours = [h for state in _STATE.values() for h in state["hourly"]]
+    return min(hours) * _HOUR if hours else None
 
 
 def events(session_id: str) -> list[dict]:

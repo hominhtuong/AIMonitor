@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Chạy AI Monitor (macOS / Linux). Mặc định http://127.0.0.1:8899
+# Cổng 8899 bận thì tự chuyển sang cổng trống kế tiếp; nếu AI Monitor đang chạy rồi
+# thì chỉ mở lại tab cũ. URL thật luôn được in ra ở dòng cuối.
 set -euo pipefail
 cd "$(dirname "$0")"
 
