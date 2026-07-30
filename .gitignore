@@ -21,3 +21,6 @@ Thumbs.db
 
 # Git worktrees (isolated dev workspaces)
 .worktrees/
+
+# Subagent-driven-development workspace (scratch)
+.superpowers/
