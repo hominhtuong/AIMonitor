@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ChildProcess } from 'node:child_process';
-import { spawnAimonServer, waitForServer, stopAimonServer } from './serverManager';
+import { spawnAimonServer, waitForServer, stopAimonServer, probeVersion, getSpawnInfo } from './serverManager';
+import { readInstanceFile, AimonInstance } from './instanceFile';
 
 function escapeHtml(text: string): string {
   return text
@@ -18,16 +19,21 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
-    if (this.proc) {
-      stopAimonServer(this.proc);
-      this.proc = undefined;
-    }
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.loadingHtml();
 
+    // Dừng server khi webview bị dispose (vd panel bị đóng) thay vì để nó sống tới tận
+    // deactivate(). Lưu ý: trên Windows, SIGTERM không khiến finally trong server.py chạy
+    // (giới hạn Node/Windows: SIGTERM map sang TerminateProcess) - out of scope lượt fix này.
+    webviewView.onDidDispose(() => {
+      if (this.proc) {
+        stopAimonServer(this.proc);
+        this.proc = undefined;
+      }
+    });
+
     try {
-      this.proc = spawnAimonServer(this.extensionUri.fsPath);
-      const instance = await waitForServer();
+      const instance = await this.ensureServer();
       const external = await vscode.env.asExternalUri(
         vscode.Uri.parse(`http://${instance.host}:${instance.port}/`)
       );
@@ -35,7 +41,33 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       webviewView.webview.html = this.errorHtml(message);
+      if (this.proc && getSpawnInfo(this.proc)?.enoent) {
+        vscode.window.showErrorMessage(
+          'AI Monitor could not find a Python 3 interpreter on PATH. ' +
+            'Install Python 3 (https://www.python.org/downloads/) and reload the window.'
+        );
+      }
     }
+  }
+
+  /**
+   * Nếu một server aimon còn sống (đọc từ instance.json rồi probe HTTP), dùng lại nó thay vì
+   * kill-rồi-spawn-lại: spawn lại ngay sau kill gây race với cơ chế single-instance của
+   * server.py (instance.json cũ chưa kịp xoá khi tiến trình mới đã kiểm tra xong). Chỉ kill +
+   * spawn mới khi thật sự không có instance nào đang sống.
+   */
+  private async ensureServer(): Promise<AimonInstance> {
+    const existing = readInstanceFile();
+    if (existing && (await probeVersion(existing.host, existing.port))) {
+      return existing;
+    }
+
+    if (this.proc) {
+      stopAimonServer(this.proc);
+      this.proc = undefined;
+    }
+    this.proc = await spawnAimonServer(this.extensionUri.fsPath);
+    return waitForServer(undefined, undefined, undefined, this.proc);
   }
 
   dispose(): void {

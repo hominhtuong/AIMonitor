@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import * as http from 'node:http';
-import { spawnAimonServer, probeVersion, waitForServer } from '../src/serverManager';
+import { spawnAimonServer, probeVersion, waitForServer, getSpawnInfo } from '../src/serverManager';
 
 test('probeVersion resolves true when server responds 200', async () => {
   const server = http.createServer((_req, res) => {
@@ -52,10 +52,27 @@ test('waitForServer throws after timeout when readFn never returns a valid insta
 });
 
 test('spawnAimonServer does not crash when the binary does not exist', async () => {
-  const proc = spawnAimonServer('.', 'this-binary-does-not-exist-xyz');
-  await new Promise((resolve) => {
-    proc.once('error', resolve);
-    proc.once('exit', resolve);
-  });
-  assert.ok(true);
+  // spawnAimonServer đã tự await sự kiện 'spawn'/'error' bên trong (waitForSpawnOutcome),
+  // nên khi Promise trả về đã resolve thì sự kiện 'error' cho candidate cuối cùng đã bắn rồi
+  // (once-listener không bắn lại lần hai) - test chỉ cần đọc SpawnInfo, không chờ sự kiện nữa.
+  const proc = await spawnAimonServer('.', ['this-binary-does-not-exist-xyz']);
+  const info = getSpawnInfo(proc);
+  assert.ok(info);
+  assert.equal(info?.enoent, true);
+});
+
+test('spawnAimonServer falls back to next candidate on ENOENT', async () => {
+  const proc = await spawnAimonServer('.', ['this-binary-does-not-exist-xyz', 'this-one-either']);
+  const info = getSpawnInfo(proc);
+  assert.ok(info);
+  assert.equal(info?.pythonBin, 'this-one-either');
+  assert.equal(info?.enoent, true);
+});
+
+test('waitForServer includes ENOENT hint in timeout message when proc spawn info is available', async () => {
+  const proc = await spawnAimonServer('.', ['this-binary-does-not-exist-xyz']);
+  await assert.rejects(
+    () => waitForServer(10, 50, () => null, proc),
+    /not found on PATH/
+  );
 });

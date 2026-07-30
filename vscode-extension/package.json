@@ -31,7 +31,7 @@
     }
   },
   "scripts": {
-    "compile": "node esbuild.js",
+    "compile": "npm run prepackage && node esbuild.js",
     "watch": "node esbuild.js --watch",
     "test": "node --require ts-node/register --test test/*.test.ts",
     "prepackage": "node scripts/copy-aimon.js",

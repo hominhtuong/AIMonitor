@@ -3,4 +3,5 @@ dist/
 out/
 aimon/
 media/
+pricing.json
 *.vsix
