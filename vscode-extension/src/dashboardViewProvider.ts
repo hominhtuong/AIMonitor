@@ -18,6 +18,10 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
+    if (this.proc) {
+      stopAimonServer(this.proc);
+      this.proc = undefined;
+    }
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.loadingHtml();
 
