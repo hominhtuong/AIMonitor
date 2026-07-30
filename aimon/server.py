@@ -44,7 +44,7 @@ BASE = os.path.join(sys._MEIPASS, "aimon") if getattr(sys, "frozen", False) else
 STATIC_DIR = os.path.join(BASE, "static")
 IS_WINDOWS = sys.platform.startswith("win")
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 DEFAULT_PORT = 8899
 PORT_SCAN_TRIES = 20  # 8899..8919 rồi mới xin cổng ngẫu nhiên
@@ -79,32 +79,32 @@ def _signal_posix(pid: int, name: str) -> None:
     os.kill(pid, sig)
 
 
-ACTION_NAMES = {
-    "pause": "tạm dừng",
-    "resume": "tiếp tục",
-    "kill": "kill",
-    "force_kill": "kill cứng",
-    "kill_tree": "kill cây",
-    "pause_tree": "tạm dừng cây",
-    "resume_tree": "tiếp tục cây",
-}
+# Chỉ dùng để kiểm tra hành động hợp lệ. Tên hiển thị nằm ở bảng dịch của UI, không ở đây.
+VALID_ACTIONS = (
+    "pause", "resume", "kill", "force_kill", "kill_tree", "pause_tree", "resume_tree",
+)
+
+
+def _err(key: str, args: dict, english: str) -> dict:
+    return {"ok": False, "error_key": key, "error_args": args, "error": english}
 
 
 def do_action(action: str, pid: int) -> dict:
-    if action not in ACTION_NAMES:
-        return {"ok": False, "error": f"Hành động không hợp lệ: {action}"}
+    # Lỗi trả về kèm error_key + error_args để UI dựng câu theo ngôn ngữ đang chọn;
+    # `error` giữ bản tiếng Anh cho ai gọi API bằng curl.
+    if action not in VALID_ACTIONS:
+        return _err("err.bad_action", {"action": action}, f"Invalid action: {action}")
     if IS_WINDOWS and action in ("pause", "resume", "pause_tree", "resume_tree"):
-        return {"ok": False, "error": "Windows không hỗ trợ tạm dừng tiến trình (không có SIGSTOP)."}
+        return _err("err.no_pause_windows", {},
+                    "Windows cannot suspend processes (no SIGSTOP).")
 
     procs = P.snapshot()
     if pid not in procs:
-        return {"ok": False, "error": f"PID {pid} không còn tồn tại"}
+        return _err("err.pid_gone", {"pid": pid}, f"PID {pid} no longer exists")
     protected = SNAP.protected_pids(procs)
     if pid in protected:
-        return {
-            "ok": False,
-            "error": f"PID {pid} được bảo vệ (là chính AI Monitor hoặc tiến trình cha của nó)",
-        }
+        return _err("err.protected", {"pid": pid},
+                    f"PID {pid} is protected (AI Monitor itself or one of its parents)")
 
     kids = P.children_map(procs)
 
@@ -119,7 +119,7 @@ def do_action(action: str, pid: int) -> dict:
         killed, failed = [], []
         for t in targets:
             if t in protected:
-                failed.append({"pid": t, "error": "được bảo vệ"})
+                failed.append({"pid": t, "error_key": "err.protected_short", "error": "protected"})
                 continue
             try:
                 _kill_posix(t)
@@ -238,11 +238,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
-            return self._json({"ok": False, "error": "JSON không hợp lệ"}, 400)
+            return self._json(_err("err.bad_json", {}, "Invalid JSON"), 400)
         try:
             pid = int(payload.get("pid"))
         except (TypeError, ValueError):
-            return self._json({"ok": False, "error": "Thiếu PID"}, 400)
+            return self._json(_err("err.missing_pid", {}, "Missing PID"), 400)
         return self._json(do_action(str(payload.get("action") or ""), pid))
 
 

@@ -16,12 +16,12 @@ const S = {
   busy: false,
   modalOpen: false,
   caps: { pause: true, os: 'macos' },
-  fx: false,   // hiệu ứng sáng chữ khi số đổi - mặc định tắt
+  // Số vừa đổi thì chữ sáng lên rồi mờ dần về màu cũ trong 1.1s. Chỉ đổi màu chữ,
+  // không đụng nền và không đổi kích thước nên không gây giật. Không còn công tắc.
+  fx: true,
   hist: null,        // kết quả /api/sessions - nạp lười, không nằm trong vòng 3 giây
   histBusy: false,
 };
-
-try { S.fx = localStorage.getItem('aimon.fx') === '1'; } catch (e) { /* chế độ riêng tư */ }
 
 /* ------------------------------------------------------------- tiện ích */
 const $ = (sel) => document.querySelector(sel);
@@ -63,11 +63,37 @@ function dayOf(ts) {
 }
 function barClass(pct) { return pct >= 85 ? 'r' : pct >= 60 ? 'a' : 'g'; }
 
+/* Nhãn loại tiến trình: tên sản phẩm (Claude Code, MCP server...) giữ nguyên, chỉ dịch
+ * mấy nhãn chung như Other/Browser/Editor. Backend gửi `kind`, `label` là bản tiếng Anh. */
+function kindLabel(o) {
+  const key = 'kind.' + (o.kind || 'other');
+  const v = t(key);
+  return v === key ? (o.label || o.kind || '') : v;
+}
+
+/* Chuỗi do backend sinh: ưu tiên mã + tham số, không có thì lấy bản tiếng Anh nó gửi kèm. */
+function noteText(w) {
+  return w.note_key ? t(w.note_key, fmtArgs(w.note_args)) : (w.note || '');
+}
+function errText(d) {
+  if (d.error_key) return t(d.error_key, fmtArgs(d.error_args));
+  return d.error || t('common.unknown_error');
+}
+/** Tham số `age` từ backend là giây - đổi sang chuỗi thời lượng theo ngôn ngữ đang dùng. */
+function fmtArgs(args) {
+  const out = Object.assign({}, args || {});
+  if (out.age != null) out.age = fmtDur(out.age);
+  if (out.pct != null) out.pct = Math.round(out.pct);
+  if (out.drift != null) out.drift = Math.round(out.drift);
+  return out;
+}
+
 /* ------------------------------------------------------------- morph DOM */
 function frag(html) {
-  const t = document.createElement('template');
-  t.innerHTML = html;
-  return t.content;
+  // đặt tên tpl chứ không phải t: t() là hàm dịch, che nó ở đây rất dễ sinh lỗi ngầm
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  return tpl.content;
 }
 const sameType = (a, b) =>
   a.nodeType === b.nodeType && (a.nodeType !== 1 || a.tagName === b.tagName);
@@ -154,6 +180,13 @@ function setText(sel, text) {
   if (el && el.textContent !== text) el.textContent = text;
 }
 
+/** Nhãn trạng thái: bình thường ẩn hẳn, chỉ bật lên khi mất kết nối hoặc đã dừng. */
+function setStatus(text) {
+  const el = $('#stamp');
+  if (!el) return;
+  if (text) { setText('#stamp', text); el.hidden = false; } else { el.hidden = true; }
+}
+
 /* ------------------------------------------------------------- modal + toast */
 function toast(msg, kind) {
   const el = document.createElement('div');
@@ -195,12 +228,12 @@ async function loadSnapshot() {
   try {
     const r = await fetch('/api/snapshot', { cache: 'no-store' });
     const data = await r.json();
-    if (data.error) { toast('Lỗi snapshot: ' + data.error, 'err'); return; }
+    if (data.error) { toast(t('err.snapshot', { msg: data.error }), 'err'); return; }
     S.snap = data;
     S.caps = data.capabilities || S.caps;
     renderAll();
   } catch (e) {
-    setText('#stamp', 'mất kết nối server');
+    setStatus(t('err.disconnected'));
   } finally {
     S.busy = false;
   }
@@ -215,18 +248,13 @@ async function loadEvents(sid) {
   } catch (e) { /* bỏ qua */ }
 }
 
-const ACT_NAME = {
-  pause: 'tạm dừng', resume: 'tiếp tục', kill: 'kill', force_kill: 'kill cứng',
-  kill_tree: 'kill cây', pause_tree: 'tạm dừng cây', resume_tree: 'tiếp tục cây',
-};
-
 async function act(action, pid, label, supervisor) {
   const destructive = action === 'kill' || action === 'force_kill' || action === 'kill_tree';
   if (destructive) {
     const ok = await askConfirm(
-      `${ACT_NAME[action]} PID ${pid}?`,
+      t('confirm.title', { action: t('act.' + action), pid }),
       label || '',
-      supervisor ? `Tiến trình này do ${supervisor} quản lý - nó có thể tự khởi động lại sau khi kill.` : ''
+      supervisor ? t('ai.supervised_hint', { name: supervisor }) : ''
     );
     if (!ok) return;
   }
@@ -239,13 +267,18 @@ async function act(action, pid, label, supervisor) {
     const d = await r.json();
     if (d.ok) {
       const n = d.killed ? d.killed.length : d.affected ? d.affected.length : 0;
-      toast(`Đã ${ACT_NAME[action]} PID ${pid}${n > 1 ? ` (${n} tiến trình)` : ''}`, 'ok');
+      toast(t('toast.done', {
+        action: t('act.' + action), pid,
+        extra: n > 1 ? t('toast.done_n', { n }) : '',
+      }), 'ok');
     } else {
-      toast(`Không ${ACT_NAME[action]} được PID ${pid}: ${d.error || 'lỗi không rõ'}`, 'err');
+      toast(t('toast.fail', {
+        action: t('act.' + action), pid, msg: errText(d),
+      }), 'err');
     }
-    if (d.failed && d.failed.length) toast(`${d.failed.length} tiến trình con không xử lý được`, 'err');
+    if (d.failed && d.failed.length) toast(t('toast.children_failed', { n: d.failed.length }), 'err');
   } catch (e) {
-    toast('Gọi API thất bại: ' + e.message, 'err');
+    toast(t('toast.api_failed', { msg: e.message }), 'err');
   }
   setTimeout(loadSnapshot, 350);
 }
@@ -260,8 +293,10 @@ function renderAll() {
   renderClosed();
   renderRes();
   renderNet();
-  setText('#stamp', 'cập nhật ' + clockOf(S.snap.ts));
-  setText('#ver', (S.caps.os || '') + (S.caps.pause ? '' : ' · không hỗ trợ tạm dừng'));
+  setStatus('');   // chạy bình thường thì không cần nhãn nào
+  // giờ cập nhật chuyển thành tooltip của nút Làm mới, không chiếm chỗ trên thanh đầu
+  $('#refresh').title = t('hdr.updated', { time: clockOf(S.snap.ts) });
+  setText('#ver', (S.caps.os || '') + (S.caps.pause ? '' : t('hdr.no_pause')));
 }
 
 function renderHeader() {
@@ -278,20 +313,21 @@ function renderHeader() {
   ab.className = 'bar ' + barClass(aiPct * 2);
   ab.firstElementChild.style.width = Math.min(100, aiPct) + '%';
 
-  const loadTxt = sys.load && sys.load.length ? `load ${sys.load[0]} · ` : '';
-  setText('#load', `${loadTxt}${sys.cpu_count} lõi · ${sys.proc_count} tiến trình`);
-  const el = $('#load');
-  if (sys.load && sys.load.length) el.title = `Load average 1/5/15 phút: ${sys.load.join(' / ')}`;
+  // Nhãn chỉ còn số tiến trình cho gọn; load average và số lõi đẩy vào tooltip.
+  setText('#load', t('hdr.procs', { procs: sys.proc_count }));
+  $('#load').title = sys.load && sys.load.length
+    ? t('hdr.load_hint', { cores: sys.cpu_count, load: sys.load.join(' / ') })
+    : t('hdr.cores_hint', { cores: sys.cpu_count });
 }
 
 /* Nhãn ngắn cho từng nguồn số. Luôn nói rõ số đến từ đâu thay vì lặng lẽ đổi ý nghĩa
  * con số to - người dùng nhìn ô này để quyết định còn chạy tiếp được bao lâu. */
 const SRC_BADGE = {
   official: '',
-  projected: 'có bù',
-  official_stale: 'số cũ',
-  estimate: 'ước lượng',
-  none: 'chưa có số',
+  projected: 'src.projected',
+  official_stale: 'src.official_stale',
+  estimate: 'src.estimate',
+  none: 'src.none',
 };
 
 /** 1 ô hạn mức. Số to luôn là %; backend đã chốt sẵn lấy % từ nguồn nào. */
@@ -300,64 +336,67 @@ function gauge(key, title, w) {
   const pct = w.pct;
   const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
   const big = pct == null ? '--' : (w.source === 'official' ? '' : '≈') + Math.round(pct) + '%';
-  const badge = SRC_BADGE[w.source] || '';
+  const badgeKey = SRC_BADGE[w.source] || '';
+  const badge = badgeKey ? t(badgeKey) : '';
 
   const bits = [];
-  if (w.resets_in > 0) bits.push('Reset sau ' + fmtDur(w.resets_in));
-  else bits.push('Chưa xác định được mốc reset');
+  bits.push(w.resets_in > 0 ? t('usage.resets_in', { dur: fmtDur(w.resets_in) }) : t('usage.no_reset'));
   // Nói rõ số to gồm những gì, để không ai tưởng đó là số chính thức tuyệt đối
   if (w.source === 'projected') {
-    bits.push(`${Math.round(w.official_pct)}% cách đây ${fmtDur(w.official_age_sec)} + ~${Math.round(w.drift_pct)}% ước tính`);
+    bits.push(t('usage.breakdown', {
+      pct: Math.round(w.official_pct), age: fmtDur(w.official_age_sec), drift: Math.round(w.drift_pct),
+    }));
   } else if (w.source === 'official_stale' && w.official_age_sec) {
-    bits.push('đọc cách đây ' + fmtDur(w.official_age_sec));
+    bits.push(t('usage.read_ago', { age: fmtDur(w.official_age_sec) }));
   }
 
-  return `<div class="ubox" data-key="u-${key}" title="${esc(w.note || '')}">
+  return `<div class="ubox" data-key="u-${key}" title="${esc(noteText(w))}">
     <div class="hdr"><b>${esc(title)}</b>
       ${badge ? `<span class="src">${esc(badge)}</span>` : ''}
       <span class="pct${pct == null ? ' off' : ''}" data-flash="1">${esc(big)}</span></div>
     <div class="bar lg ${pct == null ? '' : barClass(p)}"><i style="width:${p}%"></i></div>
     <div class="sub">${esc(bits.join(' · '))}</div>
-    <div class="loc" data-flash="1">${fmtTok(w.tokens)} token · ${money(w.cost)} · ${w.msgs || 0} lượt gọi</div>
+    <div class="loc" data-flash="1">${fmtTok(w.tokens)} ${t('common.tokens')} · ${money(w.cost)} · ${w.msgs || 0} ${t('common.calls')}</div>
   </div>`;
 }
 
 /** Row trên: thống kê Claude (hạn mức + token + chi phí hôm nay). */
 function renderUsage() {
-  const s = S.snap, t = s.totals;
+  const s = S.snap, tot = s.totals;
   const u = s.usage || {};
   const loc = u.local || {};
   const d7 = loc.d7 || { total: 0, cost: 0, msgs: 0 };
 
   render('#usage',
-    gauge('h5', 'Session (5 giờ)', u.five_hour) +
-    gauge('d7', 'Weekly (7 ngày)', u.seven_day) +
+    gauge('h5', t('usage.session'), u.five_hour) +
+    gauge('d7', t('usage.weekly'), u.seven_day) +
     `<div class="ubox" data-key="u-tok">
-      <div class="hdr"><b>Token API hôm nay</b><span class="pct" data-flash="1">${fmtTok(t.today.total)}</span></div>
-      <div class="sub">${t.today.msgs} lượt gọi · tính từ 00:00</div>
-      <div class="loc" data-flash="1">Ra ${fmtTok(t.today.output)} · cache read ${fmtTok(t.today.cache_read)}</div>
+      <div class="hdr"><b>${t('usage.tokens_today')}</b><span class="pct" data-flash="1">${fmtTok(tot.today.total)}</span></div>
+      <div class="sub">${esc(t('usage.calls_since', { n: tot.today.msgs }))}</div>
+      <div class="loc" data-flash="1">${esc(t('usage.out_cache', {
+        out: fmtTok(tot.today.output), cache: fmtTok(tot.today.cache_read) }))}</div>
     </div>
     <div class="ubox" data-key="u-cost">
-      <div class="hdr"><b>Chi phí hôm nay</b><span class="pct" data-flash="1">${money(t.today.cost)}</span></div>
-      <div class="sub">${t.sessions_today} phiên · quy đổi theo pricing.json</div>
-      <div class="loc" data-flash="1">7 ngày qua: ${money(d7.cost)}</div>
+      <div class="hdr"><b>${t('usage.cost_today')}</b><span class="pct" data-flash="1">${money(tot.today.cost)}</span></div>
+      <div class="sub">${esc(t('usage.sessions_priced', { n: tot.sessions_today }))}</div>
+      <div class="loc" data-flash="1">${esc(t('usage.last_7d', { cost: money(d7.cost) }))}</div>
     </div>`);
 }
 
 /** Row dưới: tiến trình - phiên Claude, MCP server, RAM, CPU. */
 function renderKpis() {
-  const s = S.snap, t = s.totals, sys = s.system;
+  const s = S.snap, tot = s.totals, sys = s.system;
   const mcp = s.groups.find((g) => g.kind === 'mcp') || { count: 0, rss_kb: 0 };
   const running = s.ai.filter((r) => r.session && r.session.pending.length).length;
   const cards = [
-    { k: 'live', n: t.live, l: 'Phiên Claude Code sống',
-      s: running ? `${running} phiên đang thao tác` : 'tất cả đang rảnh' },
-    { k: 'mcp', n: mcp.count, l: 'MCP server', s: fmtKB(mcp.rss_kb) + ' RAM' },
-    { k: 'ram', n: fmtKB(sys.ai_rss_kb), l: 'RAM do AI chiếm',
-      s: `${sys.mem_total_kb ? (sys.ai_rss_kb / sys.mem_total_kb * 100).toFixed(0) : 0}% RAM máy`,
+    { k: 'live', n: tot.live, l: t('kpi.live'),
+      s: running ? t('kpi.live_busy', { n: running }) : t('kpi.live_idle') },
+    { k: 'mcp', n: mcp.count, l: t('kpi.mcp'), s: t('kpi.ram_of', { ram: fmtKB(mcp.rss_kb) }) },
+    { k: 'ram', n: fmtKB(sys.ai_rss_kb), l: t('kpi.ram'),
+      s: t('kpi.ram_sub', { pct: sys.mem_total_kb ? (sys.ai_rss_kb / sys.mem_total_kb * 100).toFixed(0) : 0 }),
       hot: sys.ai_rss_kb > sys.mem_total_kb * 0.35 },
-    { k: 'cpu', n: (sys.ai_cpu_pct || 0).toFixed(1) + '%', l: 'CPU do AI chiếm',
-      s: `${sys.cpu_count} lõi · ${s.ai.length} tiến trình AI gốc`,
+    { k: 'cpu', n: (sys.ai_cpu_pct || 0).toFixed(1) + '%', l: t('kpi.cpu'),
+      s: t('kpi.cpu_sub', { cores: sys.cpu_count, n: s.ai.length }),
       hot: (sys.ai_cpu_pct || 0) > 100 },
   ];
   render('#kpis', cards.map((c) =>
@@ -369,14 +408,14 @@ function renderKpis() {
 
 function renderChips() {
   render('#chips', S.snap.groups.map((g) =>
-    `<span class="chip" data-kind="${esc(g.kind)}" data-key="c-${esc(g.kind)}"><i class="dot"></i>${esc(g.label)} <b>${g.count}</b> · ${fmtKB(g.rss_kb)}${g.cpu_pct > 0.5 ? ' · ' + g.cpu_pct + '% CPU' : ''}</span>`
-  ).join('') || '<span class="chip" data-key="c-none">Không thấy tiến trình AI nào</span>');
+    `<span class="chip" data-kind="${esc(g.kind)}" data-key="c-${esc(g.kind)}"><i class="dot"></i>${esc(kindLabel(g))} <b>${g.count}</b> · ${fmtKB(g.rss_kb)}${g.cpu_pct > 0.5 ? ' · ' + g.cpu_pct + '% CPU' : ''}</span>`
+  ).join('') || `<span class="chip" data-key="c-none">${t('chips.none')}</span>`);
 }
 
 function pauseBtn(pid, paused, tree) {
   if (!S.caps.pause) return '';
   const a = (paused ? 'resume' : 'pause') + (tree ? '_tree' : '');
-  const label = paused ? (tree ? 'Tiếp tục cây' : 'Tiếp tục') : (tree ? 'Tạm dừng cây' : 'Dừng');
+  const label = t('btn.' + (paused ? 'resume' : 'pause') + (tree ? '_tree' : ''));
   return `<button class="mini${paused ? '' : ' warn'}" data-act="${a}" data-pid="${pid}">${label}</button>`;
 }
 
@@ -384,12 +423,12 @@ function kidRow(node, depth) {
   const heavy = node.rss_tree_kb > 400 * 1024;
   return `<div class="kid${heavy ? ' heavy' : ''}" data-key="kid-${node.pid}">
       <span class="ind">${'   '.repeat(depth)}</span>
-      <span class="badge${node.kind === 'mcp' ? '' : ' dim'}">${esc(node.label)}</span>
+      <span class="badge${node.kind === 'mcp' ? '' : ' dim'}">${esc(kindLabel(node))}</span>
       <span class="nm">${esc(node.name)}</span>
       <span class="cmd">${esc(node.cmd.slice(0, 170))}</span>
-      <span class="num" data-flash="1">PID ${node.pid} · ${fmtKB(node.rss_tree_kb)}${node.cpu_pct > 0.5 ? ' · ' + node.cpu_pct + '%' : ''}${node.paused ? ' · tạm dừng' : ''}</span>
+      <span class="num" data-flash="1">PID ${node.pid} · ${fmtKB(node.rss_tree_kb)}${node.cpu_pct > 0.5 ? ' · ' + node.cpu_pct + '%' : ''}${node.paused ? ' · ' + t('ai.paused_badge') : ''}</span>
       <span class="acts">${pauseBtn(node.pid, node.paused, false)}
-        <button class="mini danger" data-act="kill_tree" data-pid="${node.pid}" data-label="${esc(node.label + ' - ' + node.name)}">Kill</button>
+        <button class="mini danger" data-act="kill_tree" data-pid="${node.pid}" data-label="${esc(kindLabel(node) + ' - ' + node.name)}">${t('btn.kill')}</button>
       </span>
     </div>` + (node.children || []).map((c) => kidRow(c, depth + 1)).join('');
 }
@@ -399,7 +438,7 @@ function sessionCard(r) {
   const doing = s && s.pending.length ? s.pending[0] : null;
   const active = !!doing && !r.paused;
   const cls = r.paused ? 'paused' : active ? 'active' : '';
-  const title = s ? (s.title || r.session_name || 'Phiên không tên') : (r.session_name || r.label);
+  const title = s ? (s.title || r.session_name || t('ai.untitled')) : (r.session_name || kindLabel(r));
   const path = s ? (s.cwd || '') : '';
   const kidsOpen = S.openKids.has(r.pid);
   const evOpen = !!(s && S.openEvents.has(s.session_id));
@@ -409,51 +448,51 @@ function sessionCard(r) {
   if (s && s.git_branch) badges.push(`<span class="badge branch">${esc(s.git_branch)}</span>`);
   if (s && s.mode && s.mode !== 'default') badges.push(`<span class="badge warn">${esc(s.mode)}</span>`);
   if (r.entrypoint) badges.push(`<span class="badge dim">${esc(r.entrypoint)}</span>`);
-  if (r.supervisor) badges.push(`<span class="badge warn" title="Tiến trình do ${esc(r.supervisor)} quản lý, kill xong có thể tự bật lại">${esc(r.supervisor)} quản lý</span>`);
-  if (r.paused) badges.push('<span class="badge warn">đã tạm dừng</span>');
+  if (r.supervisor) badges.push(`<span class="badge warn" title="${esc(t('ai.supervised_hint', { name: r.supervisor }))}">${esc(t('ai.supervised', { name: r.supervisor }))}</span>`);
+  if (r.paused) badges.push(`<span class="badge warn">${t('ai.paused_badge')}</span>`);
 
   let stats;
   if (s) {
     const tk = s.tokens, td = s.today || { total: 0, cost: 0 };
     stats = `<div class="grid">
-      <div class="cell"><div class="v" data-flash="1">${fmtTok(td.total)}</div><div class="k">token hôm nay (${money(td.cost)})</div></div>
-      <div class="cell"><div class="v" data-flash="1">${fmtTok(s.api_total)}</div><div class="k">token cả phiên (vào ${fmtTok(tk.input)} · ra ${fmtTok(tk.output)})</div></div>
-      <div class="cell"><div class="v" data-flash="1">${money(s.cost_usd)}</div><div class="k">chi phí cả phiên</div></div>
-      <div class="cell"><div class="v" data-flash="1">${s.user_turns} / ${s.assistant_msgs}</div><div class="k">lượt hỏi / lượt trả lời</div></div>
-      <div class="cell"><div class="v" data-flash="1">${s.agents_total}</div><div class="k">sub-agent đã gọi${s.agents_running.length ? ' · ' + s.agents_running.length + ' đang chạy' : ''}</div></div>
-      <div class="cell"><div class="v" data-flash="1">${fmtKB(r.rss_tree_kb)}</div><div class="k">RAM cả cây (${r.children.length} con)</div></div>
-      <div class="cell"><div class="v" data-flash="1">${r.cpu_tree_pct}%</div><div class="k">CPU cả cây</div></div>
-      <div class="cell"><div class="v">${fmtDur(r.uptime)}</div><div class="k">thời gian chạy</div></div>
+      <div class="cell"><div class="v" data-flash="1">${fmtTok(td.total)}</div><div class="k">${esc(t('ai.tok_today', { cost: money(td.cost) }))}</div></div>
+      <div class="cell"><div class="v" data-flash="1">${fmtTok(s.api_total)}</div><div class="k">${esc(t('ai.tok_session', { in: fmtTok(tk.input), out: fmtTok(tk.output) }))}</div></div>
+      <div class="cell"><div class="v" data-flash="1">${money(s.cost_usd)}</div><div class="k">${t('ai.cost_session')}</div></div>
+      <div class="cell"><div class="v" data-flash="1">${s.user_turns} / ${s.assistant_msgs}</div><div class="k">${t('ai.turns')}</div></div>
+      <div class="cell"><div class="v" data-flash="1">${s.agents_total}</div><div class="k">${t('ai.subagents')}${s.agents_running.length ? esc(t('ai.subagents_running', { n: s.agents_running.length })) : ''}</div></div>
+      <div class="cell"><div class="v" data-flash="1">${fmtKB(r.rss_tree_kb)}</div><div class="k">${esc(t('ai.ram_tree', { n: r.children.length }))}</div></div>
+      <div class="cell"><div class="v" data-flash="1">${r.cpu_tree_pct}%</div><div class="k">${t('ai.cpu_tree')}</div></div>
+      <div class="cell"><div class="v">${fmtDur(r.uptime)}</div><div class="k">${t('ai.runtime')}</div></div>
     </div>
     <div class="ctx">
-      <div class="lbl"><span>Context phiên hiện tại</span><span>${fmtTok(s.context)} / ${fmtTok(s.context_window)} (${s.context_pct}%)</span></div>
+      <div class="lbl"><span>${t('ai.context')}</span><span>${fmtTok(s.context)} / ${fmtTok(s.context_window)} (${s.context_pct}%)</span></div>
       <div class="bar ${barClass(s.context_pct)}"><i style="width:${Math.min(100, s.context_pct)}%"></i></div>
     </div>`;
   } else {
     stats = `<div class="grid">
-      <div class="cell"><div class="v" data-flash="1">${fmtKB(r.rss_tree_kb)}</div><div class="k">RAM cả cây</div></div>
-      <div class="cell"><div class="v" data-flash="1">${r.cpu_tree_pct}%</div><div class="k">CPU cả cây</div></div>
-      <div class="cell"><div class="v">${fmtDur(r.uptime)}</div><div class="k">thời gian chạy</div></div>
-      <div class="cell"><div class="v">${r.children.length}</div><div class="k">tiến trình con</div></div>
+      <div class="cell"><div class="v" data-flash="1">${fmtKB(r.rss_tree_kb)}</div><div class="k">${t('ai.ram_tree_plain')}</div></div>
+      <div class="cell"><div class="v" data-flash="1">${r.cpu_tree_pct}%</div><div class="k">${t('ai.cpu_tree')}</div></div>
+      <div class="cell"><div class="v">${fmtDur(r.uptime)}</div><div class="k">${t('ai.runtime')}</div></div>
+      <div class="cell"><div class="v">${r.children.length}</div><div class="k">${t('ai.children')}</div></div>
     </div>
-    <div class="doing"><span class="idle">Loại này không có transcript token để đọc - chỉ theo dõi tài nguyên.</span></div>`;
+    <div class="doing"><span class="idle">${t('ai.no_transcript')}</span></div>`;
   }
 
   let doingBlock = '';
   if (s) {
     if (doing) {
-      const more = s.pending.length > 1 ? ` <span class="el">+${s.pending.length - 1} tool khác đang chờ</span>` : '';
-      doingBlock = `<div class="doing run">Đang chạy: <code>${esc(doing.brief)}</code> <span class="el">${fmtDur(doing.elapsed)}${doing.side ? ' · trong sub-agent' : ''}</span>${more}</div>`;
+      const more = s.pending.length > 1 ? ` <span class="el">${esc(t('ai.more_pending', { n: s.pending.length - 1 }))}</span>` : '';
+      doingBlock = `<div class="doing run">${t('ai.doing')}<code>${esc(doing.brief)}</code> <span class="el">${fmtDur(doing.elapsed)}${doing.side ? t('ai.in_subagent') : ''}</span>${more}</div>`;
     } else {
-      doingBlock = `<div class="doing"><span class="idle">Rảnh${s.idle != null ? ' ' + fmtDur(s.idle) : ''}${s.last_prompt ? ' · lệnh cuối: ' + esc(s.last_prompt.slice(0, 90)) : ''}</span></div>`;
+      doingBlock = `<div class="doing"><span class="idle">${t('ai.idle')}${s.idle != null ? ' ' + fmtDur(s.idle) : ''}${s.last_prompt ? t('ai.last_prompt') + esc(s.last_prompt.slice(0, 90)) : ''}</span></div>`;
     }
     if (s.agents_running.length) {
       doingBlock += '<div class="doing run">' + s.agents_running.map((a) =>
-        `Sub-agent <code>${esc(a.type)}</code> ${esc(a.desc)} <span class="el">${fmtDur(a.elapsed)}</span>`
+        `${t('ai.subagent')} <code>${esc(a.type)}</code> ${esc(a.desc)} <span class="el">${fmtDur(a.elapsed)}</span>`
       ).join('<br>') + '</div>';
     }
     if (s.top_tools.length) {
-      doingBlock += `<div class="doing"><span class="idle">Tool dùng nhiều: ${s.top_tools.map((t) => esc(t.name) + ' ×' + t.count).join(' · ')}</span></div>`;
+      doingBlock += `<div class="doing"><span class="idle">${t('ai.top_tools')}${s.top_tools.map((x) => esc(x.name) + ' ×' + x.count).join(' · ')}</span></div>`;
     }
   }
 
@@ -465,7 +504,7 @@ function sessionCard(r) {
     const list = S.events[s.session_id];
     evBlock = '<div class="events">' + (list && list.length
       ? list.map((e, i) => `<div class="ev ${esc(e.kind)}" data-key="ev-${i}"><span class="t">${clockOf(e.ts)}</span><span class="x">${esc(e.text)}</span></div>`).join('')
-      : '<div class="ev"><span class="x">Chưa có dữ liệu dòng thời gian.</span></div>') + '</div>';
+      : `<div class="ev"><span class="x">${t('ai.no_events')}</span></div>`) + '</div>';
   }
 
   return `<div class="sess ${cls}" data-key="sess-${r.pid}">
@@ -476,10 +515,10 @@ function sessionCard(r) {
       ${badges.join(' ')}
       <span class="badge dim">PID ${r.pid}</span>
       <span class="acts">
-        ${s ? `<button class="mini" data-act="events" data-sid="${esc(s.session_id)}">${evOpen ? 'Ẩn' : 'Dòng thời gian'}</button>` : ''}
-        ${r.children.length ? `<button class="mini" data-act="kids" data-pid="${r.pid}">${kidsOpen ? 'Ẩn cây' : 'Cây con (' + r.children.length + ')'}</button>` : ''}
+        ${s ? `<button class="mini" data-act="events" data-sid="${esc(s.session_id)}">${evOpen ? t('ai.hide') : t('ai.timeline')}</button>` : ''}
+        ${r.children.length ? `<button class="mini" data-act="kids" data-pid="${r.pid}">${kidsOpen ? t('ai.hide_tree') : t('ai.show_tree', { n: r.children.length })}</button>` : ''}
         ${pauseBtn(r.pid, r.paused, true)}
-        <button class="mini danger" data-act="kill_tree" data-pid="${r.pid}" data-label="${esc(title)}"${r.supervisor ? ` data-sup="${esc(r.supervisor)}"` : ''}>Kill cây</button>
+        <button class="mini danger" data-act="kill_tree" data-pid="${r.pid}" data-label="${esc(title)}"${r.supervisor ? ` data-sup="${esc(r.supervisor)}"` : ''}>${t('btn.kill_tree')}</button>
       </span>
     </div>
     ${stats}${doingBlock}${kidsBlock}${evBlock}
@@ -490,7 +529,7 @@ function renderLive() {
   const list = S.snap.ai;
   render('#live', list.length
     ? list.map(sessionCard).join('')
-    : '<div class="empty" data-key="live-empty">Không có tiến trình AI nào đang chạy.</div>');
+    : `<div class="empty" data-key="live-empty">${t('ai.none')}</div>`);
 }
 
 function renderClosed() {
@@ -498,13 +537,13 @@ function renderClosed() {
   const since = range === 'today' ? (S.snap.today_start || 0) : (S.snap.ts - 7 * 86400);
   const rows = (S.snap.orphan_sessions || []).filter((s) => (s.last_ts || 0) >= since);
   if (!rows.length) {
-    render('#closed', `<div class="empty" data-key="closed-empty">Không có phiên đã đóng ${range === 'today' ? 'trong hôm nay (tính từ 00:00)' : 'trong 7 ngày qua'}.</div>`);
+    render('#closed', `<div class="empty" data-key="closed-empty">${t(range === 'today' ? 'closed.none_today' : 'closed.none_7d')}</div>`);
     return;
   }
   render('#closed', `<div class="tbl-wrap" data-key="closed-tbl"><table>
     <thead><tr>
-      <th>Phiên</th><th>Thư mục</th><th>Model</th>
-      <th class="num">Token API</th><th class="num">Context cuối</th><th class="num">Chi phí</th><th class="num">Hoạt động cuối</th>
+      <th>${t('col.session')}</th><th>${t('col.folder')}</th><th>${t('col.model')}</th>
+      <th class="num">${t('col.api_tokens')}</th><th class="num">${t('col.last_context')}</th><th class="num">${t('col.cost')}</th><th class="num">${t('col.last_active')}</th>
     </tr></thead><tbody>
     ${rows.map((s) => `<tr data-key="cs-${esc(s.session_id)}">
       <td class="nm">${esc((s.title || s.session_id).slice(0, 46))}</td>
@@ -526,20 +565,20 @@ async function loadHistory(force) {
   if (S.histBusy) return;
   if (S.hist && S.hist.range === range && !force) return renderHist();
   S.histBusy = true;
-  setText('#hist-meta', 'đang quét transcript...');
+  setText('#hist-meta', t('hist.scanning'));
   try {
     const r = await fetch('/api/sessions?days=' + encodeURIComponent(range), { cache: 'no-store' });
     const d = await r.json();
     if (d.error) {
-      toast('Không đọc được lịch sử: ' + d.error, 'err');
-      setText('#hist-meta', 'lỗi đọc transcript');
+      toast(t('hist.load_error', { msg: d.error }), 'err');
+      setText('#hist-meta', t('hist.scan_error'));
       return;
     }
     d.range = range;
     S.hist = d;
     renderHist();
   } catch (e) {
-    setText('#hist-meta', 'mất kết nối server');
+    setText('#hist-meta', t('err.disconnected'));
   } finally {
     S.histBusy = false;
   }
@@ -574,16 +613,16 @@ function renderHist() {
   if (!h) return;
   const T = h.totals;
   setText('#hist-meta',
-    `${h.scanned_files} file · quét ${h.scan_sec}s · sớm nhất ${dayOf(T.first_ts)}`);
+    t('hist.meta', { files: h.scanned_files, sec: h.scan_sec, day: dayOf(T.first_ts) }));
 
   render('#hist-kpis', [
-    { k: 'ses', n: T.sessions, l: 'Phiên đã ghi nhận',
-      s: T.msgs.toLocaleString('vi-VN') + ' lượt gọi API' },
-    { k: 'cost', n: money(T.cost_usd), l: 'Tổng chi phí quy đổi', s: 'giá API theo pricing.json' },
-    { k: 'tok', n: fmtTok(T.api_total), l: 'Tổng token API',
-      s: `ra ${fmtTok(T.output)} · cache read ${fmtTok(T.cache_read)}` },
-    { k: 'proj', n: h.projects.length, l: 'Project đã đụng tới',
-      s: h.projects.length ? 'nặng nhất: ' + h.projects[0].name : '-' },
+    { k: 'ses', n: T.sessions, l: t('hist.kpi_sessions'),
+      s: t('hist.kpi_sessions_sub', { n: T.msgs.toLocaleString() }) },
+    { k: 'cost', n: money(T.cost_usd), l: t('hist.kpi_cost'), s: t('hist.kpi_cost_sub') },
+    { k: 'tok', n: fmtTok(T.api_total), l: t('hist.kpi_tokens'),
+      s: t('hist.kpi_tokens_sub', { out: fmtTok(T.output), cache: fmtTok(T.cache_read) }) },
+    { k: 'proj', n: h.projects.length, l: t('hist.kpi_projects'),
+      s: h.projects.length ? t('hist.kpi_projects_sub', { name: h.projects[0].name }) : '-' },
   ].map((c) => `<div class="kpi" data-key="h-${c.k}">
       <div class="n">${esc(c.n)}</div><div class="l">${esc(c.l)}</div><div class="s">${esc(c.s)}</div>
     </div>`).join(''));
@@ -592,8 +631,8 @@ function renderHist() {
   render('#hist-proj', h.projects.length
     ? `<div class="tbl-wrap" data-key="hp-tbl"><table>
       <thead><tr>
-        <th>Project</th><th class="num">Phiên</th><th class="num">Lượt</th>
-        <th class="num">Token API</th><th class="num">Chi phí</th><th class="num">Tỷ trọng</th><th class="num">Gần nhất</th>
+        <th>${t('col.project')}</th><th class="num">${t('col.sessions')}</th><th class="num">${t('col.calls')}</th>
+        <th class="num">${t('col.api_tokens')}</th><th class="num">${t('col.cost')}</th><th class="num">${t('col.share')}</th><th class="num">${t('col.latest')}</th>
       </tr></thead><tbody>
       ${h.projects.map((p) => `<tr data-key="hp-${esc(p.name)}">
         <td class="nm">${esc(p.name)}</td>
@@ -605,17 +644,17 @@ function renderHist() {
         <td class="num">${dayOf(p.last_ts)}</td>
       </tr>`).join('')}
       </tbody></table></div>`
-    : '<div class="empty" data-key="hp-none">Chưa có phiên nào trong khoảng này.</div>');
+    : `<div class="empty" data-key="hp-none">${t('hist.none_range')}</div>`);
 
   const rows = histRows();
   const maxS = rows.reduce((m, r) => Math.max(m, r.cost_pct), 0);
-  setText('#hist-count', `${rows.length} / ${T.sessions} phiên`);
+  setText('#hist-count', t('hist.count', { shown: rows.length, total: T.sessions }));
   render('#hist-sess', rows.length
     ? `<div class="tbl-wrap" data-key="hs-tbl"><table>
       <thead><tr>
-        <th>Tác vụ</th><th>Thư mục</th><th>Model</th>
-        <th class="num">Lượt</th><th class="num">Token API</th><th class="num">Chi phí</th>
-        <th class="num">Tỷ trọng</th><th class="num">Hoạt động cuối</th>
+        <th>${t('col.task')}</th><th>${t('col.folder')}</th><th>${t('col.model')}</th>
+        <th class="num">${t('col.calls')}</th><th class="num">${t('col.api_tokens')}</th><th class="num">${t('col.cost')}</th>
+        <th class="num">${t('col.share')}</th><th class="num">${t('col.last_active')}</th>
       </tr></thead><tbody>
       ${rows.map((r) => `<tr data-key="hs-${esc(r.session_id)}">
         <td class="nm">${esc((r.title || r.last_prompt || r.session_id).slice(0, 60))}</td>
@@ -628,7 +667,7 @@ function renderHist() {
         <td class="num">${dayOf(r.last_ts)} ${clockOf(r.last_ts)}</td>
       </tr>`).join('')}
       </tbody></table></div>`
-    : '<div class="empty" data-key="hs-none">Không có phiên nào khớp bộ lọc.</div>');
+    : `<div class="empty" data-key="hs-none">${t('hist.none_filter')}</div>`);
 }
 
 function renderRes() {
@@ -642,19 +681,19 @@ function renderRes() {
     rows = rows.filter((p) => String(p.pid) === q || p.name.toLowerCase().includes(q) ||
       p.cmd.toLowerCase().includes(q) || p.label.toLowerCase().includes(q));
   }
-  setText('#res-count', `${rows.length} tiến trình · ${fmtKB(rows.reduce((a, p) => a + p.rss_kb, 0))}`);
+  setText('#res-count', t('res.count', { n: rows.length, ram: fmtKB(rows.reduce((a, p) => a + p.rss_kb, 0)) }));
   render('#res-body', rows.map((p) => `<tr class="${p.rss_kb > 400 * 1024 ? 'heavy ' : ''}${p.is_ai || p.in_ai_tree ? 'ai' : ''}" data-key="p-${p.pid}">
     <td class="num">${p.pid}</td>
-    <td class="nm">${esc(p.name)}${p.paused ? ' <span class="badge warn">tạm dừng</span>' : ''}<span class="cmd">${esc(p.cmd.slice(0, 200))}</span></td>
-    <td>${esc(p.label)}${p.in_ai_tree && !p.is_ai ? ' <span class="badge dim">trong cây AI</span>' : ''}</td>
+    <td class="nm">${esc(p.name)}${p.paused ? ` <span class="badge warn">${t('ai.paused_badge')}</span>` : ''}<span class="cmd">${esc(p.cmd.slice(0, 200))}</span></td>
+    <td>${esc(kindLabel(p))}${p.in_ai_tree && !p.is_ai ? ` <span class="badge dim">${t('res.in_ai_tree')}</span>` : ''}</td>
     <td class="num rss" data-flash="1">${fmtKB(p.rss_kb)}</td>
     <td class="num" data-flash="1">${p.cpu_pct < 0 ? '-' : p.cpu_pct + '%'}</td>
     <td class="num">${fmtDur(p.uptime)}</td>
     <td>${p.mine ? `${pauseBtn(p.pid, p.paused, false)}
-      <button class="mini danger" data-act="kill" data-pid="${p.pid}" data-label="${esc(p.name)}">Kill</button>
-      <button class="mini danger" data-act="kill_tree" data-pid="${p.pid}" data-label="${esc(p.name)}">Kill cây</button>`
-    : '<span class="badge dim">không phải của tôi</span>'}</td>
-  </tr>`).join('') || '<tr data-key="p-none"><td colspan="7">Không có dòng nào khớp bộ lọc.</td></tr>');
+      <button class="mini danger" data-act="kill" data-pid="${p.pid}" data-label="${esc(p.name)}">${t('btn.kill')}</button>
+      <button class="mini danger" data-act="kill_tree" data-pid="${p.pid}" data-label="${esc(p.name)}">${t('btn.kill_tree')}</button>`
+    : `<span class="badge dim">${t('res.not_mine')}</span>`}</td>
+  </tr>`).join('') || `<tr data-key="p-none"><td colspan="7">${t('res.none')}</td></tr>`);
 }
 
 function renderNet() {
@@ -662,19 +701,19 @@ function renderNet() {
   render('#port-body', (s.ports || []).map((p) => `<tr data-key="port-${p.port}-${p.addr}">
     <td class="num">${p.port}</td><td>${esc(p.addr)}</td><td class="num">${p.pid}</td>
     <td class="nm">${esc(p.command)}</td>
-    <td>${esc(p.note || '')}</td>
-    <td><button class="mini danger" data-act="kill" data-pid="${p.pid}" data-label="cổng ${p.port} - ${esc(p.command)}">Kill</button></td>
-  </tr>`).join('') || '<tr data-key="port-none"><td colspan="6">Không đọc được cổng nào (macOS/Linux cần lsof, Windows dùng netstat).</td></tr>');
+    <td>${esc(p.note_key ? t(p.note_key) : (p.note || ''))}</td>
+    <td><button class="mini danger" data-act="kill" data-pid="${p.pid}" data-label="${esc(t('net.port_label', { port: p.port, cmd: p.command }))}">${t('btn.kill')}</button></td>
+  </tr>`).join('') || `<tr data-key="port-none"><td colspan="6">${t('net.no_ports')}</td></tr>`);
 
   if (!s.docker_available) {
-    render('#docker', '<div class="empty" data-key="dk-none">Máy này chưa có Docker CLI - bỏ qua phần container.</div>');
+    render('#docker', `<div class="empty" data-key="dk-none">${t('net.no_docker')}</div>`);
     return;
   }
   render('#docker', (s.docker || []).length
-    ? `<div class="tbl-wrap" data-key="dk-tbl"><table><thead><tr><th>Tên</th><th>Image</th><th>Trạng thái</th><th>Cổng</th></tr></thead><tbody>
+    ? `<div class="tbl-wrap" data-key="dk-tbl"><table><thead><tr><th>${t('col.name')}</th><th>${t('col.image')}</th><th>${t('col.status')}</th><th>${t('col.ports')}</th></tr></thead><tbody>
       ${s.docker.map((c) => `<tr data-key="dk-${esc(c.id)}"><td class="nm">${esc(c.name)}</td><td>${esc(c.image)}</td><td>${esc(c.status)}</td><td>${esc(c.ports || '')}</td></tr>`).join('')}
       </tbody></table></div>`
-    : '<div class="empty" data-key="dk-empty">Không có container nào đang chạy.</div>');
+    : `<div class="empty" data-key="dk-empty">${t('net.no_containers')}</div>`);
 }
 
 /* ------------------------------------------------------------- sự kiện */
@@ -715,25 +754,17 @@ $('#hist-reload').addEventListener('click', () => loadHistory(true));
   $(sel).addEventListener('input', () => { if (S.snap) renderRes(); }));
 $('#closed-range').addEventListener('change', () => { if (S.snap) renderClosed(); });
 
-$('#fx').checked = S.fx;
-$('#fx').addEventListener('change', () => {
-  S.fx = $('#fx').checked;
-  try { localStorage.setItem('aimon.fx', S.fx ? '1' : '0'); } catch (e) { /* bỏ qua */ }
-  if (!S.fx) document.querySelectorAll('.upd').forEach((e) => e.classList.remove('upd'));
-});
-
 $('#refresh').addEventListener('click', loadSnapshot);
 
 /* Mở bằng icon app thì không có terminal để Ctrl+C, nên tắt hẳn từ đây. */
 $('#quit').addEventListener('click', async () => {
-  const ok = await askConfirm('Tắt AI Monitor?',
-    'Server trên máy sẽ dừng, trang này ngừng cập nhật. Mở lại bằng icon AI Monitor hoặc run.sh.');
+  const ok = await askConfirm(t('quit.title'), t('quit.body'));
   if (!ok) return;
   if (S.timer) { clearInterval(S.timer); S.timer = null; }
   S.interval = 0;
   try { await fetch('/api/quit', { method: 'POST' }); } catch (e) { /* server tắt giữa chừng là bình thường */ }
-  toast('Đã tắt AI Monitor. Đóng tab này được rồi.', 'ok');
-  setText('#stamp', 'đã dừng');
+  toast(t('quit.done'), 'ok');
+  setStatus(t('hdr.stopped'));
 });
 $('#interval').addEventListener('change', () => { S.interval = +$('#interval').value; schedule(); });
 document.addEventListener('visibilitychange', schedule);
@@ -745,5 +776,13 @@ function schedule() {
   }
 }
 
+/* Đổi ngôn ngữ: vẽ lại toàn bộ vùng động, không cần gọi lại server. */
+function onLangChange() {
+  if (S.snap) renderAll();
+  if (S.hist) renderHist();
+}
+$('#lang').addEventListener('change', (e) => setLang(e.target.value));
+
+applyStaticI18n();
 loadSnapshot();
 schedule();

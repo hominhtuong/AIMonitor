@@ -26,9 +26,13 @@ aimon/
     claude.py           parse transcript: token theo bucket giờ, tool đang chạy, sub-agent
     usage.py            hạn mức Session 5h / Weekly 7d, hiệu chỉnh % ước lượng
     ports.py            lsof / netstat + docker ps
-  static/               index.html, style.css, app.js, favicon.svg
+  static/               index.html, style.css, app.js, i18n.js, favicon.svg
+mac/AIMonitor.swift     vỏ app macOS (WKWebView)
+windows/app_win.py      điểm vào bản .exe Windows
 scripts/
-  install_macos.sh      dựng + cài AIMonitor.app rồi tự kiểm tra
+  build_macos_app.sh    đóng gói AIMonitor.app (local + CI dùng chung)
+  install_macos.sh      cài vào /Applications rồi tự kiểm tra
+  release_macos.sh      ký Developer ID + notarize + staple
   build_windows.ps1     tạo shortcut Windows
   make_icons.py         vẽ logo bằng Python thuần
 ```
@@ -225,6 +229,38 @@ cứng, nên ký trong CI phải qua dịch vụ ký đám mây (Azure Trusted S
 DigiCert KeyLocker, SSL.com eSigner). Chứng chỉ OV còn phải tích luỹ uy tín SmartScreen một
 thời gian mới hết cảnh báo; EV hết ngay nhưng đắt hơn. Hiện `.exe` chưa ký - user bấm
 **More info => Run anyway** một lần.
+
+## Đa ngôn ngữ (static/i18n.js)
+
+Giao diện có tiếng Anh và tiếng Việt, đổi bằng dropdown `#lang`, lựa chọn lưu ở
+`localStorage`. Lần đầu vào thì đoán theo `navigator.language`, không phải tiếng Việt thì mặc
+định tiếng Anh. Tên ngôn ngữ trong dropdown **không dịch** - luôn viết bằng chính ngôn ngữ đó
+để người đang xem tiếng Anh vẫn nhận ra dòng "Tiếng Việt".
+
+**Không viết chữ thẳng vào `app.js` hay `index.html`.** Ba đường:
+
+- HTML: `data-i18n="key"`, ngoài ra có `data-i18n-title`, `data-i18n-placeholder`,
+  `data-i18n-html` (dùng cho chuỗi có thẻ `<code>`).
+- JS: `t('key', { param: value })`.
+- Backend: trả `note_key` / `error_key` + tham số, **không** trả câu hoàn chỉnh. Trường
+  `note` / `error` vẫn giữ bản tiếng Anh cho ai gọi API bằng curl.
+
+Thiếu khoá thì `t()` trả về chính tên khoá - cố ý, để lộ ngay trên màn hình lúc test thay vì
+im lặng hiện tiếng Anh.
+
+Tham số `age` từ backend là **giây**; `fmtArgs()` đổi sang chuỗi thời lượng theo ngôn ngữ đang
+chọn trước khi ghép câu. Đừng format sẵn ở backend, làm thế là khoá cứng ngôn ngữ.
+
+Đổi ngôn ngữ gọi `onLangChange()` => vẽ lại vùng động từ `S.snap` đang có, không gọi lại
+server. Vì vậy dữ liệu backend phải luôn ở dạng mã, nếu không đổi cờ xong nửa màn hình vẫn
+ngôn ngữ cũ cho tới lần refresh sau.
+
+Nhãn loại tiến trình: `KIND_LABELS` ở `procs.py` để tiếng Anh, UI dịch qua `kindLabel()` theo
+`kind`. Tên sản phẩm (Claude Code, MCP server, Codex...) giữ nguyên ở cả hai ngôn ngữ, chỉ
+dịch mấy nhãn chung như Other/Browser/Editor.
+
+Cẩn thận đặt biến tên `t` trong `app.js` - nó che mất hàm dịch. `frag()` từng dính, nay đổi
+thành `tpl`; `renderUsage`/`renderKpis` dùng `tot` cho `snap.totals`.
 
 ## Frontend (static/app.js)
 

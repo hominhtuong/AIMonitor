@@ -1,0 +1,547 @@
+/* Bảng dịch cho AI Monitor.
+ *
+ * Mọi chữ hiển thị đều phải nằm ở đây, kể cả chuỗi do backend sinh ra: backend chỉ trả
+ * mã (`note_key`, `error_key`) kèm tham số, câu chữ dựng ở phía này. Nhờ vậy đổi ngôn
+ * ngữ không cần gọi lại server và chỉ có đúng một chỗ để dịch.
+ *
+ * Tham số viết dạng {ten}. Hàm t() thay thế và tự escape khi cần ở nơi gọi.
+ */
+
+const DICT = {
+  en: {
+    /* --- header --- */
+    'hdr.tagline': 'AI processes & agents on this machine',
+    'hdr.ram_sys': 'System RAM',
+    'hdr.ram_ai': 'RAM used by AI',
+    'hdr.interval': 'Auto-refresh interval',
+    'hdr.language': 'Language',
+    'hdr.every_1s': 'Every 1s',
+    'hdr.every_2s': 'Every 2s',
+    'hdr.every_3s': 'Every 3s',
+    'hdr.every_5s': 'Every 5s',
+    'hdr.every_10s': 'Every 10s',
+    'hdr.every_off': 'Off',
+    'hdr.refresh': 'Refresh',
+    'hdr.quit': 'Quit',
+    'hdr.quit_hint': 'Stop AI Monitor completely on this machine',
+    'hdr.updated': 'updated {time}',
+    'hdr.stopped': 'stopped',
+    'hdr.procs': '{procs} processes',
+    'hdr.load_hint': '{cores} CPU cores · load average over 1/5/15 min: {load}',
+    'hdr.cores_hint': '{cores} CPU cores',
+    'hdr.no_pause': ' · suspend not supported',
+
+    /* --- tabs --- */
+    'tab.ai': 'AI & Agents',
+    'tab.hist': 'Session history',
+    'tab.res': 'Resources',
+    'tab.net': 'Ports & Docker',
+
+    /* --- chung --- */
+    'common.range': 'Time range',
+    'common.today': 'Today',
+    'common.7d': '7 days',
+    'common.30d': '30 days',
+    'common.90d': '90 days',
+    'common.all': 'All time',
+    'common.cancel': 'Cancel',
+    'common.confirm': 'Confirm',
+    'common.tokens': 'tokens',
+    'common.calls': 'calls',
+    'common.unknown_error': 'unknown error',
+
+    /* --- ô hạn mức --- */
+    'usage.session': 'Session (5 hours)',
+    'usage.weekly': 'Weekly (7 days)',
+    'usage.tokens_today': 'API tokens today',
+    'usage.cost_today': 'Cost today',
+    'usage.calls_since': '{n} calls · since 00:00',
+    'usage.out_cache': 'Out {out} · cache read {cache}',
+    'usage.sessions_priced': '{n} sessions · priced from pricing.json',
+    'usage.last_7d': 'Last 7 days: {cost}',
+    'usage.resets_in': 'Resets in {dur}',
+    'usage.no_reset': 'Reset point unknown',
+    'usage.breakdown': '{pct}% from {age} ago + ~{drift}% estimated',
+    'usage.read_ago': 'read {age} ago',
+    'src.projected': 'adjusted',
+    'src.official_stale': 'stale',
+    'src.estimate': 'estimated',
+    'src.none': 'no figure',
+
+    /* --- ghi chú hạn mức (backend gửi note_key) --- */
+    'note.no_source': 'Could not read usage limits from ~/.claude.json or ~/.claude/rate-cache.json.',
+    'note.official_fresh': 'Official figure from Claude Code (Account & Usage panel).',
+    'note.official_aged': 'Official figure read {age} ago - Claude Code only refreshes it while running.',
+    'note.statusline_fresh': 'Official figure from Claude Code (statusline).',
+    'note.statusline_stale': 'This figure is stale. It only updates when the Claude Code statusline runs.',
+    'note.official': 'Official figure from Claude Code.',
+    'note.projected': '{pct}% was official when Claude Code last refreshed ({age} ago), plus about {drift}% estimated from tokens used since.',
+    'note.estimate_expired': 'Estimated from local token usage (the window has rolled over), with the ceiling derived from earlier official readings. Approximate, not Anthropic\'s own number.',
+    'note.estimate_stale': 'Estimated from local token usage (official figure is {age} old), with the ceiling derived from earlier official readings. Approximate, not Anthropic\'s own number.',
+    'note.official_stale': 'Official figure read {age} ago. This window has not reset, so the real value is higher, never lower.',
+    'note.none': 'No trustworthy percentage yet: the official figure is stale and the window has already rolled over. Open a Claude Code session in a terminal and the number will come back.',
+
+    /* --- thẻ KPI --- */
+    'kpi.live': 'Live Claude Code sessions',
+    'kpi.live_busy': '{n} sessions working',
+    'kpi.live_idle': 'all idle',
+    'kpi.mcp': 'MCP servers',
+    'kpi.ram': 'RAM held by AI',
+    'kpi.ram_sub': '{pct}% of machine RAM',
+    'kpi.cpu': 'CPU used by AI',
+    'kpi.cpu_sub': '{cores} cores · {n} root AI processes',
+    'kpi.ram_of': '{ram} RAM',
+    'chips.none': 'No AI processes found',
+
+    /* --- nhãn loại tiến trình --- */
+    'kind.automation': 'Automation driver',
+    'kind.browser': 'Browser',
+    'kind.editor': 'Editor',
+    'kind.other': 'Other',
+
+    /* --- phiên AI --- */
+    'ai.title': 'Running AI sessions',
+    'ai.hint': 'Each card is one root AI process plus its child tree (MCP servers, browser automation). Tokens and cost are read from the session transcript.',
+    'ai.closed_title': 'Closed sessions',
+    'ai.closed_hint': 'The process is gone, only the transcript remains - useful for checking tokens and cost after the fact.',
+    'ai.none': 'No AI process is running.',
+    'ai.untitled': 'Untitled session',
+    'ai.supervised': 'managed by {name}',
+    'ai.supervised_hint': 'Managed by {name}; it may restart itself after being killed.',
+    'ai.paused_badge': 'suspended',
+    'ai.tok_today': 'tokens today ({cost})',
+    'ai.tok_session': 'tokens this session (in {in} · out {out})',
+    'ai.cost_session': 'cost this session',
+    'ai.turns': 'prompts / replies',
+    'ai.subagents': 'sub-agents called',
+    'ai.subagents_running': ' · {n} running',
+    'ai.ram_tree': 'RAM whole tree ({n} children)',
+    'ai.ram_tree_plain': 'RAM whole tree',
+    'ai.cpu_tree': 'CPU whole tree',
+    'ai.runtime': 'running time',
+    'ai.children': 'child processes',
+    'ai.no_transcript': 'This kind has no token transcript to read - resource tracking only.',
+    'ai.context': 'Current session context',
+    'ai.doing': 'Running: ',
+    'ai.in_subagent': ' · inside a sub-agent',
+    'ai.more_pending': '+{n} more tools waiting',
+    'ai.idle': 'Idle',
+    'ai.last_prompt': ' · last prompt: ',
+    'ai.subagent': 'Sub-agent',
+    'ai.top_tools': 'Most used tools: ',
+    'ai.timeline': 'Timeline',
+    'ai.hide': 'Hide',
+    'ai.hide_tree': 'Hide tree',
+    'ai.show_tree': 'Child tree ({n})',
+    'ai.no_events': 'No timeline data yet.',
+
+    /* --- bảng phiên đã đóng --- */
+    'closed.none_today': 'No sessions closed today (since 00:00).',
+    'closed.none_7d': 'No sessions closed in the last 7 days.',
+    'col.session': 'Session',
+    'col.folder': 'Folder',
+    'col.model': 'Model',
+    'col.api_tokens': 'API tokens',
+    'col.last_context': 'Final context',
+    'col.cost': 'Cost',
+    'col.last_active': 'Last active',
+
+    /* --- lịch sử phiên --- */
+    'hist.title': 'Session history on this machine',
+    'hist.hint': 'Reads every transcript under <code>~/.claude/projects</code>. Cost is the API-equivalent price from <code>pricing.json</code> - use it to compare weight between tasks, not as the real bill of a subscription plan. This data covers only the machine running AI Monitor.',
+    'hist.sort': 'Sort by',
+    'hist.sort_cost': 'Highest cost',
+    'hist.sort_token': 'Most tokens',
+    'hist.sort_msgs': 'Most calls',
+    'hist.sort_recent': 'Most recent',
+    'hist.filter': 'Filter by task / folder / model...',
+    'hist.rescan': 'Rescan',
+    'hist.scanning': 'scanning transcripts...',
+    'hist.scan_error': 'could not read transcripts',
+    'hist.meta': '{files} files · scanned in {sec}s · earliest {day}',
+    'hist.by_project': 'By project',
+    'hist.by_project_hint': 'Groups sessions that share a working folder.',
+    'hist.by_session': 'By session',
+    'hist.count': '{shown} / {total} sessions',
+    'hist.kpi_sessions': 'Sessions recorded',
+    'hist.kpi_sessions_sub': '{n} API calls',
+    'hist.kpi_cost': 'Total equivalent cost',
+    'hist.kpi_cost_sub': 'API pricing from pricing.json',
+    'hist.kpi_tokens': 'Total API tokens',
+    'hist.kpi_tokens_sub': 'out {out} · cache read {cache}',
+    'hist.kpi_projects': 'Projects touched',
+    'hist.kpi_projects_sub': 'heaviest: {name}',
+    'hist.none_range': 'No sessions in this range yet.',
+    'hist.none_filter': 'No session matches the filter.',
+    'hist.load_error': 'Could not load history: {msg}',
+    'col.project': 'Project',
+    'col.sessions': 'Sessions',
+    'col.calls': 'Calls',
+    'col.share': 'Share',
+    'col.latest': 'Latest',
+    'col.task': 'Task',
+
+    /* --- tài nguyên --- */
+    'res.title': 'Resource-hungry processes',
+    'res.filter': 'Filter by name / PID / command...',
+    'res.mine': 'Only my processes',
+    'res.ai_only': 'Only AI-related',
+    'res.count': '{n} processes · {ram}',
+    'res.in_ai_tree': 'in AI tree',
+    'res.not_mine': 'not mine',
+    'res.none': 'No row matches the filter.',
+    'col.pid': 'PID',
+    'col.name': 'Name',
+    'col.kind': 'Kind',
+    'col.ram': 'RAM',
+    'col.cpu': 'CPU',
+    'col.uptime': 'Uptime',
+    'col.actions': 'Actions',
+
+    /* --- cổng & docker --- */
+    'net.title': 'Local ports listening',
+    'net.docker': 'Docker containers',
+    'net.no_ports': 'No ports could be read (macOS/Linux need lsof, Windows uses netstat).',
+    'net.no_docker': 'No Docker CLI on this machine - skipping containers.',
+    'net.no_containers': 'No container is running.',
+    'net.port_label': 'port {port} - {cmd}',
+    'col.port': 'Port',
+    'col.address': 'Address',
+    'col.process': 'Process',
+    'col.note': 'Note',
+    'port.self': 'AI Monitor (this page)',
+    'port.default': 'AI Monitor (default port)',
+    'col.image': 'Image',
+    'col.status': 'Status',
+    'col.ports': 'Ports',
+
+    /* --- thao tác --- */
+    'act.pause': 'suspend',
+    'act.resume': 'resume',
+    'act.kill': 'kill',
+    'act.force_kill': 'force kill',
+    'act.kill_tree': 'kill tree',
+    'act.pause_tree': 'suspend tree',
+    'act.resume_tree': 'resume tree',
+    'btn.pause': 'Suspend',
+    'btn.resume': 'Resume',
+    'btn.pause_tree': 'Suspend tree',
+    'btn.resume_tree': 'Resume tree',
+    'btn.kill': 'Kill',
+    'btn.kill_tree': 'Kill tree',
+    'confirm.title': '{action} PID {pid}?',
+    'toast.done': '{action} PID {pid} done{extra}',
+    'toast.done_n': ' ({n} processes)',
+    'toast.fail': 'Could not {action} PID {pid}: {msg}',
+    'toast.children_failed': '{n} child processes could not be handled',
+    'toast.api_failed': 'API call failed: {msg}',
+    'quit.title': 'Quit AI Monitor?',
+    'quit.body': 'The local server will stop and this page will stop updating. Start it again from the AI Monitor icon or run.sh.',
+    'quit.done': 'AI Monitor stopped. You can close this tab.',
+
+    /* --- lỗi từ backend (error_key) --- */
+    'err.snapshot': 'Snapshot error: {msg}',
+    'err.disconnected': 'lost connection to server',
+    'err.bad_action': 'Invalid action: {action}',
+    'err.no_pause_windows': 'Windows cannot suspend processes (no SIGSTOP).',
+    'err.pid_gone': 'PID {pid} no longer exists',
+    'err.protected': 'PID {pid} is protected (AI Monitor itself or one of its parent processes)',
+    'err.protected_short': 'protected',
+    'err.bad_json': 'Invalid JSON',
+    'err.missing_pid': 'Missing PID',
+
+    'foot.text': 'AI Monitor · reads straight from this machine, nothing leaves it',
+  },
+
+  vi: {
+    /* --- header --- */
+    'hdr.tagline': 'tiến trình & agent AI trên máy này',
+    'hdr.ram_sys': 'RAM hệ thống',
+    'hdr.ram_ai': 'RAM do AI dùng',
+    'hdr.interval': 'Chu kỳ tự làm mới',
+    'hdr.language': 'Ngôn ngữ',
+    'hdr.every_1s': '1 giây',
+    'hdr.every_2s': '2 giây',
+    'hdr.every_3s': '3 giây',
+    'hdr.every_5s': '5 giây',
+    'hdr.every_10s': '10 giây',
+    'hdr.every_off': 'Tắt tự động',
+    'hdr.refresh': 'Làm mới',
+    'hdr.quit': 'Tắt',
+    'hdr.quit_hint': 'Dừng hẳn AI Monitor trên máy',
+    'hdr.updated': 'cập nhật {time}',
+    'hdr.stopped': 'đã dừng',
+    'hdr.procs': '{procs} tiến trình',
+    'hdr.load_hint': '{cores} lõi CPU · load average 1/5/15 phút: {load}',
+    'hdr.cores_hint': '{cores} lõi CPU',
+    'hdr.no_pause': ' · không hỗ trợ tạm dừng',
+
+    /* --- tabs --- */
+    'tab.ai': 'AI & Agent',
+    'tab.hist': 'Lịch sử phiên',
+    'tab.res': 'Tài nguyên',
+    'tab.net': 'Cổng & Docker',
+
+    /* --- chung --- */
+    'common.range': 'Khoảng thời gian',
+    'common.today': 'Hôm nay',
+    'common.7d': '7 ngày',
+    'common.30d': '30 ngày',
+    'common.90d': '90 ngày',
+    'common.all': 'Toàn bộ',
+    'common.cancel': 'Huỷ',
+    'common.confirm': 'Xác nhận',
+    'common.tokens': 'token',
+    'common.calls': 'lượt gọi',
+    'common.unknown_error': 'lỗi không rõ',
+
+    /* --- ô hạn mức --- */
+    'usage.session': 'Session (5 giờ)',
+    'usage.weekly': 'Weekly (7 ngày)',
+    'usage.tokens_today': 'Token API hôm nay',
+    'usage.cost_today': 'Chi phí hôm nay',
+    'usage.calls_since': '{n} lượt gọi · tính từ 00:00',
+    'usage.out_cache': 'Ra {out} · cache read {cache}',
+    'usage.sessions_priced': '{n} phiên · quy đổi theo pricing.json',
+    'usage.last_7d': '7 ngày qua: {cost}',
+    'usage.resets_in': 'Reset sau {dur}',
+    'usage.no_reset': 'Chưa xác định được mốc reset',
+    'usage.breakdown': '{pct}% cách đây {age} + ~{drift}% ước tính',
+    'usage.read_ago': 'đọc cách đây {age}',
+    'src.projected': 'có bù',
+    'src.official_stale': 'số cũ',
+    'src.estimate': 'ước lượng',
+    'src.none': 'chưa có số',
+
+    /* --- ghi chú hạn mức --- */
+    'note.no_source': 'Chưa đọc được hạn mức từ ~/.claude.json hay ~/.claude/rate-cache.json.',
+    'note.official_fresh': 'Số chính thức từ Claude Code (bảng Account & Usage).',
+    'note.official_aged': 'Số chính thức đọc cách đây {age} - Claude Code chỉ làm mới khi đang chạy.',
+    'note.statusline_fresh': 'Số chính thức từ Claude Code (statusline).',
+    'note.statusline_stale': 'Số này đã cũ. Nó chỉ được cập nhật khi statusline của Claude Code chạy.',
+    'note.official': 'Số chính thức từ Claude Code.',
+    'note.projected': '{pct}% là số chính thức lúc Claude Code làm mới ({age} trước), cộng thêm khoảng {drift}% ước lượng theo token đã dùng từ đó tới giờ.',
+    'note.estimate_expired': 'Ước lượng theo token local (cửa sổ đã sang chu kỳ mới), trần suy ra từ các lần đọc chính thức trước đó. Là số xấp xỉ, không phải số của Anthropic.',
+    'note.estimate_stale': 'Ước lượng theo token local (số chính thức cũ {age}), trần suy ra từ các lần đọc chính thức trước đó. Là số xấp xỉ, không phải số của Anthropic.',
+    'note.official_stale': 'Số chính thức đọc cách đây {age}. Cửa sổ này chưa reset nên thực tế chỉ cao hơn chứ không thấp hơn.',
+    'note.none': 'Chưa có % đáng tin: số chính thức đã cũ và cửa sổ cũng đã sang chu kỳ mới. Mở một phiên Claude Code ở terminal là có số ngay.',
+
+    /* --- thẻ KPI --- */
+    'kpi.live': 'Phiên Claude Code sống',
+    'kpi.live_busy': '{n} phiên đang thao tác',
+    'kpi.live_idle': 'tất cả đang rảnh',
+    'kpi.mcp': 'MCP server',
+    'kpi.ram': 'RAM do AI chiếm',
+    'kpi.ram_sub': '{pct}% RAM máy',
+    'kpi.cpu': 'CPU do AI chiếm',
+    'kpi.cpu_sub': '{cores} lõi · {n} tiến trình AI gốc',
+    'kpi.ram_of': '{ram} RAM',
+    'chips.none': 'Không thấy tiến trình AI nào',
+
+    /* --- nhãn loại tiến trình --- */
+    'kind.automation': 'Trình tự động hoá',
+    'kind.browser': 'Trình duyệt',
+    'kind.editor': 'Trình soạn thảo',
+    'kind.other': 'Khác',
+
+    /* --- phiên AI --- */
+    'ai.title': 'Phiên AI đang chạy',
+    'ai.hint': 'Mỗi thẻ là 1 tiến trình AI gốc kèm cây con (MCP server, browser automation). Token / chi phí đọc từ transcript của phiên.',
+    'ai.closed_title': 'Phiên đã đóng',
+    'ai.closed_hint': 'Tiến trình không còn chạy, chỉ còn transcript - dùng để đối chiếu token và chi phí.',
+    'ai.none': 'Không có tiến trình AI nào đang chạy.',
+    'ai.untitled': 'Phiên không tên',
+    'ai.supervised': '{name} quản lý',
+    'ai.supervised_hint': 'Tiến trình này do {name} quản lý - nó có thể tự khởi động lại sau khi kill.',
+    'ai.paused_badge': 'đã tạm dừng',
+    'ai.tok_today': 'token hôm nay ({cost})',
+    'ai.tok_session': 'token cả phiên (vào {in} · ra {out})',
+    'ai.cost_session': 'chi phí cả phiên',
+    'ai.turns': 'lượt hỏi / lượt trả lời',
+    'ai.subagents': 'sub-agent đã gọi',
+    'ai.subagents_running': ' · {n} đang chạy',
+    'ai.ram_tree': 'RAM cả cây ({n} con)',
+    'ai.ram_tree_plain': 'RAM cả cây',
+    'ai.cpu_tree': 'CPU cả cây',
+    'ai.runtime': 'thời gian chạy',
+    'ai.children': 'tiến trình con',
+    'ai.no_transcript': 'Loại này không có transcript token để đọc - chỉ theo dõi tài nguyên.',
+    'ai.context': 'Context phiên hiện tại',
+    'ai.doing': 'Đang chạy: ',
+    'ai.in_subagent': ' · trong sub-agent',
+    'ai.more_pending': '+{n} tool khác đang chờ',
+    'ai.idle': 'Rảnh',
+    'ai.last_prompt': ' · lệnh cuối: ',
+    'ai.subagent': 'Sub-agent',
+    'ai.top_tools': 'Tool dùng nhiều: ',
+    'ai.timeline': 'Dòng thời gian',
+    'ai.hide': 'Ẩn',
+    'ai.hide_tree': 'Ẩn cây',
+    'ai.show_tree': 'Cây con ({n})',
+    'ai.no_events': 'Chưa có dữ liệu dòng thời gian.',
+
+    /* --- bảng phiên đã đóng --- */
+    'closed.none_today': 'Không có phiên đã đóng trong hôm nay (tính từ 00:00).',
+    'closed.none_7d': 'Không có phiên đã đóng trong 7 ngày qua.',
+    'col.session': 'Phiên',
+    'col.folder': 'Thư mục',
+    'col.model': 'Model',
+    'col.api_tokens': 'Token API',
+    'col.last_context': 'Context cuối',
+    'col.cost': 'Chi phí',
+    'col.last_active': 'Hoạt động cuối',
+
+    /* --- lịch sử phiên --- */
+    'hist.title': 'Lịch sử phiên trên máy này',
+    'hist.hint': 'Đọc toàn bộ transcript trong <code>~/.claude/projects</code>. Chi phí là giá API quy đổi theo <code>pricing.json</code> - dùng để so sánh tỷ trọng giữa các tác vụ, không phải số tiền thật của gói thuê bao. Dữ liệu này chỉ có của riêng máy đang chạy AI Monitor.',
+    'hist.sort': 'Sắp xếp',
+    'hist.sort_cost': 'Chi phí cao nhất',
+    'hist.sort_token': 'Token nhiều nhất',
+    'hist.sort_msgs': 'Nhiều lượt gọi nhất',
+    'hist.sort_recent': 'Mới nhất',
+    'hist.filter': 'Lọc theo tác vụ / thư mục / model...',
+    'hist.rescan': 'Quét lại',
+    'hist.scanning': 'đang quét transcript...',
+    'hist.scan_error': 'lỗi đọc transcript',
+    'hist.meta': '{files} file · quét {sec}s · sớm nhất {day}',
+    'hist.by_project': 'Theo project',
+    'hist.by_project_hint': 'Gộp các phiên cùng thư mục làm việc.',
+    'hist.by_session': 'Theo phiên',
+    'hist.count': '{shown} / {total} phiên',
+    'hist.kpi_sessions': 'Phiên đã ghi nhận',
+    'hist.kpi_sessions_sub': '{n} lượt gọi API',
+    'hist.kpi_cost': 'Tổng chi phí quy đổi',
+    'hist.kpi_cost_sub': 'giá API theo pricing.json',
+    'hist.kpi_tokens': 'Tổng token API',
+    'hist.kpi_tokens_sub': 'ra {out} · cache read {cache}',
+    'hist.kpi_projects': 'Project đã đụng tới',
+    'hist.kpi_projects_sub': 'nặng nhất: {name}',
+    'hist.none_range': 'Chưa có phiên nào trong khoảng này.',
+    'hist.none_filter': 'Không có phiên nào khớp bộ lọc.',
+    'hist.load_error': 'Không đọc được lịch sử: {msg}',
+    'col.project': 'Project',
+    'col.sessions': 'Phiên',
+    'col.calls': 'Lượt',
+    'col.share': 'Tỷ trọng',
+    'col.latest': 'Gần nhất',
+    'col.task': 'Tác vụ',
+
+    /* --- tài nguyên --- */
+    'res.title': 'Tiến trình ngốn tài nguyên',
+    'res.filter': 'Lọc theo tên / PID / lệnh...',
+    'res.mine': 'Chỉ tiến trình của tôi',
+    'res.ai_only': 'Chỉ liên quan AI',
+    'res.count': '{n} tiến trình · {ram}',
+    'res.in_ai_tree': 'trong cây AI',
+    'res.not_mine': 'không phải của tôi',
+    'res.none': 'Không có dòng nào khớp bộ lọc.',
+    'col.pid': 'PID',
+    'col.name': 'Tên',
+    'col.kind': 'Loại',
+    'col.ram': 'RAM',
+    'col.cpu': 'CPU',
+    'col.uptime': 'Uptime',
+    'col.actions': 'Thao tác',
+
+    /* --- cổng & docker --- */
+    'net.title': 'Cổng local đang mở (LISTEN)',
+    'net.docker': 'Docker container',
+    'net.no_ports': 'Không đọc được cổng nào (macOS/Linux cần lsof, Windows dùng netstat).',
+    'net.no_docker': 'Máy này chưa có Docker CLI - bỏ qua phần container.',
+    'net.no_containers': 'Không có container nào đang chạy.',
+    'net.port_label': 'cổng {port} - {cmd}',
+    'col.port': 'Cổng',
+    'col.address': 'Địa chỉ',
+    'col.process': 'Tiến trình',
+    'col.note': 'Ghi chú',
+    'port.self': 'AI Monitor (trang này)',
+    'port.default': 'AI Monitor (cổng mặc định)',
+    'col.image': 'Image',
+    'col.status': 'Trạng thái',
+    'col.ports': 'Cổng',
+
+    /* --- thao tác --- */
+    'act.pause': 'tạm dừng',
+    'act.resume': 'tiếp tục',
+    'act.kill': 'kill',
+    'act.force_kill': 'kill cứng',
+    'act.kill_tree': 'kill cây',
+    'act.pause_tree': 'tạm dừng cây',
+    'act.resume_tree': 'tiếp tục cây',
+    'btn.pause': 'Dừng',
+    'btn.resume': 'Tiếp tục',
+    'btn.pause_tree': 'Tạm dừng cây',
+    'btn.resume_tree': 'Tiếp tục cây',
+    'btn.kill': 'Kill',
+    'btn.kill_tree': 'Kill cây',
+    'confirm.title': '{action} PID {pid}?',
+    'toast.done': 'Đã {action} PID {pid}{extra}',
+    'toast.done_n': ' ({n} tiến trình)',
+    'toast.fail': 'Không {action} được PID {pid}: {msg}',
+    'toast.children_failed': '{n} tiến trình con không xử lý được',
+    'toast.api_failed': 'Gọi API thất bại: {msg}',
+    'quit.title': 'Tắt AI Monitor?',
+    'quit.body': 'Server trên máy sẽ dừng, trang này ngừng cập nhật. Mở lại bằng icon AI Monitor hoặc run.sh.',
+    'quit.done': 'Đã tắt AI Monitor. Đóng tab này được rồi.',
+
+    /* --- lỗi từ backend --- */
+    'err.snapshot': 'Lỗi snapshot: {msg}',
+    'err.disconnected': 'mất kết nối server',
+    'err.bad_action': 'Hành động không hợp lệ: {action}',
+    'err.no_pause_windows': 'Windows không hỗ trợ tạm dừng tiến trình (không có SIGSTOP).',
+    'err.pid_gone': 'PID {pid} không còn tồn tại',
+    'err.protected': 'PID {pid} được bảo vệ (là chính AI Monitor hoặc tiến trình cha của nó)',
+    'err.protected_short': 'được bảo vệ',
+    'err.bad_json': 'JSON không hợp lệ',
+    'err.missing_pid': 'Thiếu PID',
+
+    'foot.text': 'AI Monitor · dữ liệu đọc trực tiếp từ máy, không gửi ra ngoài',
+  },
+};
+
+/* Ngôn ngữ đang dùng. Lần đầu vào thì đoán theo browser, sau đó nhớ lựa chọn của người dùng. */
+let LANG = 'en';
+try {
+  const saved = localStorage.getItem('aimon.lang');
+  LANG = saved && DICT[saved] ? saved : ((navigator.language || '').toLowerCase().startsWith('vi') ? 'vi' : 'en');
+} catch (e) {
+  LANG = 'en';
+}
+
+/** Dịch 1 khoá, thay {tham_so}. Thiếu khoá thì trả về chính khoá để lộ ra ngay lúc test. */
+function t(key, args) {
+  const table = DICT[LANG] || DICT.en;
+  let s = table[key];
+  if (s == null) s = (DICT.en[key] != null ? DICT.en[key] : key);
+  if (args) {
+    for (const k in args) s = s.split('{' + k + '}').join(String(args[k]));
+  }
+  return s;
+}
+
+/** Đổ chữ vào mọi phần tử có data-i18n trong index.html. */
+function applyStaticI18n() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach((el) => {
+    el.innerHTML = t(el.getAttribute('data-i18n-html'));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+  const sel = document.getElementById('lang');
+  if (sel) sel.value = LANG;
+}
+
+function setLang(lang) {
+  if (!DICT[lang] || lang === LANG) return;
+  LANG = lang;
+  try { localStorage.setItem('aimon.lang', lang); } catch (e) { /* chế độ riêng tư */ }
+  applyStaticI18n();
+  if (typeof onLangChange === 'function') onLangChange();
+}

@@ -1,33 +1,55 @@
+<div align="center">
+
+<img src="assets/icon_128.png" width="96" alt="AI Monitor">
+
 # AI Monitor
 
-![logo](assets/icon_128.png)
+**English** · [Tiếng Việt](README.vi.md)
 
-Bảng theo dõi các công cụ AI đang chạy trên máy bạn: **Claude Code, Codex, Copilot, Gemini CLI, Ollama**.
+See what your AI coding tools are really doing to your machine.
 
-Activity Monitor chỉ cho bạn thấy "Python đang ăn 2 GB RAM". AI Monitor cho bạn thấy *Python nào*:
-phiên Claude Code nào, đang mở thư mục nào, đang chạy lệnh gì, đã tốn bao nhiêu token, còn bao lâu
-nữa thì đụng hạn mức - và tắt được cái nào.
+[![Version](https://img.shields.io/github/v/release/hominhtuong/AIMonitor?label=version&color=6366f1)](https://github.com/hominhtuong/AIMonitor/releases)
+[![License](https://img.shields.io/github/license/hominhtuong/AIMonitor?color=10b981)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-0ea5e9)](#2-install-the-app)
+[![Python](https://img.shields.io/badge/python-3.9%2B-3776ab)](https://www.python.org/)
+[![Dependencies](https://img.shields.io/badge/dependencies-none-64748b)](https://github.com/hominhtuong/AIMonitor/blob/main/CLAUDE.md)
+[![Downloads](https://img.shields.io/github/downloads/hominhtuong/AIMonitor/total?color=f59e0b)](https://github.com/hominhtuong/AIMonitor/releases)
 
-Chạy hoàn toàn trên máy bạn. Không gửi dữ liệu đi đâu, không cần đăng nhập, không cài thêm gì
-ngoài Python (macOS và Linux có sẵn).
-
-![Giao diện AI Monitor](assets/screenshot.png)
-
----
-
-## Mục lục
-
-1. [Mở lên trong 30 giây](#1-mở-lên-trong-30-giây)
-2. [Cài app](#2-cài-app)
-3. [Màn hình có gì](#3-màn-hình-có-gì)
-4. [Tắt bớt tiến trình AI](#4-tắt-bớt-tiến-trình-ai)
-5. [Hạn mức Session và Weekly](#5-hạn-mức-session-và-weekly)
-6. [Số token và chi phí nghĩa là gì](#6-số-token-và-chi-phí-nghĩa-là-gì)
-7. [Hỏi đáp nhanh](#7-hỏi-đáp-nhanh)
+</div>
 
 ---
 
-## 1. Mở lên trong 30 giây
+A local dashboard for the AI tools running on your machine: **Claude Code, Codex, Copilot,
+Gemini CLI, Ollama**.
+
+Activity Monitor only tells you "Python is eating 2 GB of RAM". AI Monitor tells you *which*
+Python: which Claude Code session, which folder it has open, what command it is running right
+now, how many tokens it burned, how long before you hit your usage limit - and which ones you
+can safely kill.
+
+Everything runs on your machine. No data leaves it, no account needed, nothing to install
+beyond Python (already present on macOS and Linux).
+
+![AI Monitor dashboard](assets/screenshot.png)
+
+---
+
+## Contents
+
+1. [Run it in 30 seconds](#1-run-it-in-30-seconds)
+2. [Install the app](#2-install-the-app)
+3. [Why you need this: one session, 20+ processes](#3-why-you-need-this-one-session-20-processes)
+4. [What's on screen](#4-whats-on-screen)
+5. [Shutting processes down](#5-shutting-processes-down)
+6. [Session and Weekly limits](#6-session-and-weekly-limits)
+7. [What the token and cost numbers mean](#7-what-the-token-and-cost-numbers-mean)
+8. [FAQ](#8-faq)
+9. [Contributing](#9-contributing)
+10. [Support](#10-support)
+
+---
+
+## 1. Run it in 30 seconds
 
 **macOS / Linux**
 
@@ -45,47 +67,49 @@ cd AIMonitor
 run.cmd
 ```
 
-Browser tự mở. Dừng bằng `Ctrl+C` ở cửa sổ terminal, hoặc bấm nút **Tắt** trên trang.
+Your browser opens automatically. Stop it with `Ctrl+C`, or click **Quit** on the page.
 
-Không cần lo trùng cổng: mặc định dùng `8899`, bận thì tự nhảy sang cổng trống và in địa chỉ
-thật ra màn hình. Nếu AI Monitor đã chạy sẵn thì nó mở lại đúng tab cũ chứ không bật thêm cái nữa.
+No need to worry about port clashes: it prefers `8899`, and if that is busy it moves to the
+next free port and prints the real address. If AI Monitor is already running, it reopens the
+existing tab instead of starting a second copy.
 
 ---
 
-## 2. Cài app
+## 2. Install the app
 
-Trên macOS, AI Monitor là **app thật sự**: có cửa sổ riêng, icon dưới Dock, đóng bằng Cmd+Q.
-Không mở tab browser, không cần terminal.
+On macOS, AI Monitor is a **real app**: its own window, its own Dock icon, quit with Cmd+Q.
+No browser tab, no terminal.
 
-### Cách 1: tải bản dựng sẵn (không cần clone repo)
+### Option 1: download a prebuilt release
 
-1. Vào tab **Releases** của repo, tải `AIMonitor-macos.zip`.
-2. Giải nén, kéo `AIMonitor.app` vào thư mục **Applications**.
-3. Mở lên dùng.
+1. Open the **Releases** tab and download `AIMonitor-macos.zip`.
+2. Unzip it and drag `AIMonitor.app` into your **Applications** folder.
+3. Open it.
 
-Hết. App đã được ký và Apple chứng thực (notarize) nên macOS không cảnh báo gì, không phải
-chuột phải, không phải vào System Settings mở khoá.
+That's all. The app is signed with a Developer ID and notarized by Apple, so macOS raises no
+warning - no right-click trick, no unlocking in System Settings.
 
-Máy chỉ cần có Python 3.9 trở lên - macOS có sẵn.
+Your machine only needs Python 3.9 or newer, which macOS already ships.
 
-### Cách 2: tự build từ code
+### Option 2: build from source
 
 ```bash
 ./scripts/install_macos.sh
 ```
 
-Cài vào `/Applications`, chạy thử ngay và báo lại kết quả. App không lên được thì script
-báo lỗi chứ không im lặng. Sau mỗi lần `git pull`, chạy lại lệnh này để app dùng bản mới.
+Installs into `/Applications`, launches it, and reports back. If the app fails to start, the
+script tells you instead of failing silently. Re-run it after every `git pull` so the app
+picks up the new code.
 
 ### Windows
 
-Vào tab **Releases**, tải `AIMonitor.exe` về chạy thẳng. **Không cần cài Python.** Giao diện
-cũng mở trong cửa sổ riêng, đóng cửa sổ là tắt hẳn.
+Download `AIMonitor.exe` from **Releases** and run it. **No Python needed.** The dashboard
+opens in its own window; closing the window stops everything.
 
-Lần đầu chạy, Windows SmartScreen hiện cảnh báo vì file chưa mua chứng chỉ ký:
-bấm **More info => Run anyway**.
+On first run, SmartScreen shows a warning because the file is not code-signed yet: click
+**More info => Run anyway**.
 
-Muốn chạy từ source thay vì tải .exe thì clone repo rồi tạo shortcut:
+To run from source instead, clone the repo and create a shortcut:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1
@@ -93,112 +117,147 @@ powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1
 
 ---
 
-## 3. Màn hình có gì
+## 3. Why you need this: one session, 20+ processes
 
-**Đầu trang** - RAM toàn máy, RAM riêng phần AI đang chiếm, chu kỳ tự làm mới, nút Làm mới và Tắt.
+This is a **single** Claude Code session with its child tree expanded:
 
-**Hai ô hạn mức** - Session (5 giờ) và Weekly (7 ngày), xem [mục 5](#5-hạn-mức-session-và-weekly).
+![One session and its whole process tree](assets/session-detail.png)
 
-**Tab "AI & Agent"** - mỗi thẻ là một phiên AI đang chạy:
+One session. **1.15 GB of RAM** across more than twenty processes:
 
-- tên tác vụ, thư mục làm việc, git branch, model đang dùng
-- token và chi phí của phiên
-- thanh context còn trống bao nhiêu
-- việc đang chạy ngay lúc này, ví dụ `Bash(npm test) 3.2s`
-- sub-agent đang chạy song song
-- cây con bên dưới: MCP server, trình duyệt do automation mở, RAM từng nhánh
-- dòng thời gian 60 thao tác gần nhất
-
-Bên dưới là các phiên đã đóng, xem theo hôm nay hoặc 7 ngày.
-
-**Tab "Lịch sử phiên"** - trả lời "tác vụ nào ngốn nhiều nhất". Gộp theo project và theo từng
-phiên, có cột tỷ trọng, lọc và sắp xếp được. Tab này chỉ quét khi bạn mở nó.
-
-**Tab "Tài nguyên"** - 80 tiến trình ngốn RAM nhất, lọc được theo tên hoặc chỉ xem phần liên
-quan AI. Tiến trình trên 400 MB tô đỏ.
-
-**Tab "Cổng & Docker"** - cổng nào đang bị chiếm (hay dùng khi Appium hoặc Playwright treo cổng)
-và các container Docker đang chạy.
-
-> Số liệu chỉ của **riêng máy này**. Nếu bạn dùng chung tài khoản trên nhiều máy, mỗi máy chỉ
-> thấy phần của nó.
-
----
-
-## 4. Tắt bớt tiến trình AI
-
-Mỗi thẻ có nút để **tạm dừng** (đóng băng, giữ nguyên RAM, chạy tiếp được sau) hoặc **kill**
-(tắt hẳn). Kill cây sẽ tắt luôn toàn bộ tiến trình con bên dưới.
-
-Mọi thao tác đều hỏi xác nhận. Bản thân AI Monitor và các tiến trình cha của nó không bao giờ
-bị tắt nhầm.
-
-Tạm dừng không có trên Windows (hệ điều hành không hỗ trợ), nút sẽ tự ẩn.
-
-Nếu thẻ có nhãn *"... quản lý"* thì tiến trình đó do IDE trông coi: tắt xong IDE sẽ tự bật lại.
-Muốn dứt điểm thì tắt extension tương ứng trong IDE.
-
----
-
-## 5. Hạn mức Session và Weekly
-
-Hai ô đầu trang trả lời câu hỏi "còn dùng được bao lâu nữa". Số to luôn là **phần trăm**, kèm
-một nhãn nhỏ cho biết số đó lấy từ đâu:
-
-| Nhãn | Nghĩa là |
+| What it is | RAM |
 | --- | --- |
-| *(không có nhãn)* | Số chính thức của Claude Code, còn mới. Tin được. |
-| `số cũ` | Số chính thức nhưng đọc đã lâu. Cửa sổ chưa reset nên thực tế chỉ cao hơn, không thấp hơn. |
-| `ước lượng` | AI Monitor tự suy ra từ lượng token đã dùng. Là số xấp xỉ. |
-| `chưa có số` | Chưa đủ dữ liệu để đưa ra con số đáng tin. |
+| Playwright MCP (npm + node) | 722 MB + 713 MB |
+| Chrome opened by browser automation | 655 MB |
+| Chrome helpers (renderer, GPU, ...) | 223 + 91 + 70 + 53 + 46 MB |
+| Appium MCP, other MCP servers, LSP | ~90 MB combined |
 
-Dòng dưới luôn cho biết **còn bao lâu nữa tới mốc reset** và lượng token đã dùng trong cửa sổ
-hiện tại.
+None of that shows up as "Claude Code" in Activity Monitor. You see a dozen anonymous `node`,
+`Python` and `Google Chrome Helper` entries and no way to tell which belongs to what. When a
+session ends badly, these children are often orphaned and keep holding memory.
 
-Con số này lấy đúng từ chỗ Claude Code lưu lại phần trăm của chính nó, nên khớp với bảng
-*Account & Usage* trong Claude Code. Khi Claude Code không chạy một thời gian dài thì số sẽ
-đứng yên và nhãn chuyển thành `số cũ` - mở lại Claude Code là tự cập nhật.
-
-AI Monitor chỉ đọc file trên máy, không bao giờ tự gọi API Anthropic bằng tài khoản của bạn.
+AI Monitor groups them under the session that spawned them, so you can see the real cost of a
+session and kill the whole tree with one button.
 
 ---
 
-## 6. Số token và chi phí nghĩa là gì
+## 4. What's on screen
 
-- **Token API** đếm cả phần cache đọc lại, nên con số rất lớn là bình thường với phiên dài
-  (hàng chục triệu). Đây là lượng token đi qua API, không phải độ dài cuộc trò chuyện.
-- **Chi phí** là quy đổi theo bảng giá API để bạn so sánh giữa các phiên. Nếu bạn dùng gói
-  thuê tháng thì đây **không phải** số tiền bị trừ. Muốn đổi giá thì sửa `pricing.json`.
-- "Hôm nay" tính từ 00:00 giờ máy.
+The interface is **bilingual** - pick 🇺🇸 English or 🇻🇳 Vietnamese from the language dropdown
+at the top right. Your choice is remembered.
+
+**Top bar** - system RAM, RAM held by AI, refresh interval, and the Refresh / Quit buttons.
+
+**Two limit cards** - Session (5 hours) and Weekly (7 days), see [section 6](#6-session-and-weekly-limits).
+
+**"AI & Agents" tab** - one card per running AI session:
+
+- task name, working folder, git branch, model in use
+- tokens and cost for the session
+- how much context is still free
+- what it is doing right now, e.g. `Bash(npm test) 3.2s`
+- sub-agents running in parallel
+- the child tree: MCP servers, browsers opened by automation, RAM per branch
+- a timeline of the last 60 actions
+
+Below that are closed sessions, viewable for today or the last 7 days.
+
+**"Session history" tab** - answers "which task burned the most?". Grouped by project and by
+session, with a share column, filtering and sorting. This tab only scans when you open it.
+
+**"Resources" tab** - the 80 processes using the most RAM, filterable by name or limited to
+AI-related ones. Anything above 400 MB is highlighted red.
+
+**"Ports & Docker" tab** - which ports are taken (handy when Appium or Playwright leaves one
+hanging) and which Docker containers are running.
+
+> All figures cover **this machine only**. If you use the same account on several machines,
+> each one sees just its own share.
 
 ---
 
-## 7. Hỏi đáp nhanh
+## 5. Shutting processes down
 
-**Tắt Copilot rồi nó lại chạy?** Đó là VS Code tự bật lại, không phải lỗi tool. Muốn dứt điểm
-thì disable extension.
+Every card has buttons to **suspend** (freeze, keeps its memory, resumable) or **kill**.
+Kill tree takes down every child process underneath as well.
 
-**Số Session hoặc Weekly có nhãn `số cũ`?** Claude Code chưa chạy lại nên chưa làm mới phần
-trăm. Mở Claude Code lên là số tự cập nhật, xem [mục 5](#5-hạn-mức-session-và-weekly).
+Every action asks for confirmation. AI Monitor itself and its parent processes can never be
+killed by accident.
 
-**Không thấy phiên AI nào?** Với Claude Code, kiểm tra thư mục `~/.claude/projects/` đã có dữ
-liệu chưa. Với Codex hay Copilot, tool chỉ theo dõi được RAM và CPU vì chúng không ghi lịch sử
-theo dạng đọc được.
+Suspend is unavailable on Windows (the OS has no equivalent), so the button hides itself.
 
-**Mở app trên macOS thì bị đòi cài Rosetta?** Đó là lỗi của bản cũ, đã sửa. Chạy lại
-`./scripts/install_macos.sh` để cài đè bản mới.
-
-**Cổng 8899 đang bận?** Không cần làm gì, tool tự chuyển cổng. Muốn ép đúng một cổng thì
-`./run.sh --port 9001 --strict-port`.
-
-**Trang có nhấp nháy khi tự làm mới?** Không. Mỗi lần làm mới chỉ sửa đúng con số thay đổi,
-giữ nguyên vị trí cuộn và các nhánh đang mở.
+If a card is tagged *"managed by ..."*, an IDE supervises that process: kill it and the IDE
+will start it again. To stop it for good, disable the matching extension.
 
 ---
 
-## Góp code
+## 6. Session and Weekly limits
 
-Đặc tả kỹ thuật, các bẫy đã gặp và quy ước code nằm ở [CLAUDE.md](CLAUDE.md).
+The two cards at the top answer "how much longer can I keep going?". The big number is always
+a **percentage**, with a small badge telling you where it came from:
 
-Repo có sẵn 2 skill dùng với Claude Code: `/push-code` (commit và push an toàn) và `/merge-code`
-(merge qua nhánh tạm rồi mở Pull Request). Không dùng Claude Code thì cứ commit như bình thường.
+| Badge | Meaning |
+| --- | --- |
+| *(none)* | Official figure from Claude Code, fresh. Trustworthy. |
+| `adjusted` | Official figure plus an estimate of what you have used since it was refreshed. |
+| `stale` | Official but read a while ago. The window has not reset, so the real value is higher, never lower. |
+| `estimated` | Derived from local token usage. Approximate. |
+| `no figure` | Not enough data for a number worth trusting. |
+
+The line underneath always shows **how long until the next reset** and how many tokens the
+current window has used.
+
+The number comes from the same place Claude Code stores its own percentages, so it matches the
+*Account & Usage* panel. That store is a cache which Claude Code refreshes periodically, so AI
+Monitor adds an estimate of the usage since the last refresh - which is what the `adjusted`
+badge means. In practice it tracks `/usage` in the CLI within a point or two.
+
+AI Monitor only reads local files. It never calls the Anthropic API with your credentials.
+
+---
+
+## 7. What the token and cost numbers mean
+
+- **API tokens** include cache reads, so large numbers are normal on long sessions (tens of
+  millions). This is traffic through the API, not the length of your conversation.
+- **Cost** is converted using API list prices so you can compare sessions against each other.
+  On a subscription plan this is **not** the amount you are billed. Edit `pricing.json` to
+  change the rates.
+- "Today" starts at 00:00 local time.
+
+---
+
+## 8. FAQ
+
+**I killed Copilot and it came back.** VS Code restarted it, that is not a bug in this tool.
+Disable the extension to stop it for good.
+
+**The Session or Weekly card says `stale`.** Claude Code has not refreshed its figure
+recently. Open Claude Code and it updates itself, see [section 6](#6-session-and-weekly-limits).
+
+**No AI sessions listed.** For Claude Code, check that `~/.claude/projects/` has data. For
+Codex or Copilot, only RAM and CPU can be tracked - they do not write a readable transcript.
+
+**Port 8899 is busy.** Nothing to do, the tool moves to another port. To force one specific
+port: `./run.sh --port 9001 --strict-port`.
+
+**Does the page flicker when it refreshes?** No. Each refresh only touches the values that
+actually changed, keeping your scroll position and any expanded branches.
+
+---
+
+## 9. Contributing
+
+Pull requests are welcome. `main` is protected: fork or branch, then open a PR - see
+[CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the checks to run before pushing.
+
+Technical documentation, design decisions and the traps already hit live in
+[CLAUDE.md](CLAUDE.md).
+
+---
+
+## 10. Support
+
+- Homepage: [mituultra.com](https://mituultra.com)
+- Email: [minhtuong2502@gmail.com](mailto:minhtuong2502@gmail.com)
+- Bugs and feature requests: [GitHub Issues](https://github.com/hominhtuong/AIMonitor/issues)

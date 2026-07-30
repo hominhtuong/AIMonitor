@@ -141,23 +141,29 @@ def official() -> dict:
         "ts": None,
         "age_sec": None,
         "stale": True,
-        "note": "Chưa đọc được hạn mức từ ~/.claude.json hay ~/.claude/rate-cache.json.",
+        # UI dịch theo note_key + note_args; `note` là bản tiếng Anh cho ai gọi API trực tiếp
+        "note_key": "note.no_source",
+        "note_args": {},
+        "note": "Could not read usage limits from ~/.claude.json or ~/.claude/rate-cache.json.",
     }
 
     cj = _claude_json_usage()
     if cj:
         age = max(0.0, time.time() - cj["ts"])
         out.update(cj)
+        fresh = age <= STALE_AFTER
         out.update(
             {
                 "available": True,
                 "source": "claude.json",
                 "path": "~/.claude.json",
                 "age_sec": round(age),
-                "stale": age > STALE_AFTER,
-                "note": "Số chính thức từ Claude Code (bảng Account & Usage)."
-                if age <= STALE_AFTER
-                else f"Số chính thức đọc cách đây {_age_txt(age)} - Claude Code chỉ làm mới khi đang chạy.",
+                "stale": not fresh,
+                "note_key": "note.official_fresh" if fresh else "note.official_aged",
+                "note_args": {} if fresh else {"age": round(age)},
+                "note": "Official figure from Claude Code (Account & Usage panel)."
+                if fresh
+                else "Claude Code last refreshed this a while ago; it only updates while running.",
             }
         )
         return out
@@ -189,13 +195,14 @@ def official() -> dict:
         }
     )
     if out["stale"]:
+        out["note_key"] = "note.statusline_stale"
         out["note"] = (
-            "Số chính thức đang cũ. Nó chỉ được cập nhật khi statusline của Claude Code chạy "
-            "(mở phiên Claude Code ở terminal, hoặc bật extension statusline). Trong lúc đó "
-            "dùng cột ước lượng local bên cạnh."
+            "This figure is old. It only updates when the Claude Code statusline runs."
         )
     else:
-        out["note"] = "Số chính thức từ Claude Code (statusline)."
+        out["note_key"] = "note.statusline_fresh"
+        out["note"] = "Official figure from Claude Code (statusline)."
+    out["note_args"] = {}
     return out
 
 
@@ -420,26 +427,37 @@ def _resolve(key: str, off: dict, limit: float | None, now: float) -> dict:
         "limit_tokens": round(limit) if limit else None,
     }
 
+    # Mỗi nhánh trả kèm note_key + note_args để UI dựng câu theo ngôn ngữ đang chọn;
+    # `note` giữ bản tiếng Anh cho ai đọc thẳng /api/snapshot.
     if official_pct is not None and not off.get("stale") and not expired and (drift or 0) >= MIN_SHOW_DRIFT:
         out.update(
             {
                 "pct": round(min(100.0, official_pct + drift), 1),
                 "source": "projected",
-                "note": f"{official_pct:.0f}% là số chính thức lúc Claude Code làm mới "
-                f"({_age_txt(age)} trước), cộng thêm ~{drift:.0f}% ước lượng theo token đã dùng "
-                "từ đó tới giờ.",
+                "note_key": "note.projected",
+                "note_args": {"pct": official_pct, "age": age, "drift": drift},
+                "note": f"{official_pct:.0f}% official at last refresh, plus ~{drift:.0f}% "
+                "estimated from tokens used since then.",
             }
         )
     elif official_pct is not None and not off.get("stale") and not expired:
-        out.update({"pct": official_pct, "source": "official", "note": "Số chính thức từ Claude Code."})
+        out.update(
+            {
+                "pct": official_pct,
+                "source": "official",
+                "note_key": "note.official",
+                "note_args": {},
+                "note": "Official figure from Claude Code.",
+            }
+        )
     elif est_pct is not None:
-        why = "cửa sổ đã sang chu kỳ mới" if expired else f"số chính thức cũ {_age_txt(age)}"
         out.update(
             {
                 "pct": est_pct,
                 "source": "estimate",
-                "note": f"Ước lượng theo token local ({why}), trần suy ra từ các lần đọc chính thức "
-                "trước đó. Là số xấp xỉ, không phải số của Anthropic.",
+                "note_key": "note.estimate_expired" if expired else "note.estimate_stale",
+                "note_args": {} if expired else {"age": age},
+                "note": "Estimated from local token usage. Approximate, not Anthropic's own number.",
             }
         )
     elif official_pct is not None and not expired:
@@ -447,8 +465,10 @@ def _resolve(key: str, off: dict, limit: float | None, now: float) -> dict:
             {
                 "pct": official_pct,
                 "source": "official_stale",
-                "note": f"Số chính thức đọc cách đây {_age_txt(age)}, cửa sổ này chưa reset nên thực tế "
-                "chỉ cao hơn chứ không thấp hơn.",
+                "note_key": "note.official_stale",
+                "note_args": {"age": age},
+                "note": "Official figure read a while ago; this window has not reset, "
+                "so the real value is higher, never lower.",
             }
         )
     else:
@@ -456,8 +476,10 @@ def _resolve(key: str, off: dict, limit: float | None, now: float) -> dict:
             {
                 "pct": None,
                 "source": "none",
-                "note": "Chưa có % đáng tin: số chính thức đã cũ và cửa sổ cũng đã sang chu kỳ mới. "
-                "Mở một phiên Claude Code ở terminal để statusline ghi lại hạn mức là có số ngay.",
+                "note_key": "note.none",
+                "note_args": {},
+                "note": "No trustworthy percentage yet: the official figure is stale and the "
+                "window has already rolled over.",
             }
         )
     return out
