@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Bản đóng gói (tự build lại bằng scripts/)
+build/
+dist/
+*.app/
+
+# Hệ điều hành / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Log chạy thử
+*.log

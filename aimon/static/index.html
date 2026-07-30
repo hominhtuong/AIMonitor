@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Monitor</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="hd">
+    <div class="brand">
+      <img src="/favicon.svg" alt="AI Monitor">
+      <h1>AI Monitor</h1>
+      <span class="tag">tiến trình &amp; agent AI trên máy này</span>
+    </div>
+
+    <div class="meter">
+      <div class="lbl"><span>RAM hệ thống</span><span id="mem-txt">-</span></div>
+      <div class="bar" id="mem-bar"><i style="width:0"></i></div>
+    </div>
+
+    <div class="meter">
+      <div class="lbl"><span>RAM do AI dùng</span><span id="ai-txt">-</span></div>
+      <div class="bar g" id="ai-bar"><i style="width:0"></i></div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <span id="load" class="tag"></span>
+    <label class="chk" title="Làm sáng nhẹ con số vừa đổi (chỉ màu chữ, không đổi nền)">
+      <input type="checkbox" id="fx"> Hiệu ứng
+    </label>
+    <select id="interval" title="Chu kỳ tự làm mới">
+      <option value="1000">1 giây</option>
+      <option value="2000">2 giây</option>
+      <option value="3000" selected>3 giây</option>
+      <option value="5000">5 giây</option>
+      <option value="10000">10 giây</option>
+      <option value="0">Tắt tự động</option>
+    </select>
+    <button id="refresh">Làm mới</button>
+    <span id="stamp" class="tag">đang tải...</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="usage" id="usage"></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="chips" id="chips"></div>
+
+  <div class="tabs">
+    <button data-tab="ai" class="on">AI &amp; Agent</button>
+    <button data-tab="res">Tài nguyên</button>
+    <button data-tab="net">Cổng &amp; Docker</button>
+  </div>
+
+  <section class="pane on" id="pane-ai">
+    <h2>Phiên AI đang chạy</h2>
+    <p class="hint">Mỗi thẻ là 1 tiến trình AI gốc kèm cây con (MCP server, browser automation). Token / chi phí đọc từ transcript của phiên.</p>
+    <div id="live"></div>
+
+    <div class="h2row">
+      <h2>Phiên đã đóng</h2>
+      <select id="closed-range" title="Khoảng thời gian">
+        <option value="today" selected>Hôm nay</option>
+        <option value="7d">7 ngày</option>
+      </select>
+      <span class="hint" style="margin:0">Tiến trình không còn chạy, chỉ còn transcript - dùng để đối chiếu token và chi phí.</span>
+    </div>
+    <div id="closed"></div>
+  </section>
+
+  <section class="pane" id="pane-res">
+    <h2>Tiến trình ngốn tài nguyên</h2>
+    <div class="toolbar">
+      <input type="text" id="filter" placeholder="Lọc theo tên / PID / lệnh...">
+      <label class="chk"><input type="checkbox" id="mine" checked> Chỉ tiến trình của tôi</label>
+      <label class="chk"><input type="checkbox" id="aionly"> Chỉ liên quan AI</label>
+      <span class="tag" id="res-count"></span>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>PID</th><th>Tên</th><th>Loại</th>
+        <th class="num">RAM</th><th class="num">CPU</th><th class="num">Uptime</th><th>Thao tác</th>
+      </tr></thead>
+      <tbody id="res-body"></tbody>
+    </table></div>
+  </section>
+
+  <section class="pane" id="pane-net">
+    <h2>Cổng local đang mở (LISTEN)</h2>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th class="num">Cổng</th><th>Địa chỉ</th><th>PID</th><th>Tiến trình</th><th>Ghi chú</th><th>Thao tác</th>
+      </tr></thead>
+      <tbody id="port-body"></tbody>
+    </table></div>
+
+    <h2>Docker container</h2>
+    <div id="docker"></div>
+  </section>
+
+  <div class="foot">AI Monitor · dữ liệu đọc trực tiếp từ máy, không gửi ra ngoài · <span id="ver"></span></div>
+</div>
+
+<div id="modal" hidden>
+  <div class="box" role="dialog" aria-modal="true">
+    <h3 id="m-title">Xác nhận</h3>
+    <p id="m-body"></p>
+    <div class="warnline" id="m-warn" hidden></div>
+    <div class="row">
+      <button id="m-cancel">Huỷ</button>
+      <button id="m-ok" class="primary">Xác nhận</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
