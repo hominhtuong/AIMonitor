@@ -1,0 +1,48 @@
+{
+  "name": "aimon-vscode",
+  "displayName": "AI Monitor",
+  "description": "Monitor AI processes, token usage, and account limits inside VSCode",
+  "version": "0.1.0",
+  "publisher": "aimonitor",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aimon",
+          "title": "AI Monitor",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "aimon": [
+        {
+          "id": "aimon.dashboardView",
+          "name": "Dashboard",
+          "type": "webview"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test": "node --require ts-node/register --test test/*.test.ts",
+    "prepackage": "node scripts/copy-aimon.js",
+    "package": "npm run prepackage && npm run compile && vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.21.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.2",
+    "@vscode/vsce": "^2.24.0"
+  }
+}
