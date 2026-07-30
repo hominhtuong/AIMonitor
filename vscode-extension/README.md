@@ -22,7 +22,7 @@ không gửi dữ liệu ra ngoài, không gọi API bên thứ ba.
 Extension chưa lên VSCode Marketplace, cài từ file `.vsix`:
 
 ```bash
-code --install-extension aimon-vscode-0.1.0.vsix
+code --install-extension aimon-vscode-0.1.1.vsix
 ```
 
 Hoặc trong VSCode: mở Extensions panel → nút `...` → **Install from VSIX...** → chọn file.
@@ -32,6 +32,6 @@ mở dashboard.
 
 ## Trạng thái
 
-Bản 0.1.0, dùng thử nội bộ. Xem repo chính
+Bản 0.1.1, dùng thử nội bộ. Xem repo chính
 [hominhtuong/AIMonitor](https://github.com/hominhtuong/AIMonitor) để biết thêm về app macOS/
 Windows độc lập, hoặc báo lỗi.

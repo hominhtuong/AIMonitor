@@ -2,7 +2,7 @@
   "name": "aimon-vscode",
   "displayName": "AI Monitor",
   "description": "Monitor AI processes, token usage, and account limits inside VSCode",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "aimonitor",
   "icon": "images/icon.png",
   "engines": {
