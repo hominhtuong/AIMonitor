@@ -1,0 +1,83 @@
+name: Build Windows app
+
+# Push lên main => có sẵn bản build để tải trong tab Actions.
+# Đẩy tag v* => đính kèm AIMonitor.exe vào Release.
+#
+# PyInstaller chỉ là công cụ lúc build, không phải dependency của tool: người dùng tải
+# AIMonitor.exe về là chạy, KHÔNG cần cài Python. Ràng buộc "chỉ dùng stdlib" của code
+# trong aimon/ vẫn giữ nguyên.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Kiểm tra cú pháp
+        run: python -m compileall -q aimon windows
+
+      - name: Cài PyInstaller
+        run: pip install --disable-pip-version-check pyinstaller
+
+      - name: Đóng gói AIMonitor.exe
+        run: |
+          pyinstaller --noconfirm --clean --onefile --noconsole `
+            --name AIMonitor `
+            --icon assets/icon.ico `
+            --add-data "aimon/static;aimon/static" `
+            --add-data "pricing.json;." `
+            windows/app_win.py
+
+      - name: Chạy thử bản đã đóng gói
+        shell: pwsh
+        run: |
+          # --no-window: chỉ bật server, không mở cửa sổ (runner không có ai nhìn)
+          $p = Start-Process -FilePath dist/AIMonitor.exe -ArgumentList '--no-window' -PassThru
+          $url = $null
+          foreach ($i in 1..30) {
+            Start-Sleep -Seconds 1
+            $state = "$env:USERPROFILE\.aimon\instance.json"
+            if (Test-Path $state) {
+              $url = (Get-Content $state -Raw | ConvertFrom-Json).url
+              if ($url) { break }
+            }
+          }
+          if (-not $url) { Stop-Process -Id $p.Id -Force; throw "Server không khởi động được" }
+          $v = Invoke-RestMethod "$url/api/version" -TimeoutSec 5
+          Write-Host "version=$($v.version) os=$($v.os)"
+          # đọc luôn snapshot: đây mới là chỗ lộ ra nếu đóng gói thiếu pricing.json / static
+          $snap = Invoke-RestMethod "$url/api/snapshot" -TimeoutSec 30
+          if (-not $snap.totals) { throw "Snapshot thiếu dữ liệu" }
+          Invoke-WebRequest "$url/static/app.js" -TimeoutSec 5 | Out-Null
+          Write-Host "OK - exe chạy được, có đủ tài nguyên"
+          Stop-Process -Id $p.Id -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AIMonitor-windows
+          path: dist/AIMonitor.exe
+
+      - name: Đính kèm vào Release khi đẩy tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AIMonitor.exe
+          body: |
+            ## Windows
+
+            Tải `AIMonitor.exe` về chạy thẳng, không cần cài Python.
+
+            Lần đầu chạy, Windows SmartScreen sẽ hiện cảnh báo vì file chưa mua chứng chỉ ký:
+            bấm **More info => Run anyway**.

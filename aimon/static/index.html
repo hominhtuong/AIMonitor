@@ -26,22 +26,25 @@
       <div class="bar g" id="ai-bar"><i style="width:0"></i></div>
     </div>
 
-    <div class="spacer"></div>
-
-    <span id="load" class="tag"></span>
-    <label class="chk" title="Làm sáng nhẹ con số vừa đổi (chỉ màu chữ, không đổi nền)">
-      <input type="checkbox" id="fx"> Hiệu ứng
-    </label>
-    <select id="interval" title="Chu kỳ tự làm mới">
-      <option value="1000">1 giây</option>
-      <option value="2000">2 giây</option>
-      <option value="3000" selected>3 giây</option>
-      <option value="5000">5 giây</option>
-      <option value="10000">10 giây</option>
-      <option value="0">Tắt tự động</option>
-    </select>
-    <button id="refresh">Làm mới</button>
-    <span id="stamp" class="tag">đang tải...</span>
+    <!-- Gom thành một cụm để khi cửa sổ hẹp thì cả cụm xuống hàng và vẫn dồn về phải,
+         thay vì từng nút rơi lẻ ra góc trái. -->
+    <div class="ctl">
+      <span id="load" class="tag"></span>
+      <label class="chk" title="Làm sáng nhẹ con số vừa đổi (chỉ màu chữ, không đổi nền)">
+        <input type="checkbox" id="fx"> Hiệu ứng
+      </label>
+      <select id="interval" title="Chu kỳ tự làm mới">
+        <option value="1000">1 giây</option>
+        <option value="2000">2 giây</option>
+        <option value="3000" selected>3 giây</option>
+        <option value="5000">5 giây</option>
+        <option value="10000">10 giây</option>
+        <option value="0">Tắt tự động</option>
+      </select>
+      <button id="refresh">Làm mới</button>
+      <button id="quit" title="Dừng hẳn AI Monitor trên máy">Tắt</button>
+      <span id="stamp" class="tag">đang tải...</span>
+    </div>
   </div>
 </header>
 
@@ -52,6 +55,7 @@
 
   <div class="tabs">
     <button data-tab="ai" class="on">AI &amp; Agent</button>
+    <button data-tab="hist">Lịch sử phiên</button>
     <button data-tab="res">Tài nguyên</button>
     <button data-tab="net">Cổng &amp; Docker</button>
   </div>
@@ -70,6 +74,38 @@
       <span class="hint" style="margin:0">Tiến trình không còn chạy, chỉ còn transcript - dùng để đối chiếu token và chi phí.</span>
     </div>
     <div id="closed"></div>
+  </section>
+
+  <section class="pane" id="pane-hist">
+    <h2>Lịch sử phiên trên máy này</h2>
+    <p class="hint">Đọc toàn bộ transcript trong <code>~/.claude/projects</code>. Chi phí là giá API quy đổi theo <code>pricing.json</code> - dùng để so sánh tỷ trọng giữa các tác vụ, không phải số tiền thật của gói thuê bao. Dữ liệu này chỉ có của riêng máy đang chạy AI Monitor.</p>
+    <div class="toolbar">
+      <select id="hist-range" title="Khoảng thời gian">
+        <option value="7">7 ngày</option>
+        <option value="30">30 ngày</option>
+        <option value="90">90 ngày</option>
+        <option value="all" selected>Toàn bộ</option>
+      </select>
+      <select id="hist-sort" title="Sắp xếp">
+        <option value="cost" selected>Chi phí cao nhất</option>
+        <option value="token">Token nhiều nhất</option>
+        <option value="msgs">Nhiều lượt gọi nhất</option>
+        <option value="recent">Mới nhất</option>
+      </select>
+      <input type="text" id="hist-filter" placeholder="Lọc theo tác vụ / thư mục / model...">
+      <button id="hist-reload">Quét lại</button>
+      <span class="tag" id="hist-meta"></span>
+    </div>
+
+    <div class="kpis" id="hist-kpis"></div>
+
+    <div class="h2row"><h2>Theo project</h2>
+      <span class="hint" style="margin:0">Gộp các phiên cùng thư mục làm việc.</span>
+    </div>
+    <div id="hist-proj"></div>
+
+    <div class="h2row"><h2>Theo phiên</h2><span class="tag" id="hist-count"></span></div>
+    <div id="hist-sess"></div>
   </section>
 
   <section class="pane" id="pane-res">

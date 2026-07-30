@@ -17,6 +17,8 @@ const S = {
   modalOpen: false,
   caps: { pause: true, os: 'macos' },
   fx: false,   // hiệu ứng sáng chữ khi số đổi - mặc định tắt
+  hist: null,        // kết quả /api/sessions - nạp lười, không nằm trong vòng 3 giây
+  histBusy: false,
 };
 
 try { S.fx = localStorage.getItem('aimon.fx') === '1'; } catch (e) { /* chế độ riêng tư */ }
@@ -282,42 +284,54 @@ function renderHeader() {
   if (sys.load && sys.load.length) el.title = `Load average 1/5/15 phút: ${sys.load.join(' / ')}`;
 }
 
-const OFFICIAL_HINT =
-  'Phần trăm hạn mức do Claude Code báo ra, đọc từ ~/.claude/rate-cache.json. ' +
-  'File này chỉ được ghi khi statusline của Claude Code chạy, nên có lúc không có số mới. ' +
-  'Khi đó ô này hiển thị lượng token thực tế đã dùng, đọc trực tiếp từ transcript.';
+/* Nhãn ngắn cho từng nguồn số. Luôn nói rõ số đến từ đâu thay vì lặng lẽ đổi ý nghĩa
+ * con số to - người dùng nhìn ô này để quyết định còn chạy tiếp được bao lâu. */
+const SRC_BADGE = {
+  official: '',
+  projected: 'có bù',
+  official_stale: 'số cũ',
+  estimate: 'ước lượng',
+  none: 'chưa có số',
+};
 
-/** 1 ô hạn mức. Có % chính thức còn mới => hiện %; không có/đã cũ => chỉ hiện số local. */
-function gauge(key, title, pct, resetIn, local, localLabel) {
-  const fresh = pct != null && !S.snap.usage.official.stale;
-  const p = fresh ? Math.max(0, Math.min(100, pct)) : 0;
-  const big = fresh ? p.toFixed(0) + '%' : fmtTok(local.total);
-  const sub = fresh
-    ? (resetIn > 0 ? 'Reset sau ' + fmtDur(resetIn) : 'Chờ mốc reset mới')
-    : `${localLabel} · ${local.msgs || 0} lượt gọi`;
-  return `<div class="ubox" data-key="u-${key}" title="${esc(OFFICIAL_HINT)}">
-    <div class="hdr"><b>${esc(title)}</b><span class="pct" data-flash="1">${esc(big)}</span></div>
-    ${fresh
-      ? `<div class="bar lg ${barClass(p)}"><i style="width:${p}%"></i></div>`
-      : '<div class="bar lg"><i style="width:0"></i></div>'}
-    <div class="sub">${esc(sub)}</div>
-    <div class="loc" data-flash="1">${fresh
-      ? `${esc(localLabel)}: ${fmtTok(local.total)} token · ${money(local.cost)}`
-      : `${money(local.cost)} · token đã dùng theo transcript`}</div>
+/** 1 ô hạn mức. Số to luôn là %; backend đã chốt sẵn lấy % từ nguồn nào. */
+function gauge(key, title, w) {
+  w = w || {};
+  const pct = w.pct;
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const big = pct == null ? '--' : (w.source === 'official' ? '' : '≈') + Math.round(pct) + '%';
+  const badge = SRC_BADGE[w.source] || '';
+
+  const bits = [];
+  if (w.resets_in > 0) bits.push('Reset sau ' + fmtDur(w.resets_in));
+  else bits.push('Chưa xác định được mốc reset');
+  // Nói rõ số to gồm những gì, để không ai tưởng đó là số chính thức tuyệt đối
+  if (w.source === 'projected') {
+    bits.push(`${Math.round(w.official_pct)}% cách đây ${fmtDur(w.official_age_sec)} + ~${Math.round(w.drift_pct)}% ước tính`);
+  } else if (w.source === 'official_stale' && w.official_age_sec) {
+    bits.push('đọc cách đây ' + fmtDur(w.official_age_sec));
+  }
+
+  return `<div class="ubox" data-key="u-${key}" title="${esc(w.note || '')}">
+    <div class="hdr"><b>${esc(title)}</b>
+      ${badge ? `<span class="src">${esc(badge)}</span>` : ''}
+      <span class="pct${pct == null ? ' off' : ''}" data-flash="1">${esc(big)}</span></div>
+    <div class="bar lg ${pct == null ? '' : barClass(p)}"><i style="width:${p}%"></i></div>
+    <div class="sub">${esc(bits.join(' · '))}</div>
+    <div class="loc" data-flash="1">${fmtTok(w.tokens)} token · ${money(w.cost)} · ${w.msgs || 0} lượt gọi</div>
   </div>`;
 }
 
 /** Row trên: thống kê Claude (hạn mức + token + chi phí hôm nay). */
 function renderUsage() {
   const s = S.snap, t = s.totals;
-  const off = (s.usage || {}).official || {};
-  const loc = (s.usage || {}).local || {};
-  const h5 = loc.h5 || { total: 0, cost: 0, msgs: 0 };
+  const u = s.usage || {};
+  const loc = u.local || {};
   const d7 = loc.d7 || { total: 0, cost: 0, msgs: 0 };
 
   render('#usage',
-    gauge('h5', 'Session (5 giờ)', off.five_hour_pct, off.five_hour_in, h5, '5 giờ qua') +
-    gauge('d7', 'Weekly (7 ngày)', off.seven_day_pct, off.seven_day_in, d7, '7 ngày qua') +
+    gauge('h5', 'Session (5 giờ)', u.five_hour) +
+    gauge('d7', 'Weekly (7 ngày)', u.seven_day) +
     `<div class="ubox" data-key="u-tok">
       <div class="hdr"><b>Token API hôm nay</b><span class="pct" data-flash="1">${fmtTok(t.today.total)}</span></div>
       <div class="sub">${t.today.msgs} lượt gọi · tính từ 00:00</div>
@@ -504,6 +518,119 @@ function renderClosed() {
   </tbody></table></div>`);
 }
 
+/* ------------------------------------------------------- tab Lịch sử phiên */
+
+/** Quét toàn bộ transcript - nặng nên nạp lười, chỉ khi mở tab hoặc bấm quét lại. */
+async function loadHistory(force) {
+  const range = $('#hist-range').value;
+  if (S.histBusy) return;
+  if (S.hist && S.hist.range === range && !force) return renderHist();
+  S.histBusy = true;
+  setText('#hist-meta', 'đang quét transcript...');
+  try {
+    const r = await fetch('/api/sessions?days=' + encodeURIComponent(range), { cache: 'no-store' });
+    const d = await r.json();
+    if (d.error) {
+      toast('Không đọc được lịch sử: ' + d.error, 'err');
+      setText('#hist-meta', 'lỗi đọc transcript');
+      return;
+    }
+    d.range = range;
+    S.hist = d;
+    renderHist();
+  } catch (e) {
+    setText('#hist-meta', 'mất kết nối server');
+  } finally {
+    S.histBusy = false;
+  }
+}
+
+function histRows() {
+  const q = ($('#hist-filter').value || '').toLowerCase().trim();
+  let rows = S.hist.sessions;
+  if (q) {
+    rows = rows.filter((r) =>
+      (r.title || '').toLowerCase().includes(q) ||
+      (r.last_prompt || '').toLowerCase().includes(q) ||
+      (r.cwd || '').toLowerCase().includes(q) ||
+      r.models.join(' ').toLowerCase().includes(q));
+  }
+  const by = $('#hist-sort').value;
+  const rank = by === 'token' ? (r) => -r.api_total
+    : by === 'msgs' ? (r) => -r.msgs
+    : by === 'recent' ? (r) => -r.last_ts
+    : (r) => -r.cost_usd;
+  return rows.slice().sort((a, b) => rank(a) - rank(b));
+}
+
+/** Thanh tỷ trọng: dài theo mức cao nhất đang hiển thị, để hàng nhỏ vẫn nhìn thấy. */
+function shareCell(pct, max) {
+  const w = max > 0 ? Math.max(2, (pct / max) * 100) : 0;
+  return `<div class="share"><div class="bar"><i style="width:${w}%"></i></div><span>${pct.toFixed(2)}%</span></div>`;
+}
+
+function renderHist() {
+  const h = S.hist;
+  if (!h) return;
+  const T = h.totals;
+  setText('#hist-meta',
+    `${h.scanned_files} file · quét ${h.scan_sec}s · sớm nhất ${dayOf(T.first_ts)}`);
+
+  render('#hist-kpis', [
+    { k: 'ses', n: T.sessions, l: 'Phiên đã ghi nhận',
+      s: T.msgs.toLocaleString('vi-VN') + ' lượt gọi API' },
+    { k: 'cost', n: money(T.cost_usd), l: 'Tổng chi phí quy đổi', s: 'giá API theo pricing.json' },
+    { k: 'tok', n: fmtTok(T.api_total), l: 'Tổng token API',
+      s: `ra ${fmtTok(T.output)} · cache read ${fmtTok(T.cache_read)}` },
+    { k: 'proj', n: h.projects.length, l: 'Project đã đụng tới',
+      s: h.projects.length ? 'nặng nhất: ' + h.projects[0].name : '-' },
+  ].map((c) => `<div class="kpi" data-key="h-${c.k}">
+      <div class="n">${esc(c.n)}</div><div class="l">${esc(c.l)}</div><div class="s">${esc(c.s)}</div>
+    </div>`).join(''));
+
+  const maxP = h.projects.reduce((m, p) => Math.max(m, p.cost_pct), 0);
+  render('#hist-proj', h.projects.length
+    ? `<div class="tbl-wrap" data-key="hp-tbl"><table>
+      <thead><tr>
+        <th>Project</th><th class="num">Phiên</th><th class="num">Lượt</th>
+        <th class="num">Token API</th><th class="num">Chi phí</th><th class="num">Tỷ trọng</th><th class="num">Gần nhất</th>
+      </tr></thead><tbody>
+      ${h.projects.map((p) => `<tr data-key="hp-${esc(p.name)}">
+        <td class="nm">${esc(p.name)}</td>
+        <td class="num">${p.sessions}</td>
+        <td class="num">${p.msgs}</td>
+        <td class="num">${fmtTok(p.api_total)}</td>
+        <td class="num">${money(p.cost_usd)}</td>
+        <td class="num">${shareCell(p.cost_pct, maxP)}</td>
+        <td class="num">${dayOf(p.last_ts)}</td>
+      </tr>`).join('')}
+      </tbody></table></div>`
+    : '<div class="empty" data-key="hp-none">Chưa có phiên nào trong khoảng này.</div>');
+
+  const rows = histRows();
+  const maxS = rows.reduce((m, r) => Math.max(m, r.cost_pct), 0);
+  setText('#hist-count', `${rows.length} / ${T.sessions} phiên`);
+  render('#hist-sess', rows.length
+    ? `<div class="tbl-wrap" data-key="hs-tbl"><table>
+      <thead><tr>
+        <th>Tác vụ</th><th>Thư mục</th><th>Model</th>
+        <th class="num">Lượt</th><th class="num">Token API</th><th class="num">Chi phí</th>
+        <th class="num">Tỷ trọng</th><th class="num">Hoạt động cuối</th>
+      </tr></thead><tbody>
+      ${rows.map((r) => `<tr data-key="hs-${esc(r.session_id)}">
+        <td class="nm">${esc((r.title || r.last_prompt || r.session_id).slice(0, 60))}</td>
+        <td>${esc(r.cwd.split('/').pop() || r.project)}${r.git_branch ? ' <span class="badge branch">' + esc(r.git_branch) + '</span>' : ''}</td>
+        <td>${esc(r.models.map((m) => m.replace('claude-', '')).join(', '))}</td>
+        <td class="num">${r.msgs}</td>
+        <td class="num">${fmtTok(r.api_total)}</td>
+        <td class="num">${money(r.cost_usd)}</td>
+        <td class="num">${shareCell(r.cost_pct, maxS)}</td>
+        <td class="num">${dayOf(r.last_ts)} ${clockOf(r.last_ts)}</td>
+      </tr>`).join('')}
+      </tbody></table></div>`
+    : '<div class="empty" data-key="hs-none">Không có phiên nào khớp bộ lọc.</div>');
+}
+
 function renderRes() {
   const q = ($('#filter').value || '').toLowerCase().trim();
   const mineOnly = $('#mine').checked;
@@ -575,8 +702,14 @@ document.querySelectorAll('.tabs button').forEach((b) => {
     S.tab = b.dataset.tab;
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
     document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'pane-' + S.tab));
+    if (S.tab === 'hist') loadHistory();
   });
 });
+
+$('#hist-range').addEventListener('change', () => loadHistory());
+$('#hist-reload').addEventListener('click', () => loadHistory(true));
+['#hist-sort', '#hist-filter'].forEach((sel) =>
+  $(sel).addEventListener('input', () => { if (S.hist) renderHist(); }));
 
 ['#filter', '#mine', '#aionly'].forEach((sel) =>
   $(sel).addEventListener('input', () => { if (S.snap) renderRes(); }));
@@ -590,6 +723,18 @@ $('#fx').addEventListener('change', () => {
 });
 
 $('#refresh').addEventListener('click', loadSnapshot);
+
+/* Mở bằng icon app thì không có terminal để Ctrl+C, nên tắt hẳn từ đây. */
+$('#quit').addEventListener('click', async () => {
+  const ok = await askConfirm('Tắt AI Monitor?',
+    'Server trên máy sẽ dừng, trang này ngừng cập nhật. Mở lại bằng icon AI Monitor hoặc run.sh.');
+  if (!ok) return;
+  if (S.timer) { clearInterval(S.timer); S.timer = null; }
+  S.interval = 0;
+  try { await fetch('/api/quit', { method: 'POST' }); } catch (e) { /* server tắt giữa chừng là bình thường */ }
+  toast('Đã tắt AI Monitor. Đóng tab này được rồi.', 'ok');
+  setText('#stamp', 'đã dừng');
+});
 $('#interval').addEventListener('change', () => { S.interval = +$('#interval').value; schedule(); });
 document.addEventListener('visibilitychange', schedule);
 

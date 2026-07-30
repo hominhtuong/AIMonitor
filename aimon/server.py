@@ -8,11 +8,16 @@ Chạy:
 
 Chỉ dùng Python stdlib (>= 3.9). Server bind 127.0.0.1, không mở ra LAN,
 không gửi dữ liệu đi đâu.
+
+Cổng: thích 8899, nếu bận thì tự lùi 8900, 8901... rồi cuối cùng xin cổng ngẫu nhiên
+từ OS. Nếu cổng bận vì AI Monitor đã chạy sẵn thì không bật instance thứ hai, chỉ mở
+lại tab cũ (dùng --new nếu thật sự muốn thêm instance, --strict-port nếu cần đúng cổng).
 """
 
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import mimetypes
 import os
@@ -30,13 +35,22 @@ if __package__ in (None, ""):  # cho phép chạy `python3 aimon/server.py`
 from .collectors import claude as C  # noqa: E402
 from .collectors import ports as PO  # noqa: E402
 from .collectors import procs as P  # noqa: E402
+from . import instance as INST  # noqa: E402
 from . import snapshot as SNAP  # noqa: E402
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+# Bản .exe cho Windows (PyInstaller) giải nén tài nguyên ra thư mục tạm sys._MEIPASS,
+# không nằm cạnh file .py nữa.
+BASE = os.path.join(sys._MEIPASS, "aimon") if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE, "static")
 IS_WINDOWS = sys.platform.startswith("win")
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
+
+DEFAULT_PORT = 8899
+PORT_SCAN_TRIES = 20  # 8899..8919 rồi mới xin cổng ngẫu nhiên
+
+# Điền trong main(), để /api/version báo lại cổng thật đang dùng
+RUNTIME: dict = {"host": "", "port": 0, "url": ""}
 
 
 # ---------------------------------------------------------------- thao tác
@@ -193,14 +207,32 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/events":
             sid = (parse_qs(u.query).get("session") or [""])[0]
             return self._json({"session_id": sid, "events": C.events(sid)})
+        if route == "/api/sessions":
+            # Quét toàn bộ transcript nên chỉ chạy khi người dùng mở tab Lịch sử,
+            # không nằm trong vòng làm mới 3 giây của /api/snapshot.
+            raw = (parse_qs(u.query).get("days") or ["all"])[0]
+            try:
+                days = None if raw == "all" else max(1.0, float(raw))
+            except ValueError:
+                days = None
+            try:
+                return self._json(C.history(days))
+            except Exception as e:
+                return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
         if route == "/api/ports":
             return self._json(PO.collect(force=True))
         if route == "/api/version":
-            return self._json({"version": VERSION, **P.capabilities()})
+            return self._json({"version": VERSION, **RUNTIME, **P.capabilities()})
         return self._json({"error": "not found"}, 404)
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/action":
+        route = urlparse(self.path).path
+        if route == "/api/quit":
+            # Mở bằng app icon thì không có terminal nào để Ctrl+C, nên phải tắt được từ trang.
+            self._json({"ok": True})
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return
+        if route != "/api/action":
             return self._json({"error": "not found"}, 404)
         length = int(self.headers.get("Content-Length") or 0)
         try:
@@ -222,33 +254,135 @@ def _warmup() -> None:
         pass
 
 
+# ---------------------------------------------------------------- chọn cổng
+
+
+def _bind(host: str, port: int) -> ThreadingHTTPServer | None:
+    """Thử mở cổng. None nếu cổng đang bận / không được phép; lỗi khác thì raise."""
+    try:
+        return ThreadingHTTPServer((host, port), Handler)
+    except OSError as e:
+        if e.errno in (errno.EADDRINUSE, errno.EACCES):
+            return None
+        raise
+
+
+def _bind_auto(host: str, preferred: int) -> ThreadingHTTPServer | None:
+    """Cổng mong muốn trước; bận thì lùi dần; hết thì để OS cấp cổng ngẫu nhiên."""
+    httpd = _bind(host, preferred)
+    if httpd is not None:
+        return httpd
+    for port in range(preferred + 1, min(preferred + 1 + PORT_SCAN_TRIES, 65536)):
+        httpd = _bind(host, port)
+        if httpd is not None:
+            return httpd
+    return _bind(host, 0)
+
+
+def _on_sigterm(httpd: ThreadingHTTPServer) -> None:
+    """Bắt SIGTERM để serve_forever() thoát êm, chạy nốt finally (dọn state file)."""
+    import signal
+
+    if IS_WINDOWS:
+        return
+    try:
+        signal.signal(signal.SIGTERM, lambda *_: threading.Thread(target=httpd.shutdown).start())
+    except (OSError, ValueError):
+        pass  # không phải main thread thì thôi
+
+
+def _running_instance(host: str, preferred: int) -> dict | None:
+    """Đã có AI Monitor chạy sẵn? Kiểm tra cổng mong muốn rồi tới cổng trong state file."""
+    seen: set[tuple[str, int]] = set()
+    candidates = [(host, preferred)]
+    st = INST.read() or {}
+    if st.get("port"):
+        try:
+            candidates.append((st.get("host") or host, int(st["port"])))
+        except (TypeError, ValueError):
+            pass
+    for h, p in candidates:
+        if (h, p) in seen:
+            continue
+        seen.add((h, p))
+        info = INST.probe(h, p)
+        if info:
+            return {"host": h, "port": p, "url": INST.url_of(h, p), "version": info.get("version")}
+    return None
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="AI Monitor - dashboard tiến trình AI local")
-    ap.add_argument("--port", type=int, default=int(os.environ.get("AIMON_PORT", 8899)))
+    ap.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("AIMON_PORT", DEFAULT_PORT)),
+        help=f"cổng mong muốn (mặc định {DEFAULT_PORT}); bận thì tự tìm cổng trống khác",
+    )
     ap.add_argument("--host", default=os.environ.get("AIMON_HOST", "127.0.0.1"))
     ap.add_argument("--open", action="store_true", help="mở browser sau khi server chạy")
+    ap.add_argument(
+        "--strict-port",
+        action="store_true",
+        help="bắt buộc đúng cổng --port, đang bận thì báo lỗi thay vì đổi cổng",
+    )
+    ap.add_argument(
+        "--new",
+        action="store_true",
+        help="luôn bật instance mới, kể cả khi AI Monitor đang chạy",
+    )
     args = ap.parse_args(argv)
+
+    # Đang chạy rồi thì mở lại tab cũ, không bật thêm instance thứ hai
+    if not args.new:
+        found = _running_instance(args.host, args.port)
+        if found:
+            ver = f" {found['version']}" if found.get("version") else ""
+            print(f"AI Monitor{ver} đang chạy rồi: {found['url']}", flush=True)
+            if args.open:
+                webbrowser.open(found["url"])
+            else:
+                print("Dùng --new nếu muốn bật thêm một instance nữa.", flush=True)
+            return 0
 
     P.snapshot()  # snapshot mồi để lần gọi đầu có %CPU
     threading.Thread(target=_warmup, daemon=True).start()
 
-    try:
-        httpd = ThreadingHTTPServer((args.host, args.port), Handler)
-    except OSError as e:
-        print(f"Không mở được cổng {args.port}: {e}", file=sys.stderr)
-        print("Có thể AI Monitor đang chạy rồi, hoặc dùng --port khác.", file=sys.stderr)
-        return 1
+    if args.strict_port:
+        httpd = _bind(args.host, args.port)
+        if httpd is None:
+            print(f"Cổng {args.port} đang bận (đang bật --strict-port).", file=sys.stderr)
+            print("Bỏ --strict-port để tự đổi cổng, hoặc chọn --port khác.", file=sys.stderr)
+            return 1
+    else:
+        httpd = _bind_auto(args.host, args.port)
+        if httpd is None:
+            print(f"Không mở được cổng nào quanh {args.port}.", file=sys.stderr)
+            return 1
 
-    url = f"http://{args.host}:{args.port}"
-    print(f"AI Monitor {VERSION} đang chạy: {url}   (Ctrl+C để dừng)")
+    port = httpd.server_address[1]
+    if port != args.port:
+        print(f"Cổng {args.port} đang bận => dùng cổng {port}.", flush=True)
+
+    import platform
+
+    url = INST.url_of(args.host, port)
+    # arch để cài đặt trên macOS kiểm tra được app có bị chạy qua Rosetta hay không
+    RUNTIME.update({"host": args.host, "port": port, "url": url, "arch": platform.machine()})
+    INST.write(args.host, port, VERSION)
+
+    # flush vì stdout có thể bị pipe (AIMonitor.app, nohup) - vẫn phải thấy URL ngay
+    print(f"AI Monitor {VERSION} đang chạy: {url}   (Ctrl+C để dừng)", flush=True)
     if args.open:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+    _on_sigterm(httpd)  # `kill <pid>` cũng phải dọn state như Ctrl+C
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nĐã dừng AI Monitor.")
     finally:
         httpd.server_close()
+        INST.clear()
     return 0
 
 

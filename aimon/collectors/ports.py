@@ -14,6 +14,8 @@ import shutil
 import subprocess
 import sys
 
+from .. import instance as INST
+
 IS_WINDOWS = sys.platform.startswith("win")
 TTL = 5.0
 
@@ -26,11 +28,18 @@ INTERESTING = {
     5173: "Vite",
     8000: "HTTP dev",
     8080: "HTTP dev",
-    8899: "AI Monitor",
+    8899: "AI Monitor (cổng mặc định)",
 }
 
 
-def _listening_posix() -> list[dict]:
+def _note(port: int, pid: int, me: tuple[int, int]) -> str:
+    """Cổng của AI Monitor là động nên phải tra từ state file, không hardcode được."""
+    if me[0] and (port, pid) == me:
+        return "AI Monitor (trang này)"
+    return INTERESTING.get(port, "")
+
+
+def _listening_posix(me: tuple[int, int] = (0, 0)) -> list[dict]:
     if not shutil.which("lsof"):
         return []
     try:
@@ -62,7 +71,7 @@ def _listening_posix() -> list[dict]:
                 "pid": pid,
                 "command": cmd.replace("\\x20", " "),
                 "user": user,
-                "note": INTERESTING.get(port, ""),
+                "note": _note(port, pid, me),
             },
         )
     return sorted(rows.values(), key=lambda r: r["port"])
@@ -87,7 +96,7 @@ def _tasklist_names() -> dict[int, str]:
     return names
 
 
-def _listening_windows() -> list[dict]:
+def _listening_windows(me: tuple[int, int] = (0, 0)) -> list[dict]:
     try:
         out = subprocess.run(
             ["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, timeout=20
@@ -116,7 +125,7 @@ def _listening_windows() -> list[dict]:
                 "pid": pid,
                 "command": names.get(pid, "?"),
                 "user": "",
-                "note": INTERESTING.get(port, ""),
+                "note": _note(port, pid, me),
             },
         )
     return sorted(rows.values(), key=lambda r: r["port"])
@@ -157,7 +166,8 @@ def collect(force: bool = False) -> dict:
     now = time.time()
     if force or now - _cache["ts"] > TTL:
         docker, available = _docker()
-        ports = _listening_windows() if IS_WINDOWS else _listening_posix()
+        me = INST.self_ident()
+        ports = _listening_windows(me) if IS_WINDOWS else _listening_posix(me)
         _cache.update({"ts": now, "ports": ports, "docker": docker, "docker_available": available})
     return {
         "ports": _cache["ports"],

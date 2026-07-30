@@ -1,0 +1,126 @@
+name: Build macOS app
+
+# Push lên main => có sẵn bản build để tải trong tab Actions.
+# Đẩy tag v* => tạo Release kèm file .zip cho người dùng cuối tải về.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14        # runner Apple Silicon, có sẵn Xcode nên có swiftc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kiểm tra cú pháp
+        run: |
+          python3 -m compileall -q aimon
+          node --check aimon/static/app.js
+
+      - name: Chạy được trên Python 3.9 (bản có sẵn của macOS)
+        run: /usr/bin/python3 -c "import sys; sys.path.insert(0,'.'); import aimon.server"
+
+      # Chưa nạp secret thì mọi bước ký dưới đây tự bỏ qua, build vẫn ra app ký ad-hoc.
+      - name: Có chứng chỉ Apple hay không
+        id: cert
+        run: echo "has=${{ secrets.MACOS_CERT_P12 != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Nạp chứng chỉ vào keychain tạm
+        if: steps.cert.outputs.has == 'true'
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          PASS="$(uuidgen)"
+          security create-keychain -p "$PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 900 "$KEYCHAIN"
+          security unlock-keychain -p "$PASS" "$KEYCHAIN"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          # thiếu dòng này thì codesign treo chờ nhập mật khẩu keychain và job timeout
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$PASS" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Dựng AIMonitor.app
+        env:
+          AIMON_SIGN_ID: ${{ secrets.MACOS_SIGN_ID }}
+        run: ./scripts/build_macos_app.sh dist
+
+      - name: Notarize (Apple duyệt thì máy người dùng mới hết cảnh báo)
+        if: steps.cert.outputs.has == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          ditto -c -k --keepParent dist/AIMonitor.app "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --wait
+          # đóng dấu vào bundle để máy offline cũng xác minh được
+          xcrun stapler staple dist/AIMonitor.app
+          spctl -a -vv dist/AIMonitor.app
+
+      - name: Xác nhận là app native, universal
+        run: |
+          BIN=dist/AIMonitor.app/Contents/MacOS/AIMonitor
+          file "$BIN"
+          ARCHS="$(lipo -archs "$BIN")"
+          echo "kiến trúc: $ARCHS"
+          case "$ARCHS" in
+            *arm64*x86_64*|*x86_64*arm64*) ;;
+            *) echo "::error::Thiếu kiến trúc, phải có cả arm64 lẫn x86_64"; exit 1 ;;
+          esac
+
+      # Không dùng `open` để thử: runner chạy headless nên bật app GUI dễ hỏng vì lý do
+      # không liên quan tới code. Kiểm tra thẳng thứ dễ vỡ khi đóng gói sai - server có
+      # chạy được từ trong Contents/Resources hay không.
+      - name: Server chạy được từ trong bundle
+        working-directory: dist/AIMonitor.app/Contents/Resources
+        run: |
+          /usr/bin/python3 -c "
+          import sys; sys.path.insert(0, '.')
+          import aimon.server, aimon.snapshot
+          assert aimon.snapshot.build(), 'snapshot rỗng'
+          print('server import + snapshot OK')
+          "
+
+      - name: Đóng gói
+        run: |
+          # ditto giữ nguyên quyền + resource fork của bundle, zip thường làm hỏng .app
+          ditto -c -k --sequesterRsrc --keepParent dist/AIMonitor.app dist/AIMonitor-macos.zip
+          # giải nén lại để chắc file tải về vẫn là universal và vẫn còn cờ thực thi
+          ditto -x -k dist/AIMonitor-macos.zip /tmp/check
+          test -x /tmp/check/AIMonitor.app/Contents/MacOS/AIMonitor
+          lipo -archs /tmp/check/AIMonitor.app/Contents/MacOS/AIMonitor
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AIMonitor-macos
+          path: dist/AIMonitor-macos.zip
+
+      # Chỉ đính vào Release khi bản build này đã notarize. Chưa nạp secret mà vẫn đính thì
+      # bản ad-hoc sẽ ghi đè lên bản đã notarize phát hành tay, và người tải về lại gặp
+      # cảnh báo - đúng thứ vừa bỏ công xử lý.
+      - name: Tạo Release khi đẩy tag
+        if: startsWith(github.ref, 'refs/tags/v') && steps.cert.outputs.has == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AIMonitor-macos.zip
+          body: |
+            ## Cài đặt
+
+            1. Tải `AIMonitor-macos.zip`, giải nén, kéo `AIMonitor.app` vào thư mục Applications.
+            3. Mở lên dùng.
+
+            App đã ký bằng Developer ID và được Apple notarize nên macOS không cảnh báo gì.
+
+            Máy cần có Python 3.9 trở lên - macOS có sẵn.
