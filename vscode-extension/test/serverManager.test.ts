@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import * as http from 'node:http';
-import { probeVersion, waitForServer } from '../src/serverManager';
+import { spawnAimonServer, probeVersion, waitForServer } from '../src/serverManager';
 
 test('probeVersion resolves true when server responds 200', async () => {
   const server = http.createServer((_req, res) => {
@@ -49,4 +49,13 @@ test('waitForServer resolves once readFn returns a probeable instance', async ()
 
 test('waitForServer throws after timeout when readFn never returns a valid instance', async () => {
   await assert.rejects(() => waitForServer(10, 100, () => null));
+});
+
+test('spawnAimonServer does not crash when the binary does not exist', async () => {
+  const proc = spawnAimonServer('.', 'this-binary-does-not-exist-xyz');
+  await new Promise((resolve) => {
+    proc.once('error', resolve);
+    proc.once('exit', resolve);
+  });
+  assert.ok(true);
 });

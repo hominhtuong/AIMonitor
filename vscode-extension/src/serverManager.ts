@@ -3,13 +3,14 @@ import * as http from 'node:http';
 import { readInstanceFile, AimonInstance } from './instanceFile';
 
 export function spawnAimonServer(aimonParentDir: string, pythonBin = 'python3'): ChildProcess {
-  // Không truyền --new: nếu instance khác (vd app macOS standalone) đã chạy,
-  // server.py tự phát hiện và tiến trình này thoát ngay sau khi in URL cũ —
-  // an toàn để SIGTERM sau đó (stopAimonServer) vì tiến trình đã tự thoát rồi.
-  return spawn(pythonBin, ['-m', 'aimon.server', '--port', '0'], {
+  const proc = spawn(pythonBin, ['-m', 'aimon.server', '--port', '0'], {
     cwd: aimonParentDir,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  // Tránh Node throw khi pythonBin không tồn tại trên PATH (vd Windows chỉ có `python`).
+  // waitForServer() sẽ tự timeout vì instance.json không bao giờ xuất hiện.
+  proc.on('error', () => {});
+  return proc;
 }
 
 export function probeVersion(host: string, port: number, timeoutMs = 1000): Promise<boolean> {
