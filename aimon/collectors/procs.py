@@ -42,7 +42,7 @@ KIND_LABELS = {
     "python": "Python",
     "java": "Java",
     "docker": "Docker",
-    "other": "Khác",
+    "other": "Other",
 }
 
 # Tiến trình do IDE/app quản lý: kill xong sẽ được supervisor bật lại
@@ -134,7 +134,7 @@ def classify(cmd: str) -> tuple[str, str, bool]:
         return "java", "Java", False
     if re.search(r"docker|containerd", cmd, re.I):
         return "docker", "Docker", False
-    return "other", "Khác", False
+    return "other", "Other", False
 
 
 def short_name(cmd: str) -> str:

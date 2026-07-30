@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,42 +8,53 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<!-- Mọi chữ hiển thị đều đi qua data-i18n; app.js đổ nội dung theo ngôn ngữ đang chọn.
+     Đừng viết chữ thẳng vào đây, nếu không nó sẽ không dịch được. -->
 <header>
   <div class="hd">
     <div class="brand">
       <img src="/favicon.svg" alt="AI Monitor">
-      <h1>AI Monitor</h1>
-      <span class="tag">tiến trình &amp; agent AI trên máy này</span>
+      <div class="who">
+        <h1>AI Monitor</h1>
+        <span class="tag" data-i18n="hdr.tagline"></span>
+      </div>
     </div>
 
     <div class="meter">
-      <div class="lbl"><span>RAM hệ thống</span><span id="mem-txt">-</span></div>
+      <div class="lbl"><span data-i18n="hdr.ram_sys"></span><span id="mem-txt">-</span></div>
       <div class="bar" id="mem-bar"><i style="width:0"></i></div>
     </div>
 
     <div class="meter">
-      <div class="lbl"><span>RAM do AI dùng</span><span id="ai-txt">-</span></div>
+      <div class="lbl"><span data-i18n="hdr.ram_ai"></span><span id="ai-txt">-</span></div>
       <div class="bar g" id="ai-bar"><i style="width:0"></i></div>
     </div>
 
+    <!-- Cùng hàng với 2 thanh RAM. Để trong ô đo thì ô đó cao hơn ô kia và hai thanh
+         lệch nhau, nên tách hẳn ra ngoài. Load average + số lõi nằm ở tooltip. -->
+    <span id="load" class="tag procs"></span>
+
     <!-- Gom thành một cụm để khi cửa sổ hẹp thì cả cụm xuống hàng và vẫn dồn về phải,
-         thay vì từng nút rơi lẻ ra góc trái. -->
+         thay vì từng nút rơi lẻ ra góc trái. Cờ nằm ngoài cùng bên phải. -->
     <div class="ctl">
-      <span id="load" class="tag"></span>
-      <label class="chk" title="Làm sáng nhẹ con số vừa đổi (chỉ màu chữ, không đổi nền)">
-        <input type="checkbox" id="fx"> Hiệu ứng
-      </label>
-      <select id="interval" title="Chu kỳ tự làm mới">
-        <option value="1000">1 giây</option>
-        <option value="2000">2 giây</option>
-        <option value="3000" selected>3 giây</option>
-        <option value="5000">5 giây</option>
-        <option value="10000">10 giây</option>
-        <option value="0">Tắt tự động</option>
+      <!-- chỉ hiện khi có trục trặc (mất kết nối, đã dừng), lúc bình thường ẩn đi -->
+      <span id="stamp" class="tag alert" hidden></span>
+      <select id="interval" data-i18n-title="hdr.interval">
+        <option value="1000" data-i18n="hdr.every_1s"></option>
+        <option value="2000" data-i18n="hdr.every_2s"></option>
+        <option value="3000" selected data-i18n="hdr.every_3s"></option>
+        <option value="5000" data-i18n="hdr.every_5s"></option>
+        <option value="10000" data-i18n="hdr.every_10s"></option>
+        <option value="0" data-i18n="hdr.every_off"></option>
       </select>
-      <button id="refresh">Làm mới</button>
-      <button id="quit" title="Dừng hẳn AI Monitor trên máy">Tắt</button>
-      <span id="stamp" class="tag">đang tải...</span>
+      <button id="refresh" data-i18n="hdr.refresh"></button>
+      <button id="quit" data-i18n="hdr.quit" data-i18n-title="hdr.quit_hint"></button>
+      <!-- Tên ngôn ngữ luôn viết bằng chính ngôn ngữ đó, không dịch theo giao diện:
+           người đang xem tiếng Anh vẫn phải nhận ra dòng "Tiếng Việt" là của mình. -->
+      <select id="lang" data-i18n-title="hdr.language">
+        <option value="en">&#127482;&#127480;&nbsp; English</option>
+        <option value="vi">&#127483;&#127475;&nbsp; Tiếng Việt</option>
+      </select>
     </div>
   </div>
 </header>
@@ -54,106 +65,110 @@
   <div class="chips" id="chips"></div>
 
   <div class="tabs">
-    <button data-tab="ai" class="on">AI &amp; Agent</button>
-    <button data-tab="hist">Lịch sử phiên</button>
-    <button data-tab="res">Tài nguyên</button>
-    <button data-tab="net">Cổng &amp; Docker</button>
+    <button data-tab="ai" class="on" data-i18n="tab.ai"></button>
+    <button data-tab="hist" data-i18n="tab.hist"></button>
+    <button data-tab="res" data-i18n="tab.res"></button>
+    <button data-tab="net" data-i18n="tab.net"></button>
   </div>
 
   <section class="pane on" id="pane-ai">
-    <h2>Phiên AI đang chạy</h2>
-    <p class="hint">Mỗi thẻ là 1 tiến trình AI gốc kèm cây con (MCP server, browser automation). Token / chi phí đọc từ transcript của phiên.</p>
+    <h2 data-i18n="ai.title"></h2>
+    <p class="hint" data-i18n="ai.hint"></p>
     <div id="live"></div>
 
     <div class="h2row">
-      <h2>Phiên đã đóng</h2>
-      <select id="closed-range" title="Khoảng thời gian">
-        <option value="today" selected>Hôm nay</option>
-        <option value="7d">7 ngày</option>
+      <h2 data-i18n="ai.closed_title"></h2>
+      <select id="closed-range" data-i18n-title="common.range">
+        <option value="today" selected data-i18n="common.today"></option>
+        <option value="7d" data-i18n="common.7d"></option>
       </select>
-      <span class="hint" style="margin:0">Tiến trình không còn chạy, chỉ còn transcript - dùng để đối chiếu token và chi phí.</span>
+      <span class="hint" style="margin:0" data-i18n="ai.closed_hint"></span>
     </div>
     <div id="closed"></div>
   </section>
 
   <section class="pane" id="pane-hist">
-    <h2>Lịch sử phiên trên máy này</h2>
-    <p class="hint">Đọc toàn bộ transcript trong <code>~/.claude/projects</code>. Chi phí là giá API quy đổi theo <code>pricing.json</code> - dùng để so sánh tỷ trọng giữa các tác vụ, không phải số tiền thật của gói thuê bao. Dữ liệu này chỉ có của riêng máy đang chạy AI Monitor.</p>
+    <h2 data-i18n="hist.title"></h2>
+    <p class="hint" data-i18n-html="hist.hint"></p>
     <div class="toolbar">
-      <select id="hist-range" title="Khoảng thời gian">
-        <option value="7">7 ngày</option>
-        <option value="30">30 ngày</option>
-        <option value="90">90 ngày</option>
-        <option value="all" selected>Toàn bộ</option>
+      <select id="hist-range" data-i18n-title="common.range">
+        <option value="7" data-i18n="common.7d"></option>
+        <option value="30" data-i18n="common.30d"></option>
+        <option value="90" data-i18n="common.90d"></option>
+        <option value="all" selected data-i18n="common.all"></option>
       </select>
-      <select id="hist-sort" title="Sắp xếp">
-        <option value="cost" selected>Chi phí cao nhất</option>
-        <option value="token">Token nhiều nhất</option>
-        <option value="msgs">Nhiều lượt gọi nhất</option>
-        <option value="recent">Mới nhất</option>
+      <select id="hist-sort" data-i18n-title="hist.sort">
+        <option value="cost" selected data-i18n="hist.sort_cost"></option>
+        <option value="token" data-i18n="hist.sort_token"></option>
+        <option value="msgs" data-i18n="hist.sort_msgs"></option>
+        <option value="recent" data-i18n="hist.sort_recent"></option>
       </select>
-      <input type="text" id="hist-filter" placeholder="Lọc theo tác vụ / thư mục / model...">
-      <button id="hist-reload">Quét lại</button>
+      <input type="text" id="hist-filter" data-i18n-placeholder="hist.filter">
+      <button id="hist-reload" data-i18n="hist.rescan"></button>
       <span class="tag" id="hist-meta"></span>
     </div>
 
     <div class="kpis" id="hist-kpis"></div>
 
-    <div class="h2row"><h2>Theo project</h2>
-      <span class="hint" style="margin:0">Gộp các phiên cùng thư mục làm việc.</span>
+    <div class="h2row"><h2 data-i18n="hist.by_project"></h2>
+      <span class="hint" style="margin:0" data-i18n="hist.by_project_hint"></span>
     </div>
     <div id="hist-proj"></div>
 
-    <div class="h2row"><h2>Theo phiên</h2><span class="tag" id="hist-count"></span></div>
+    <div class="h2row"><h2 data-i18n="hist.by_session"></h2><span class="tag" id="hist-count"></span></div>
     <div id="hist-sess"></div>
   </section>
 
   <section class="pane" id="pane-res">
-    <h2>Tiến trình ngốn tài nguyên</h2>
+    <h2 data-i18n="res.title"></h2>
     <div class="toolbar">
-      <input type="text" id="filter" placeholder="Lọc theo tên / PID / lệnh...">
-      <label class="chk"><input type="checkbox" id="mine" checked> Chỉ tiến trình của tôi</label>
-      <label class="chk"><input type="checkbox" id="aionly"> Chỉ liên quan AI</label>
+      <input type="text" id="filter" data-i18n-placeholder="res.filter">
+      <label class="chk"><input type="checkbox" id="mine" checked> <span data-i18n="res.mine"></span></label>
+      <label class="chk"><input type="checkbox" id="aionly"> <span data-i18n="res.ai_only"></span></label>
       <span class="tag" id="res-count"></span>
     </div>
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th>PID</th><th>Tên</th><th>Loại</th>
-        <th class="num">RAM</th><th class="num">CPU</th><th class="num">Uptime</th><th>Thao tác</th>
+        <th data-i18n="col.pid"></th><th data-i18n="col.name"></th><th data-i18n="col.kind"></th>
+        <th class="num" data-i18n="col.ram"></th><th class="num" data-i18n="col.cpu"></th>
+        <th class="num" data-i18n="col.uptime"></th><th data-i18n="col.actions"></th>
       </tr></thead>
       <tbody id="res-body"></tbody>
     </table></div>
   </section>
 
   <section class="pane" id="pane-net">
-    <h2>Cổng local đang mở (LISTEN)</h2>
+    <h2 data-i18n="net.title"></h2>
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th class="num">Cổng</th><th>Địa chỉ</th><th>PID</th><th>Tiến trình</th><th>Ghi chú</th><th>Thao tác</th>
+        <th class="num" data-i18n="col.port"></th><th data-i18n="col.address"></th>
+        <th data-i18n="col.pid"></th><th data-i18n="col.process"></th>
+        <th data-i18n="col.note"></th><th data-i18n="col.actions"></th>
       </tr></thead>
       <tbody id="port-body"></tbody>
     </table></div>
 
-    <h2>Docker container</h2>
+    <h2 data-i18n="net.docker"></h2>
     <div id="docker"></div>
   </section>
 
-  <div class="foot">AI Monitor · dữ liệu đọc trực tiếp từ máy, không gửi ra ngoài · <span id="ver"></span></div>
+  <div class="foot"><span data-i18n="foot.text"></span> · <span id="ver"></span></div>
 </div>
 
 <div id="modal" hidden>
   <div class="box" role="dialog" aria-modal="true">
-    <h3 id="m-title">Xác nhận</h3>
+    <h3 id="m-title"></h3>
     <p id="m-body"></p>
     <div class="warnline" id="m-warn" hidden></div>
     <div class="row">
-      <button id="m-cancel">Huỷ</button>
-      <button id="m-ok" class="primary">Xác nhận</button>
+      <button id="m-cancel" data-i18n="common.cancel"></button>
+      <button id="m-ok" class="primary" data-i18n="common.confirm"></button>
     </div>
   </div>
 </div>
 
 <div id="toast"></div>
+<script src="/static/i18n.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

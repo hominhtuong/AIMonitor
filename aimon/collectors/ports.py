@@ -28,15 +28,24 @@ INTERESTING = {
     5173: "Vite",
     8000: "HTTP dev",
     8080: "HTTP dev",
-    8899: "AI Monitor (cổng mặc định)",
+    8899: "AI Monitor (default port)",
 }
 
 
 def _note(port: int, pid: int, me: tuple[int, int]) -> str:
     """Cổng của AI Monitor là động nên phải tra từ state file, không hardcode được."""
     if me[0] and (port, pid) == me:
-        return "AI Monitor (trang này)"
+        return "AI Monitor (this page)"
     return INTERESTING.get(port, "")
+
+
+def _note_key(port: int, pid: int, me: tuple[int, int]) -> str:
+    """Mã để UI dịch. Tên sản phẩm (Vite, Appium...) giữ nguyên nên không cần mã."""
+    if me[0] and (port, pid) == me:
+        return "port.self"
+    if port == 8899:
+        return "port.default"
+    return ""
 
 
 def _listening_posix(me: tuple[int, int] = (0, 0)) -> list[dict]:
@@ -72,6 +81,7 @@ def _listening_posix(me: tuple[int, int] = (0, 0)) -> list[dict]:
                 "command": cmd.replace("\\x20", " "),
                 "user": user,
                 "note": _note(port, pid, me),
+                "note_key": _note_key(port, pid, me),
             },
         )
     return sorted(rows.values(), key=lambda r: r["port"])
@@ -126,6 +136,7 @@ def _listening_windows(me: tuple[int, int] = (0, 0)) -> list[dict]:
                 "command": names.get(pid, "?"),
                 "user": "",
                 "note": _note(port, pid, me),
+                "note_key": _note_key(port, pid, me),
             },
         )
     return sorted(rows.values(), key=lambda r: r["port"])
