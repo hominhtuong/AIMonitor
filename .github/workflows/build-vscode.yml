@@ -114,8 +114,26 @@ jobs:
           name: AIMonitor-vscode
           path: vscode-extension/*.vsix
 
-  # Chạy đúng file .vsix mà job build vừa tạo, trên Windows thật. Đây là chỗ duy nhất bắt
-  # được các lỗi chỉ có ở Windows: tên binary Python, alias Microsoft Store, dọn state.
+  # Token Marketplace hết hạn tối đa sau 1 năm, và chọn sai scope/organization lúc tạo là
+  # chuyện rất hay xảy ra. Kiểm tra ngay trên main để biết trước, thay vì phát hiện giữa lúc
+  # đẩy tag - lúc đó Release đã tạo rồi mà extension thì chưa lên store.
+  # Không chạy cho pull_request: PR từ fork không đọc được secret.
+  check-pat:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    steps:
+      - name: Bỏ qua khi chưa có VSCE_PAT
+        if: env.VSCE_PAT == ''
+        run: echo "::notice::Chưa có secret VSCE_PAT - bỏ qua bước kiểm tra token."
+
+      - name: Kiểm tra token publish còn dùng được
+        if: env.VSCE_PAT != ''
+        run: npx --yes @vscode/vsce@2 verify-pat mituultra
+
+  # Chạy đúng file .vsix mà job build vừa tạo, trên Windows thật. Đây là chỗ duy nhất bắt được
+  # các lỗi chỉ có ở Windows: tên binary Python, alias Microsoft Store, dọn state.
   windows-check:
     needs: build
     runs-on: windows-latest
