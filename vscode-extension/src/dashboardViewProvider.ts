@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ChildProcess } from 'node:child_process';
-import { spawnAimonServer, waitForServer, stopAimonServer, probeVersion, getSpawnInfo } from './serverManager';
+import { startAimonServer, shutdownAimonServer, probeVersion } from './serverManager';
 import { readInstanceFile, AimonInstance } from './instanceFile';
 
 function escapeHtml(text: string): string {
@@ -15,6 +15,8 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = 'aimon.dashboardView';
 
   private proc: ChildProcess | undefined;
+  /** Instance của server do CHÍNH provider này bật, để tắt êm qua /api/quit. */
+  private ownInstance: AimonInstance | undefined;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -22,14 +24,10 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.loadingHtml();
 
-    // Dừng server khi webview bị dispose (vd panel bị đóng) thay vì để nó sống tới tận
-    // deactivate(). Lưu ý: trên Windows, SIGTERM không khiến finally trong server.py chạy
-    // (giới hạn Node/Windows: SIGTERM map sang TerminateProcess) - out of scope lượt fix này.
+    // Dừng server khi webview bị dispose thay vì để nó sống tới tận deactivate().
+    // Có retainContextWhenHidden nên thu gọn panel không dispose - chỉ đóng hẳn mới dispose.
     webviewView.onDidDispose(() => {
-      if (this.proc) {
-        stopAimonServer(this.proc);
-        this.proc = undefined;
-      }
+      void this.stopOwnServer();
     });
 
     try {
@@ -41,20 +39,18 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       webviewView.webview.html = this.errorHtml(message);
-      if (this.proc && getSpawnInfo(this.proc)?.enoent) {
-        vscode.window.showErrorMessage(
-          'AI Monitor could not find a Python 3 interpreter on PATH. ' +
-            'Install Python 3 (https://www.python.org/downloads/) and reload the window.'
-        );
-      }
+      vscode.window.showErrorMessage(
+        'AI Monitor could not start its Python server. Open the panel for details.'
+      );
     }
   }
 
   /**
    * Nếu một server aimon còn sống (đọc từ instance.json rồi probe HTTP), dùng lại nó thay vì
    * kill-rồi-spawn-lại: spawn lại ngay sau kill gây race với cơ chế single-instance của
-   * server.py (instance.json cũ chưa kịp xoá khi tiến trình mới đã kiểm tra xong). Chỉ kill +
-   * spawn mới khi thật sự không có instance nào đang sống.
+   * server.py (instance.json cũ chưa kịp xoá khi tiến trình mới đã kiểm tra xong). Server đó
+   * có thể là của app macOS/Windows standalone hoặc của một cửa sổ VSCode khác - dùng chung
+   * được, và vì không phải của mình nên `ownInstance` để trống, lúc đóng panel không giết nhầm.
    */
   private async ensureServer(): Promise<AimonInstance> {
     const existing = readInstanceFile();
@@ -62,19 +58,23 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
       return existing;
     }
 
-    if (this.proc) {
-      stopAimonServer(this.proc);
-      this.proc = undefined;
-    }
-    this.proc = await spawnAimonServer(this.extensionUri.fsPath);
-    return waitForServer(undefined, undefined, undefined, this.proc);
+    await this.stopOwnServer();
+    const started = await startAimonServer(this.extensionUri.fsPath);
+    this.proc = started.proc;
+    this.ownInstance = started.instance;
+    return started.instance;
+  }
+
+  private async stopOwnServer(): Promise<void> {
+    const proc = this.proc;
+    const instance = this.ownInstance;
+    this.proc = undefined;
+    this.ownInstance = undefined;
+    if (proc) await shutdownAimonServer(proc, instance);
   }
 
   dispose(): void {
-    if (this.proc) {
-      stopAimonServer(this.proc);
-      this.proc = undefined;
-    }
+    void this.stopOwnServer();
   }
 
   private loadingHtml(): string {
@@ -89,8 +89,8 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
 
   private errorHtml(message: string): string {
     return `<!DOCTYPE html><html><body>` +
-      `<p>AI Monitor failed to start: ${escapeHtml(message)}</p>` +
-      `<p>Make sure <code>python3</code> is installed and on your PATH.</p>` +
+      `<h3>AI Monitor failed to start</h3>` +
+      `<pre style="white-space:pre-wrap">${escapeHtml(message)}</pre>` +
       `</body></html>`;
   }
 }

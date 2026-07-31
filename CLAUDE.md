@@ -176,10 +176,13 @@ chứ đừng chạy từ cây source, vì lỗi đóng gói chỉ lộ ra ở �
 | --- | --- | --- |
 | `build-macos.yml` | `AIMonitor-macos.zip` | macos-latest |
 | `build-windows.yml` | `AIMonitor.exe` | windows-latest |
-| `build-vscode.yml` | `aimon-vscode-*.vsix` | ubuntu-latest, Python 3.9 (đúng sàn của repo) |
+| `build-vscode.yml` | `aimonitor-*.vsix` + publish lên Marketplace | ubuntu-latest rồi windows-latest, Python 3.9 (đúng sàn của repo) |
 
-`build-vscode.yml` giải nén VSIX rồi chạy server bên trong nó, soát cả danh sách file trong
-gói: thiếu `pricing.json` / `static/` hay lọt `__pycache__`, `.ts` là fail ngay.
+`build-vscode.yml` có ba job nối tiếp: `build` (tsc, unit test, đóng gói, soát danh sách file
+trong gói, chạy server trên Linux), `windows-check` (tải đúng file `.vsix` đó về
+windows-latest rồi chạy lại server bằng `python` thật), `release` (chỉ khi đẩy tag: đính kèm
+`.vsix` vào Release rồi publish). Thiếu `pricing.json` / `static/` hay lọt `__pycache__`,
+`.ts` là fail ngay ở job đầu.
 
 ## Ký app
 
@@ -279,8 +282,57 @@ Bốn chỗ đã trả giá:
    server Python block khi ghi, treo vĩnh viễn. `serverManager.ts` đọc và giữ 2000 ký tự cuối
    để hiện trong webview khi khởi động lỗi.
 
-Windows chỉ có `python` chứ thường không có `python3`, nên `DEFAULT_PYTHON_CANDIDATES` thử lần
-lượt hai tên; ENOENT ở tên đầu thì tự chuyển sang tên sau.
+Không khai `activationEvents`: từ VSCode 1.74 nó tự sinh `onView:` từ phần `views` trong
+`contributes`, khai thêm chỉ tổ bị cảnh báo. Nhờ vậy extension chỉ thức dậy khi user mở panel
+chứ không phải mọi cửa sổ VSCode.
+
+`extensionKind` để `["workspace", "ui"]`: qua Remote-SSH thì tiến trình AI chạy ở máy remote,
+nên extension phải chạy bên đó mới thấy đúng. `asExternalUri` lo phần port forwarding.
+
+### Windows - hai chỗ phải làm riêng
+
+**`python` trên Windows thường không phải Python.** Windows 10/11 cài sẵn App Execution Alias
+`python.exe` trỏ về Microsoft Store. Máy chưa cài Python thật thì alias đó vẫn nằm trên PATH,
+nên `spawn` **không** báo ENOENT: nó chạy được, mở trang Store rồi thoát ngay với mã 9009.
+Chỉ dựa vào ENOENT để đổi candidate là extension treo đủ 15 giây rồi báo timeout vô nghĩa.
+
+Vì vậy `pythonCandidates()` trả thứ tự khác nhau theo hệ điều hành, Windows là
+`['py -3', 'python', 'python3']` - `py.exe` là launcher chính thức, không bao giờ trỏ về alias
+Store. Kèm theo đó `waitForServer()` bỏ chờ ngay khi tiến trình con thoát, và
+`startAimonServer()` chuyển sang candidate kế tiếp thay vì bỏ cuộc.
+
+**Không SIGTERM để tắt server.** Node trên Windows dịch SIGTERM thành `TerminateProcess`:
+Python chết ngay, khối `finally` trong `server.py` không chạy, `~/.aimon/instance.json` ở lại
+làm rác. `shutdownAimonServer()` gọi `POST /api/quit` trước - endpoint đó chạy
+`server.shutdown()` nên `serve_forever()` thoát êm và state được dọn - hết hạn 1.5 giây mới
+SIGTERM. Cùng một đường trên cả ba hệ điều hành. Job `windows-check` trong CI kiểm tra đúng
+điều này: gọi `/api/quit` rồi khẳng định `instance.json` biến mất.
+
+### Phát hành lên VSCode Marketplace
+
+Danh tính extension là `<publisher>.<name>` = **`mituultra.aimonitor`**. VSCode không có
+"bundle id" kiểu `com.mitu.aimonitor` như JetBrains: `name` chỉ được dùng chữ thường, số và
+gạch nối, còn `publisher` phải là publisher ID đã đăng ký ở
+[Marketplace manage](https://marketplace.visualstudio.com/manage). **Đổi được trước lần
+publish đầu, sau đó thì không** - muốn đổi là phải đăng extension mới, mất hết lượt cài và
+đánh giá.
+
+- CI publish **chính file `.vsix`** đã qua job `build` và `windows-check`, bằng
+  `vsce publish --packagePath`. Đừng đổi thành `vsce publish` không tham số: nó build lại và
+  phát hành thứ chưa ai chạy thử.
+- Số phiên bản lấy từ `vscode-extension/package.json`, **không** lấy từ tag git. Quên bump nó
+  là Marketplace từ chối vì version đã tồn tại. Đây là chỗ dễ quên nhất khi đẩy tag.
+- Thiếu secret `VSCE_PAT` thì workflow không fail, chỉ ghi cảnh báo vào job summary và
+  Release vẫn có `.vsix`.
+- `OVSX_PAT` là tuỳ chọn, để đăng thêm lên Open VSX (store của VSCodium, Cursor, Windsurf).
+
+| Secret | Lấy ở đâu |
+| --- | --- |
+| `VSCE_PAT` | Azure DevOps => User settings => Personal Access Tokens, Organization = **All accessible organizations**, scope **Marketplace => Manage** |
+| `OVSX_PAT` | open-vsx.org, đăng nhập rồi vào Settings => Access Tokens |
+
+PAT của Azure DevOps hết hạn tối đa 1 năm, hết hạn thì bước publish fail với 401 - lúc đó tạo
+token mới rồi cập nhật secret, không phải lỗi code.
 
 ## Đa ngôn ngữ (static/i18n.js)
 
@@ -335,13 +387,9 @@ API trả lỗi rõ ràng thay vì im lặng. Giữ nguyên guard này khi thêm
   Fix: chặn request có `Host` không thuộc `localhost` / `127.0.0.1` / `[::1]`.
 - `/api/action` và `/api/quit` không có xác thực. Chấp nhận được khi chỉ bind loopback, nhưng
   phải thêm token trước khi mở ra LAN (`--host 0.0.0.0`).
-- **Extension VSCode trên Windows để lại state rác.** Node gửi SIGTERM trên Windows là gọi
-  `TerminateProcess`, khối `finally` trong `server.py` không chạy nên `~/.aimon/instance.json`
-  còn nguyên. Lần bật sau `_running_instance()` vẫn probe lại nên không hỏng, chỉ bẩn.
 - **Nhiều cửa sổ VSCode dùng chung một server.** Cửa sổ mở panel trước sẽ spawn server, cửa sổ
   sau probe thấy còn sống thì dùng lại (và không giữ `proc` nên không giết nhầm). Nhưng cửa sổ
   đầu đóng panel là server chết, iframe cửa sổ sau trắng cho tới lần mở lại.
-- Extension chưa lên VSCode Marketplace, phải cài tay từ `.vsix`.
 
 ## Kiểm tra trước khi commit
 

@@ -1,15 +1,38 @@
 {
-  "name": "aimon-vscode",
+  "name": "aimonitor",
   "displayName": "AI Monitor",
-  "description": "Monitor AI processes, token usage, and account limits inside VSCode",
-  "version": "0.1.1",
-  "publisher": "aimonitor",
+  "description": "See every AI process, token, and account limit on your machine, inside VSCode. Runs fully offline.",
+  "version": "1.0.0",
+  "publisher": "mituultra",
+  "license": "MIT",
   "icon": "images/icon.png",
+  "homepage": "https://github.com/hominhtuong/AIMonitor#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hominhtuong/AIMonitor.git",
+    "directory": "vscode-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/hominhtuong/AIMonitor/issues"
+  },
+  "qna": "https://github.com/hominhtuong/AIMonitor/issues",
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": ["AI", "Visualization", "Other"],
+  "keywords": ["claude", "claude code", "token usage", "ai monitor", "process monitor"],
+  "extensionKind": ["workspace", "ui"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "Reads only its own bundled files and your local Claude usage data. It never reads or runs workspace code."
+    },
+    "virtualWorkspaces": true
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -36,7 +59,9 @@
     "watch": "node esbuild.js --watch",
     "test": "node --require ts-node/register --test test/*.test.ts",
     "prepackage": "node scripts/copy-aimon.js",
-    "package": "npm run prepackage && npm run compile && vsce package"
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package",
+    "publish": "vsce publish"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",

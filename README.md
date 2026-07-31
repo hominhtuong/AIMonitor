@@ -117,19 +117,19 @@ powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1
 
 ### VSCode
 
-If you would rather keep the dashboard next to your code, install the extension: an AI Monitor
-icon appears in the activity bar and the dashboard opens as a panel inside the editor.
-
-Download `aimon-vscode-*.vsix` from **Releases**, then:
+If you would rather keep the dashboard next to your code, install the extension from the
+Marketplace: search **AI Monitor** in the Extensions panel, or run
 
 ```bash
-code --install-extension aimon-vscode-0.1.1.vsix
+code --install-extension mituultra.aimonitor
 ```
 
-Or inside VSCode: Extensions panel => `...` menu => **Install from VSIX...**
+An AI Monitor icon appears in the activity bar and the dashboard opens as a panel inside the
+editor. It starts the same local server on first open, so it needs Python 3.9+ on your PATH -
+on Windows, install from python.org and tick **"Add python.exe to PATH"**.
 
-The extension starts the same local server on first open, so it needs `python3` on your PATH.
-It is not on the Marketplace yet, so the `.vsix` file is the only way in for now.
+Offline installs can still grab the `.vsix` from **Releases** and use Extensions panel =>
+`...` menu => **Install from VSIX...**
 
 ---
 
