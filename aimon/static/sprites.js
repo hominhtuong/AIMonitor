@@ -13,8 +13,10 @@
  * đó cảnh chỉ `drawImage` từ atlas ra. Vẽ lại từng hình chữ nhật mỗi khung hình cho hơn
  * chục nhân vật ở 30fps là hàng nghìn lệnh fill - đủ để quạt máy chạy.
  *
- * Toạ độ trong file này là pixel gốc (16x20 mỗi nhân vật). Việc phóng to là của office.js
- * và luôn phóng theo BỘI SỐ NGUYÊN, nếu không pixel bị nội suy thành một đám mờ.
+ * Toạ độ trong file này là pixel gốc (16x20 mỗi nhân vật) - đó là đơn vị office.js đo phòng
+ * theo, và đổi nó là phải đổi cả bố cục bàn ghế. Nhưng atlas được vẽ ở độ phân giải gấp
+ * `SPRITE_SS` lần (xem ngay dưới), nên toạ độ lẻ 1/3 pixel là hợp lệ và đó chính là chỗ có
+ * được nét cong, viền mảnh và mảng sáng tối.
  *
  * TỶ LỆ CHIBI, cố ý: đầu chiếm gần nửa chiều cao (9/20), mắt to 2x2 có chấm sáng, có má
  * hồng. Bản đầu theo tỷ lệ người thật - ở bậc phóng nhỏ mặt chỉ còn hai chấm 1x1, nhìn vô
@@ -30,6 +32,18 @@
 
 const SPRITE_W = 16;
 const SPRITE_H = 20;
+
+/* LƯỚI CON. Một pixel gốc được vẽ bằng SPRITE_SS x SPRITE_SS pixel thật trong atlas.
+ *
+ * Đây là thứ tạo ra khác biệt giữa "khối vuông xếp lại" và "hình có nét": đỉnh đầu bo được
+ * theo đường tròn thật thay vì vát một pixel, tròng mắt có con ngươi lẫn chấm loá, viền chỉ
+ * dày 1/3 pixel thay vì một pixel đặc - viền dày bằng cả một mảng màu là lý do bản trước
+ * nhìn như hình dán chứ không như nhân vật.
+ *
+ * Chọn 3, không phải 2 hay 4: hơn trăm nhân vật x 13 khung hình nên atlas nặng theo bình
+ * phương hệ số (4 là gấp 16 lần), còn 2 thì không đủ chỗ cho vừa nét cong vừa viền mảnh.
+ * Đổi số này không phải sửa gì khác trong file - mọi nét đều đi qua px(). */
+const SPRITE_SS = 3;
 
 /* Màu dùng chung cho mọi nhân vật. Tách riêng vì chúng là đặc điểm của phong cách vẽ, không
  * phải của từng người: đổi ở đây là cả bộ đổi theo. */
@@ -94,42 +108,126 @@ const FRAMES = [
   'k0',               // ngồi, tay buông
   'k1', 'k2',         // ngồi, hai nhịp gõ phím
   'k3',               // ngồi gục xuống (tạm dừng / ngủ)
+  'kf',               // ngồi QUAY MẶT RA - ngoái lại nhìn khi có người rê chuột vào
 ];
 const FRAME_INDEX = {};
 FRAMES.forEach((k, i) => { FRAME_INDEX[k] = i; });
 
 /* ------------------------------------------------------------- nét cơ bản */
 
-/** Hình chữ nhật đặc, bo về pixel nguyên. Mọi nét trong file này đi qua đây. */
+/** Hình chữ nhật đặc, toạ độ tính bằng pixel GỐC rồi quy về lưới con. Mọi nét trong file này
+ *  đi qua đây, nên chỉ mình nó biết tới SPRITE_SS.
+ *
+ *  Bo hai MÉP chứ không bo gốc rồi nhân bề rộng: `round(x)+round(w)` lệch với `round(x+w)` ở
+ *  toạ độ lẻ, và chỗ lệch đó thành một khe hở giữa hai mảng lẽ ra phải liền nhau - ở nền tối
+ *  nó hiện thành đường kẻ sáng chạy dọc thân người. */
 function px(g, x, y, w, h, color) {
+  const x0 = Math.round(x * SPRITE_SS), x1 = Math.round((x + w) * SPRITE_SS);
+  const y0 = Math.round(y * SPRITE_SS), y1 = Math.round((y + h) * SPRITE_SS);
+  if (x1 <= x0 || y1 <= y0) return;
   g.fillStyle = color;
-  g.fillRect(x | 0, y | 0, w | 0, h | 0);
+  g.fillRect(x0, y0, x1 - x0, y1 - y0);
 }
 
-/** Khối đầu bo góc. Vuông vức thì nhìn như cái hộp, bo 1 pixel bốn góc là đủ mềm. */
+/* Pha màu. Nhờ có mấy hàm này mà bóng đổ và mảng sáng dựng được từ chính màu của nhân vật,
+ * không phải khai thêm màu cho từng người - hơn trăm nhân vật thì khai tay là không xong. */
+const RGB_CACHE = new Map();
+
+function toRgb(c) {
+  let v = RGB_CACHE.get(c);
+  if (v) return v;
+  const s = String(c).replace('#', '');
+  const n = s.length === 3
+    ? parseInt(s[0] + s[0] + s[1] + s[1] + s[2] + s[2], 16)
+    : parseInt(s.slice(0, 6), 16);
+  v = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  RGB_CACHE.set(c, v);
+  return v;
+}
+
+function mixC(a, b, t) {
+  const x = toRgb(a), y = toRgb(b);
+  const r = Math.round(x[0] + (y[0] - x[0]) * t);
+  const g = Math.round(x[1] + (y[1] - x[1]) * t);
+  const bl = Math.round(x[2] + (y[2] - x[2]) * t);
+  return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
+}
+
+const lighten = (c, t) => mixC(c, '#ffffff', t);
+const darken = (c, t) => mixC(c, '#191320', t);   // ngả tím chứ không ngả đen: bóng thuần đen
+                                                  // làm màu chết, đây là mẹo cũ của pixel art
+
+/** Hình chữ nhật BO GÓC thật, vẽ từng hàng của lưới con theo cung tròn bán kính `r`.
+ *
+ *  Ở lưới thô thì "bo góc" chỉ là vát đúng một pixel, và mọi thứ trong phòng - đầu người,
+ *  thân thú, giọt slime - đều hoá ra cái hộp. Có lưới con thì bo được theo đường tròn, và
+ *  đó là thứ đọc ra ngay cả khi nhìn lướt cả phòng. */
+function roundBox(g, x, y, w, h, r, color) {
+  const S = SPRITE_SS;
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  const y0 = Math.round(y * S), y1 = Math.round((y + h) * S);
+  g.fillStyle = color;
+  for (let iy = y0; iy < y1; iy++) {
+    const cy = (iy + 0.5) / S - y;                       // vị trí trong khối, đơn vị pixel gốc
+    let d = 0;
+    if (cy < rr) d = rr - cy;
+    else if (cy > h - rr) d = cy - (h - rr);
+    const inset = d > 0 ? rr - Math.sqrt(Math.max(0, rr * rr - d * d)) : 0;
+    const x0 = Math.round((x + inset) * S), x1 = Math.round((x + w - inset) * S);
+    if (x1 > x0) g.fillRect(x0, iy, x1 - x0, 1);
+  }
+}
+
+/** Chóp nhọn: rộng ở đáy, thu dần về đỉnh. Tai mèo, chỏm tóc dựng, sừng, ngọn lửa - trước
+ *  đây tất cả đều là hình chữ nhật, nên "tai nhọn" thật ra là hai cái cột vuông. */
+function spike(g, x, y, w, h, color) {
+  const S = SPRITE_SS;
+  const y0 = Math.round(y * S), y1 = Math.round((y + h) * S);
+  const cx = x + w / 2;
+  g.fillStyle = color;
+  for (let iy = y0; iy < y1; iy++) {
+    const t = (iy + 0.5 - y0) / Math.max(1, y1 - y0);   // 0 ở đỉnh, 1 ở đáy
+    const ww = w * (0.3 + 0.7 * t);
+    const a = Math.round((cx - ww / 2) * S), b = Math.round((cx + ww / 2) * S);
+    if (b > a) g.fillRect(a, iy, b - a, 1);
+  }
+}
+
+/** Khối đầu bo góc - dùng chung cho người, thú và cả bộ Hải trình / Nhẫn giả. */
 function headBlock(g, y0, h, color) {
-  px(g, 4, y0, 8, 1, color);
-  px(g, 3, y0 + 1, 10, h - 2, color);
-  px(g, 4, y0 + h - 1, 8, 1, color);
+  roundBox(g, 3, y0, 10, h, 1.7, color);
+}
+
+/** Con mắt: tròng bo góc, con ngươi, chấm loá góc trên trái và một vệt phản chiếu ở đáy.
+ *
+ *  Bản trước mắt là một ô vuông đặc 2x2 cộng một chấm trắng 1x1 - đúng một nửa con mắt là
+ *  chấm loá, nên ánh nhìn trông như hai hạt đậu. Cùng diện tích ấy, lưới con chứa được cả
+ *  bốn thành phần và khuôn mặt lập tức có thần. */
+function eye(g, x, y, w, h, ink) {
+  const c = ink || INK;
+  roundBox(g, x, y, w, h, Math.min(w, h) * 0.4, c);
+  px(g, x + w * 0.28, y + h * 0.52, w * 0.5, h * 0.36, lighten(c, 0.22));  // phản chiếu đáy
+  px(g, x + w * 0.1, y + h * 0.12, w * 0.36, h * 0.3, EYE_LIGHT);          // chấm loá
 }
 
 /** Mặt nhìn thẳng: mắt to có chấm sáng, má hồng, miệng nhỏ. Đây là toàn bộ phần "cute". */
 function faceFront(g, p, dy) {
-  px(g, 4, 5 + dy, 2, 2, INK);          // mắt trái
-  px(g, 10, 5 + dy, 2, 2, INK);         // mắt phải
-  px(g, 4, 5 + dy, 1, 1, EYE_LIGHT);    // chấm sáng - bỏ đi là ánh nhìn chết hẳn
-  px(g, 10, 5 + dy, 1, 1, EYE_LIGHT);
-  px(g, 3, 7 + dy, 1, 1, BLUSH);        // má
-  px(g, 12, 7 + dy, 1, 1, BLUSH);
-  px(g, 7, 7 + dy, 2, 1, p.skinDark);   // miệng
+  eye(g, 4, 5 + dy, 2, 2);
+  eye(g, 10, 5 + dy, 2, 2);
+  px(g, 3, 6.9 + dy, 1.1, 0.9, BLUSH);          // má
+  px(g, 11.9, 6.9 + dy, 1.1, 0.9, BLUSH);
+  px(g, 7.7, 6.6 + dy, 0.7, 0.4, p.skinDark);   // sống mũi
+  px(g, 7, 7.5 + dy, 2, 0.34, p.skinDark);      // miệng, cong bằng hai nét lệch nhau 1/3 pixel
+  px(g, 7.3, 7.84 + dy, 1.4, 0.33, p.skinDark);
 }
 
 /** Mặt nhìn ngang: chỉ một mắt, thêm cái mũi nhỏ nhô ra. */
 function faceSide(g, p) {
-  px(g, 9, 5, 2, 2, INK);
-  px(g, 9, 5, 1, 1, EYE_LIGHT);
-  px(g, 12, 6, 1, 1, p.skin);           // mũi
-  px(g, 11, 7, 1, 1, BLUSH);
+  eye(g, 9, 5, 2, 2);
+  px(g, 12, 5.9, 1, 0.9, p.skin);               // mũi
+  px(g, 12, 6.6, 1, 0.34, p.skinDark);          // gờ dưới mũi cho khỏi bẹt
+  px(g, 10.8, 7, 1.1, 0.9, BLUSH);
+  px(g, 9.4, 7.6, 1.6, 0.34, p.skinDark);       // miệng
 }
 
 /* ------------------------------------------------------------- kiểu tóc
@@ -287,24 +385,24 @@ const HAIR = {
 
   catears: {
     front(g, p, dy) {
-      px(g, 3, dy, 2, 2, p.hairC);            // hai tai nhọn
-      px(g, 11, dy, 2, 2, p.hairC);
-      px(g, 4, dy, 1, 1, BLUSH);              // lòng tai
-      px(g, 11, dy, 1, 1, BLUSH);
+      spike(g, 3, dy - 0.6, 2.2, 2.6, p.hairC);   // hai tai nhọn
+      spike(g, 10.8, dy - 0.6, 2.2, 2.6, p.hairC);
+      spike(g, 3.5, dy, 1.2, 1.8, BLUSH);         // lòng tai
+      spike(g, 11.3, dy, 1.2, 1.8, BLUSH);
       headBlock(g, 1 + dy, 4, p.hairC);
       px(g, 3, 4 + dy, 1, 3, p.hairC);
       px(g, 12, 4 + dy, 1, 3, p.hairC);
       px(g, 4, 4 + dy, 8, 1, p.hairDark);
     },
     back(g, p, dy) {
-      px(g, 3, dy, 2, 2, p.hairC);
-      px(g, 11, dy, 2, 2, p.hairC);
+      spike(g, 3, dy - 0.6, 2.2, 2.6, p.hairC);
+      spike(g, 10.8, dy - 0.6, 2.2, 2.6, p.hairC);
       headBlock(g, 1 + dy, 7, p.hairC);
       px(g, 4, 8 + dy, 8, 1, p.hairDark);
     },
     side(g, p) {
-      px(g, 4, 0, 2, 2, p.hairC);
-      px(g, 9, 0, 2, 2, p.hairC);
+      spike(g, 4, -0.6, 2.2, 2.6, p.hairC);
+      spike(g, 8.8, -0.6, 2.2, 2.6, p.hairC);
       headBlock(g, 1, 4, p.hairC);
       px(g, 3, 4, 4, 3, p.hairC);
     },
@@ -312,25 +410,25 @@ const HAIR = {
 
   spiky: {
     front(g, p, dy) {
-      px(g, 4, dy, 2, 1, p.hairC);            // ba chóp dựng
-      px(g, 7, dy, 2, 1, p.hairC);
-      px(g, 10, dy, 2, 1, p.hairC);
+      spike(g, 3.6, dy - 0.8, 2.4, 2.4, p.hairC);   // ba chóp dựng
+      spike(g, 6.8, dy - 1, 2.4, 2.6, p.hairC);
+      spike(g, 10, dy - 0.8, 2.4, 2.4, p.hairC);
       headBlock(g, 1 + dy, 4, p.hairC);
       px(g, 3, 4 + dy, 1, 2, p.hairC);
       px(g, 12, 4 + dy, 1, 2, p.hairC);
       px(g, 4, 4 + dy, 8, 1, p.hairDark);
     },
     back(g, p, dy) {
-      px(g, 4, dy, 2, 1, p.hairC);
-      px(g, 7, dy, 2, 1, p.hairC);
-      px(g, 10, dy, 2, 1, p.hairC);
+      spike(g, 3.6, dy - 0.8, 2.4, 2.4, p.hairC);
+      spike(g, 6.8, dy - 1, 2.4, 2.6, p.hairC);
+      spike(g, 10, dy - 0.8, 2.4, 2.4, p.hairC);
       headBlock(g, 1 + dy, 7, p.hairC);
       px(g, 4, 8 + dy, 8, 1, p.hairDark);
     },
     side(g, p) {
-      px(g, 4, 0, 2, 1, p.hairC);
-      px(g, 7, 0, 2, 1, p.hairC);
-      px(g, 10, 0, 2, 1, p.hairC);
+      spike(g, 3.6, -0.8, 2.4, 2.4, p.hairC);
+      spike(g, 6.8, -1, 2.4, 2.6, p.hairC);
+      spike(g, 10, -0.8, 2.4, 2.4, p.hairC);
       headBlock(g, 1, 4, p.hairC);
       px(g, 3, 4, 4, 3, p.hairC);
     },
@@ -375,25 +473,41 @@ function outfitFront(g, p, y0) {
 
 /* ------------------------------------------------------------- các tư thế */
 
+/** Khối vải: một vệt sáng chạy dọc mép trái và một mảng tối ở gấu.
+ *
+ *  Hậu kỳ ở cuối file chỉ lo được đường VIỀN ngoài silhouette, tức chiều dày. Cái này lo
+ *  KHỐI: không có nó thì thân người là một mảng màu phẳng lì, có nó thì đọc ra được cái áo
+ *  có bề dày và nguồn sáng đến từ trên trái - cùng hướng với mọi bộ. */
+function clothShade(g, x, y, w, h, color) {
+  px(g, x, y + h - h * 0.26, w, h * 0.26, darken(color, 0.14));
+  px(g, x, y, w * 0.22, h * 0.72, lighten(color, 0.09));
+}
+
 /** Đôi chân + giày. `step` 0 đứng yên, 1 và 2 là hai nhịp bước. */
 function legs(g, p, step) {
   const off = step === 1 ? 1 : step === 2 ? -1 : 0;
   px(g, 5, 16, 2, 3, p.pants);
   px(g, 9, 16, 2, 3, p.pants);
+  px(g, 5, 16, 0.5, 3, lighten(p.pants, 0.1));      // mặt ngoài ống quần hứng sáng
+  px(g, 10.5, 16, 0.5, 3, darken(p.pants, 0.12));
   // Bước đi: một bàn chân đưa ra trước, bàn kia lùi lại. Chỉ xê dịch giày chứ không xê dịch
   // cả ống chân - dịch cả chân ở kích thước này thì nhân vật trông như bị gãy.
-  px(g, 5 - Math.max(0, off), 19, 2, 1, p.shoes);
-  px(g, 9 + Math.max(0, -off), 19, 2, 1, p.shoes);
+  roundBox(g, 5 - Math.max(0, off), 18.85, 2, 1.15, 0.45, p.shoes);
+  roundBox(g, 9 + Math.max(0, -off), 18.85, 2, 1.15, 0.45, p.shoes);
 }
 
 function torso(g, p) {
-  px(g, 4, 10, 8, 6, p.shirt);
+  roundBox(g, 4, 10, 8, 6, 0.8, p.shirt);
+  clothShade(g, 4, 10, 8, 6, p.shirt);
   px(g, 4, 10, 8, 1, p.shirtDark);            // cổ áo
+  px(g, 6.4, 10, 3.2, 0.5, darken(p.shirtDark, 0.2));   // hõm cổ
   outfitFront(g, p, 10);
   px(g, 3, 11, 1, 4, p.shirt);                // hai tay
   px(g, 12, 11, 1, 4, p.shirt);
-  px(g, 3, 15, 1, 1, p.skin);                 // bàn tay
-  px(g, 12, 15, 1, 1, p.skin);
+  px(g, 3, 11, 1, 4, lighten(p.shirt, 0.06));
+  px(g, 12, 11, 1, 4, darken(p.shirt, 0.1));
+  roundBox(g, 3, 14.9, 1, 1.1, 0.4, p.skin);  // bàn tay
+  roundBox(g, 12, 14.9, 1, 1.1, 0.4, p.skin);
 }
 
 /** Nhìn thẳng: thấy mặt. */
@@ -418,41 +532,52 @@ function drawSide(g, p, step) {
   headBlock(g, 1, 9, p.skin);
   HAIR[p.hair].side(g, p);
   faceSide(g, p);
-  px(g, 4, 10, 8, 6, p.shirt);
+  roundBox(g, 4, 10, 8, 6, 0.8, p.shirt);
+  clothShade(g, 4, 10, 8, 6, p.shirt);
   px(g, 4, 10, 8, 1, p.shirtDark);
   outfitFront(g, p, 10);
   // Chỉ thấy một tay, và nó đánh theo nhịp chân
   const ax = step === 1 ? 10 : step === 2 ? 4 : 7;
-  px(g, ax, 11, 2, 4, p.shirtDark);
-  px(g, ax, 15, 2, 1, p.skin);
+  roundBox(g, ax, 11, 2, 4, 0.6, p.shirtDark);
+  roundBox(g, ax, 14.9, 2, 1.1, 0.45, p.skin);
   legs(g, p, step);
 }
 
 /* Ngồi: nhìn từ sau lưng vì bàn quay mặt vào tường, người ngồi quay lưng ra phía người xem.
  * Đây là góc duy nhất cho thấy được cả người lẫn màn hình cùng lúc. Chân khuất sau ghế nên
- * không vẽ - vẽ chân thò ra dưới ghế trông như đang lơ lửng. */
+ * không vẽ - vẽ chân thò ra dưới ghế trông như đang lơ lửng.
+ *
+ * `arms === 'turn'` là tư thế NGOÁI LẠI NHÌN: vẫn nguyên cái thân ngồi ấy, chỉ đổi đầu sang
+ * mặt trước. Người ta rê chuột vào một người đang làm việc thì muốn thấy người đó ngước lên
+ * đáp lại, chứ không phải thấy họ đứng dậy rời ghế - xem ghi chú ở office.js/setHover. */
 function drawSit(g, p, arms) {
   const drop = arms === 'sleep' ? 2 : 0;      // gục xuống thì cả đầu lẫn vai thấp hơn
+  const turn = arms === 'turn';
   headBlock(g, 1 + drop, 9, p.skin);
-  HAIR[p.hair].back(g, p, drop);
+  if (turn) { HAIR[p.hair].front(g, p, drop); faceFront(g, p, drop); }
+  else HAIR[p.hair].back(g, p, drop);
 
   // Bắt đầu ở y=10, ĐÚNG hàng kết thúc của khối đầu. Để lệch một hàng là hở một vệt sàn
   // ngang cổ, và ở bậc phóng 5 nhìn như cái đầu rời ra khỏi thân.
-  px(g, 3, 10 + drop, 10, 7, p.shirt);        // lưng rộng hơn vì đang ngồi hơi khom
+  roundBox(g, 3, 10 + drop, 10, 7, 1, p.shirt);   // lưng rộng hơn vì đang ngồi hơi khom
+  clothShade(g, 3, 10 + drop, 10, 7, p.shirt);
   px(g, 3, 10 + drop, 10, 1, p.shirtDark);
+  // Ngoái lại thì thấy NGỰC chứ không thấy lưng: bỏ rãnh sống lưng, thay bằng hoạ tiết áo.
+  if (turn) outfitFront(g, p, 10 + drop);
+  else px(g, 7.4, 10.6 + drop, 1.2, 5.4, darken(p.shirt, 0.1));   // rãnh sống lưng
 
   if (arms === 'sleep') {
     px(g, 2, 12 + drop, 2, 3, p.shirtDark);   // hai tay buông thõng
     px(g, 12, 12 + drop, 2, 3, p.shirtDark);
-    px(g, 2, 15 + drop, 2, 1, p.skin);
-    px(g, 12, 15 + drop, 2, 1, p.skin);
+    roundBox(g, 2, 14.9 + drop, 2, 1.1, 0.45, p.skin);
+    roundBox(g, 12, 14.9 + drop, 2, 1.1, 0.45, p.skin);
     return;
   }
-  if (arms === 'rest') {
+  if (arms === 'rest' || turn) {              // ngoái lại thì rời tay khỏi bàn phím
     px(g, 2, 12, 2, 4, p.shirtDark);
     px(g, 12, 12, 2, 4, p.shirtDark);
-    px(g, 2, 16, 2, 1, p.skin);
-    px(g, 12, 16, 2, 1, p.skin);
+    roundBox(g, 2, 15.9, 2, 1.1, 0.45, p.skin);
+    roundBox(g, 12, 15.9, 2, 1.1, 0.45, p.skin);
     return;
   }
   // Gõ phím: hai cẳng tay vươn ra trước, hai bàn tay so le nhau một pixel theo nhịp.
@@ -478,6 +603,7 @@ function drawPersonFrame(g, p, key) {
     case 'k1': return drawSit(g, p, 'typeA');
     case 'k2': return drawSit(g, p, 'typeB');
     case 'k3': return drawSit(g, p, 'sleep');
+    case 'kf': return drawSit(g, p, 'turn');
     default: return drawDown(g, p, 0);
   }
 }
@@ -517,64 +643,68 @@ const PET_CHARS = [
 function petEars(g, p, y0) {
   const k = p.ear;
   if (k === 'cat') {
-    px(g, 3, y0 - 2, 2, 3, p.body);       // hai tai nhọn dựng
-    px(g, 11, y0 - 2, 2, 3, p.body);
-    px(g, 4, y0 - 1, 1, 1, p.nose);       // lòng tai
-    px(g, 11, y0 - 1, 1, 1, p.nose);
+    spike(g, 3, y0 - 2, 2.2, 3, p.body);  // hai tai nhọn dựng
+    spike(g, 10.8, y0 - 2, 2.2, 3, p.body);
+    spike(g, 3.5, y0 - 1.4, 1.2, 2, p.nose);   // lòng tai
+    spike(g, 11.3, y0 - 1.4, 1.2, 2, p.nose);
   } else if (k === 'long') {
-    px(g, 4, y0 - 5, 2, 6, p.body);       // tai thỏ dài
-    px(g, 10, y0 - 5, 2, 6, p.body);
-    px(g, 4, y0 - 4, 1, 3, p.nose);
-    px(g, 11, y0 - 4, 1, 3, p.nose);
+    roundBox(g, 4, y0 - 5, 2, 6, 0.9, p.body);   // tai thỏ dài
+    roundBox(g, 10, y0 - 5, 2, 6, 0.9, p.body);
+    roundBox(g, 4.2, y0 - 4.2, 1.4, 4, 0.6, p.nose);
+    roundBox(g, 10.4, y0 - 4.2, 1.4, 4, 0.6, p.nose);
   } else if (k === 'flop') {
-    px(g, 2, y0, 2, 4, p.bodyDark);       // tai cụp rủ hai bên
-    px(g, 12, y0, 2, 4, p.bodyDark);
+    roundBox(g, 2, y0 - 0.3, 2, 4.3, 0.9, p.bodyDark);   // tai cụp rủ hai bên
+    roundBox(g, 12, y0 - 0.3, 2, 4.3, 0.9, p.bodyDark);
   } else if (k === 'horn') {
-    px(g, 2, y0, 2, 2, p.bodyDark);       // tai bò
-    px(g, 12, y0, 2, 2, p.bodyDark);
-    px(g, 4, y0 - 2, 2, 2, '#e8d9a8');    // hai cái sừng
-    px(g, 10, y0 - 2, 2, 2, '#e8d9a8');
+    roundBox(g, 2, y0, 2, 2, 0.8, p.bodyDark);   // tai bò
+    roundBox(g, 12, y0, 2, 2, 0.8, p.bodyDark);
+    spike(g, 4, y0 - 2.2, 2, 2.4, '#e8d9a8');    // hai cái sừng
+    spike(g, 10, y0 - 2.2, 2, 2.4, '#e8d9a8');
   } else if (k === 'comb') {
-    px(g, 6, y0 - 3, 4, 2, '#e05050');    // mào gà
-    px(g, 7, y0 - 4, 2, 1, '#e05050');
+    roundBox(g, 6, y0 - 3, 4, 2.2, 0.9, '#e05050');   // mào gà
+    spike(g, 6.6, y0 - 4, 1.4, 1.4, '#e05050');
+    spike(g, 8.2, y0 - 4.2, 1.4, 1.6, '#e05050');
   } else if (k === 'frog') {
-    px(g, 3, y0 - 2, 3, 3, p.body);       // hai mắt lồi
-    px(g, 10, y0 - 2, 3, 3, p.body);
-    px(g, 4, y0 - 1, 1, 1, INK);
-    px(g, 11, y0 - 1, 1, 1, INK);
+    roundBox(g, 3, y0 - 2, 3, 3, 1.4, p.body);   // hai mắt lồi
+    roundBox(g, 10, y0 - 2, 3, 3, 1.4, p.body);
+    eye(g, 3.9, y0 - 1.4, 1.3, 1.5);
+    eye(g, 10.8, y0 - 1.4, 1.3, 1.5);
   }
 }
 
 function petFaceFront(g, p) {
-  px(g, 5, 7, 2, 2, INK);                 // mắt
-  px(g, 9, 7, 2, 2, INK);
-  px(g, 5, 7, 1, 1, EYE_LIGHT);
-  px(g, 9, 7, 1, 1, EYE_LIGHT);
+  eye(g, 5, 7, 2, 2);
+  eye(g, 9, 7, 2, 2);
   if (p.beak) {
-    px(g, 7, 9, 2, 2, p.nose);            // mỏ
+    roundBox(g, 7, 9, 2, 2, 0.7, p.nose);      // mỏ
+    px(g, 7, 9.9, 2, 0.34, darken(p.nose, 0.25));
   } else {
-    px(g, 6, 9, 4, 2, p.belly);           // mõm
-    px(g, 7, 9, 2, 1, p.nose);            // mũi
+    roundBox(g, 6, 8.9, 4, 2.1, 0.9, p.belly); // mõm
+    roundBox(g, 7, 8.9, 2, 1, 0.4, p.nose);    // mũi
+    px(g, 7.7, 10, 0.6, 0.9, darken(p.belly, 0.2));   // rãnh giữa mõm
   }
-  px(g, 3, 9, 1, 1, BLUSH);
-  px(g, 12, 9, 1, 1, BLUSH);
+  px(g, 3, 8.9, 1.1, 0.9, BLUSH);
+  px(g, 11.9, 8.9, 1.1, 0.9, BLUSH);
 }
 
 /** Thân + bốn chân. `step` cho nhịp đi. */
 function petBody(g, p, step, y0) {
-  px(g, 4, y0, 8, 5, p.body);
-  px(g, 5, y0 + 1, 6, 3, p.belly);        // bụng sáng hơn
+  roundBox(g, 4, y0, 8, 5, 1.4, p.body);
+  roundBox(g, 5, y0 + 1, 6, 3, 1.2, p.belly);        // bụng sáng hơn
+  px(g, 4, y0 + 3.6, 8, 1.4, darken(p.body, 0.12));  // bụng dưới nằm trong bóng
   if (p.spots) {                          // đốm bò
-    px(g, 4, y0, 3, 2, p.bodyDark);
-    px(g, 10, y0 + 2, 2, 2, p.bodyDark);
+    roundBox(g, 4, y0, 3, 2, 0.8, p.bodyDark);
+    roundBox(g, 10, y0 + 2, 2, 2, 0.8, p.bodyDark);
   }
   if (p.wool) {                           // lông cừu lởm chởm
-    px(g, 3, y0, 1, 4, p.body);
-    px(g, 12, y0, 1, 4, p.body);
+    for (let i = 0; i < 4; i++) {
+      roundBox(g, 3.2, y0 + i, 1.3, 1.2, 0.6, p.body);
+      roundBox(g, 11.5, y0 + i, 1.3, 1.2, 0.6, p.body);
+    }
   }
   const off = step === 1 ? 1 : step === 2 ? -1 : 0;
-  px(g, 4 - Math.max(0, off), y0 + 5, 2, 2, p.bodyDark);
-  px(g, 10 + Math.max(0, -off), y0 + 5, 2, 2, p.bodyDark);
+  roundBox(g, 4 - Math.max(0, off), y0 + 5, 2, 2, 0.7, p.bodyDark);
+  roundBox(g, 10 + Math.max(0, -off), y0 + 5, 2, 2, 0.7, p.bodyDark);
 }
 
 function petTail(g, p, x, y) {
@@ -602,27 +732,29 @@ function petUp(g, p, step) {
 function petSide(g, p, step) {
   petEars(g, p, 3);
   headBlock(g, 3, 8, p.body);
-  px(g, 9, 7, 2, 2, INK);                 // một mắt
-  px(g, 9, 7, 1, 1, EYE_LIGHT);
-  if (p.beak) px(g, 13, 8, 2, 2, p.nose);
-  else { px(g, 12, 8, 2, 2, p.belly); px(g, 13, 9, 1, 1, p.nose); }
-  px(g, 3, 11, 10, 5, p.body);
-  px(g, 4, 12, 8, 3, p.belly);
+  eye(g, 9, 7, 2, 2);                     // một mắt
+  if (p.beak) roundBox(g, 13, 8, 2, 2, 0.7, p.nose);
+  else { roundBox(g, 12, 8, 2, 2, 0.8, p.belly); roundBox(g, 13, 8.9, 1, 1, 0.4, p.nose); }
+  roundBox(g, 3, 11, 10, 5, 1.5, p.body);
+  roundBox(g, 4, 12, 8, 3, 1.2, p.belly);
+  px(g, 3, 14.6, 10, 1.4, darken(p.body, 0.12));
   const off = step === 1 ? 1 : step === 2 ? -1 : 0;
-  px(g, 4 - Math.max(0, off), 16, 2, 3, p.bodyDark);
-  px(g, 10 + Math.max(0, -off), 16, 2, 3, p.bodyDark);
+  roundBox(g, 4 - Math.max(0, off), 16, 2, 3, 0.7, p.bodyDark);
+  roundBox(g, 10 + Math.max(0, -off), 16, 2, 3, 0.7, p.bodyDark);
   petTail(g, p, 1, 12);
 }
 
 /* Ngồi ở bàn: nhìn từ sau lưng, chỉ thấy tai + đầu + lưng nhô lên khỏi mặt bàn. */
 function petSit(g, p, arms) {
   const drop = arms === 'sleep' ? 2 : 0;
+  const turn = arms === 'turn';
   petEars(g, p, 3 + drop);
   headBlock(g, 3 + drop, 8, p.body);
-  px(g, 5, 9 + drop, 6, 2, p.bodyDark);
-  px(g, 3, 11 + drop, 10, 6, p.body);     // lưng
-  px(g, 4, 12 + drop, 8, 4, p.belly);
-  if (arms === 'sleep' || arms === 'rest') {
+  if (turn) petFaceFront(g, p);
+  else px(g, 5, 9 + drop, 6, 2, p.bodyDark);   // gáy
+  roundBox(g, 3, 11 + drop, 10, 6, 1.4, p.body);     // lưng
+  roundBox(g, 4, 12 + drop, 8, 4, 1.2, p.belly);
+  if (arms === 'sleep' || arms === 'rest' || turn) {
     px(g, 2, 13 + drop, 2, 3, p.bodyDark);
     px(g, 12, 13 + drop, 2, 3, p.bodyDark);
     return;
@@ -649,6 +781,7 @@ function drawPetFrame(g, p, key) {
     case 'k1': return petSit(g, p, 'typeA');
     case 'k2': return petSit(g, p, 'typeB');
     case 'k3': return petSit(g, p, 'sleep');
+    case 'kf': return petSit(g, p, 'turn');
     default: return petDown(g, p, 0);
   }
 }
@@ -678,11 +811,26 @@ const SLIME_CHARS = [
  *  Phải THÓT DẦN về đỉnh. Vẽ thành một khối chữ nhật bo góc thì nhìn ra cái hộp chứ không
  *  ra giọt - đúng lỗi của bản đầu, cả bộ trông như mấy cái TV cũ. */
 function slimeDome(g, p, cx, baseY, w, h) {
-  for (let i = 0; i < h; i++) {
-    const y = baseY - h + i;
-    const shrink = i === 0 ? 4 : i === 1 ? 2 : i === 2 ? 1 : 0;
-    const ww = w - shrink * 2;
-    px(g, cx - ww / 2, y, ww, 1, y >= baseY - 2 ? p.bodyDark : p.body);
+  const S = SPRITE_SS;
+  const top = baseY - h;
+  const y0 = Math.round(top * S), y1 = Math.round(baseY * S);
+  const hi = lighten(p.body, 0.16);
+  for (let iy = y0; iy < y1; iy++) {
+    const cy = (iy + 0.5) / S - top;                 // 0 ở đỉnh, h ở đáy
+    // Nửa trên là cung tròn (đỉnh thót lại), nửa dưới nở ra chạm sàn - đúng dáng một giọt
+    // chất lỏng. Bản trước thu theo bốn nấc số nguyên nên đỉnh gãy thành bậc thang.
+    const t = Math.min(1, cy / (h * 0.72));
+    const ww = w * (0.34 + 0.66 * Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t))));
+    const a = Math.round((cx - ww / 2) * S), b = Math.round((cx + ww / 2) * S);
+    if (b <= a) continue;
+    g.fillStyle = cy > h - 1.6 ? p.bodyDark : p.body;
+    g.fillRect(a, iy, b - a, 1);
+    // Mảng sáng lệch về trái: khối trong suốt phải có chỗ hắt sáng, không thì nó là mảng màu
+    // phẳng chứ không ra chất lỏng.
+    if (cy > 0.6 && cy < h * 0.55) {
+      g.fillStyle = hi;
+      g.fillRect(a + Math.round(ww * S * 0.14), iy, Math.max(1, Math.round(ww * S * 0.2)), 1);
+    }
   }
 }
 
@@ -698,11 +846,11 @@ function slimeHat(g, p, topY) {
 }
 
 function slimeFace(g, p, eyeY) {
-  px(g, 5, eyeY, 2, 3, INK);
-  px(g, 9, eyeY, 2, 3, INK);
-  px(g, 5, eyeY, 1, 1, EYE_LIGHT);
-  px(g, 9, eyeY, 1, 1, EYE_LIGHT);
-  px(g, 7, eyeY + 3, 2, 1, INK);               // miệng
+  eye(g, 5, eyeY, 2, 3);
+  eye(g, 9, eyeY, 2, 3);
+  px(g, 7, eyeY + 3, 2, 0.4, INK);             // miệng cong
+  px(g, 6.6, eyeY + 2.7, 0.4, 0.4, INK);
+  px(g, 9, eyeY + 2.7, 0.4, 0.4, INK);
 }
 
 /** step 0 đứng yên, 1 nhún xuống (bè ra), 2 vươn lên (thon lại). */
@@ -729,9 +877,7 @@ function slimeSide(g, p, step) {
   const s = slimeShape(step);
   slimeDome(g, p, 8, 19, s.w, s.h);
   slimeHat(g, p, 19 - s.h);
-  const eyeY = 19 - s.h + 3;
-  px(g, 9, eyeY, 2, 3, INK);
-  px(g, 9, eyeY, 1, 1, EYE_LIGHT);
+  eye(g, 9, 19 - s.h + 3, 2, 3);
 }
 
 /* Ngồi ở bàn: nhô lên khỏi mặt bàn, quay lưng. Slime không có tay nên "gõ phím" diễn bằng
@@ -741,6 +887,8 @@ function slimeSit(g, p, arms) {
   const shift = arms === 'typeA' ? -1 : arms === 'typeB' ? 1 : 0;
   slimeDome(g, p, 8 + shift, 19, 13, 12 - drop);
   slimeHat(g, p, 19 - (12 - drop));
+  // Slime không có đầu riêng để ngoái, nên "quay lại" chính là hiện khuôn mặt ra.
+  if (arms === 'turn') slimeFace(g, p, 19 - 12 + 3);
 }
 
 function drawSlimeFrame(g, p, key) {
@@ -758,6 +906,7 @@ function drawSlimeFrame(g, p, key) {
     case 'k1': return slimeSit(g, p, 'typeA');
     case 'k2': return slimeSit(g, p, 'typeB');
     case 'k3': return slimeSit(g, p, 'sleep');
+    case 'kf': return slimeSit(g, p, 'turn');
     default: return slimeDown(g, p, 0);
   }
 }
@@ -796,20 +945,19 @@ function mascotHat(g, p, topY) {
 
 /** Thân bo tròn, hai chân bé tí. `dy` để nhún khi đi. */
 function mascotBody(g, p, dy) {
-  px(g, 5, 6 + dy, 6, 1, p.tint);
-  px(g, 4, 7 + dy, 8, 9, p.tint);
-  px(g, 5, 16 + dy, 6, 1, p.tint);
-  px(g, 5, 17 + dy, 2, 2, p.tint);            // hai chân
-  px(g, 9, 17 + dy, 2, 2, p.tint);
+  roundBox(g, 4, 6 + dy, 8, 11, 2.6, p.tint);
+  px(g, 4, 14.4 + dy, 8, 2.6, darken(p.tint, 0.1));   // nửa dưới nằm trong bóng
+  px(g, 4.6, 7 + dy, 1.4, 6, lighten(p.tint, 0.14));  // vệt sáng dọc mép trái
+  roundBox(g, 5, 16.9 + dy, 2, 2.1, 0.8, darken(p.tint, 0.16));   // hai chân
+  roundBox(g, 9, 16.9 + dy, 2, 2.1, 0.8, darken(p.tint, 0.16));
 }
 
 function mascotFace(g, dy) {
-  px(g, 5, 10 + dy, 2, 3, INK);
-  px(g, 9, 10 + dy, 2, 3, INK);
-  px(g, 5, 10 + dy, 1, 1, EYE_LIGHT);
-  px(g, 9, 10 + dy, 1, 1, EYE_LIGHT);
-  px(g, 3, 13 + dy, 1, 1, BLUSH);
-  px(g, 12, 13 + dy, 1, 1, BLUSH);
+  eye(g, 5, 10 + dy, 2, 3);
+  eye(g, 9, 10 + dy, 2, 3);
+  px(g, 7.3, 13.1 + dy, 1.4, 0.34, INK);              // miệng
+  px(g, 3, 12.9 + dy, 1.1, 0.9, BLUSH);
+  px(g, 11.9, 12.9 + dy, 1.1, 0.9, BLUSH);
 }
 
 function mascotDown(g, p, step) {
@@ -829,16 +977,17 @@ function mascotSide(g, p, step) {
   const dy = step === 1 ? 1 : 0;
   mascotBody(g, p, dy);
   mascotHat(g, p, 6 + dy);
-  px(g, 9, 10 + dy, 2, 3, INK);
-  px(g, 9, 10 + dy, 1, 1, EYE_LIGHT);
-  px(g, 12, 13 + dy, 1, 1, BLUSH);
+  eye(g, 9, 10 + dy, 2, 3);
+  px(g, 11.9, 12.9 + dy, 1.1, 0.9, BLUSH);
 }
 
 function mascotSit(g, p, arms) {
   const drop = arms === 'sleep' ? 2 : 0;
-  px(g, 5, 6 + drop, 6, 1, p.tint);
-  px(g, 4, 7 + drop, 8, 10, p.tint);
+  roundBox(g, 4, 6 + drop, 8, 11, 2.6, p.tint);
+  px(g, 4, 14.4 + drop, 8, 2.6, darken(p.tint, 0.1));
+  px(g, 4.6, 7 + drop, 1.4, 6, lighten(p.tint, 0.14));
   mascotHat(g, p, 6 + drop);
+  if (arms === 'turn') mascotFace(g, drop);
   if (arms === 'typeA' || arms === 'typeB') {
     const up = arms === 'typeA';
     px(g, 2, 12, 2, 3, p.tint);               // hai tay ngắn vươn ra bàn phím
@@ -866,21 +1015,24 @@ function drawMascotFrame(g, p, key) {
     case 'k1': return mascotSit(g, p, 'typeA');
     case 'k2': return mascotSit(g, p, 'typeB');
     case 'k3': return mascotSit(g, p, 'sleep');
+    case 'kf': return mascotSit(g, p, 'turn');
     default: return mascotDown(g, p, 0);
   }
 }
 
 /** Con mèo đi lang thang trong phòng. 10x8, hai nhịp chân. */
 function drawCat(g, step) {
-  const body = '#e0a94a', dark = '#b8842f', eye = '#2b2233';
-  px(g, 1, 3, 7, 4, body);            // thân
-  px(g, 7, 1, 3, 3, body);            // đầu
-  px(g, 7, 1, 1, 1, dark);            // tai
-  px(g, 9, 1, 1, 1, dark);
-  px(g, 9, 2, 1, 1, eye);             // mắt
-  px(g, 0, 1, 1, 3, dark);            // đuôi dựng
-  px(g, 1, 7, 2, 1, step ? dark : body);
-  px(g, 5, 7, 2, 1, step ? body : dark);
+  const body = '#e0a94a', dark = '#b8842f';
+  roundBox(g, 1, 3, 7, 4, 1.5, body);       // thân
+  px(g, 1, 5.6, 7, 1.4, darken(body, 0.12));
+  roundBox(g, 6.8, 1, 3.2, 3.2, 1.2, body); // đầu
+  spike(g, 6.9, 0.6, 1.2, 1.4, dark);       // tai
+  spike(g, 8.7, 0.6, 1.2, 1.4, dark);
+  px(g, 9, 2.2, 0.7, 0.7, INK);             // mắt
+  px(g, 9.6, 3, 0.6, 0.34, darken(body, 0.3));  // mũi
+  roundBox(g, 0.2, 0.8, 0.9, 3.2, 0.45, dark);  // đuôi dựng
+  roundBox(g, 1, 6.8, 2, 1.2, 0.5, step ? dark : body);
+  roundBox(g, 5, 6.8, 2, 1.2, 0.5, step ? body : dark);
 }
 
 /* ============================================================ BỘ 5: HẢI TRÌNH
@@ -951,7 +1103,8 @@ function voyageHair(g, p, view, dy) {
   } else if (t === 'afro') {
     px(g, 2, dy, 12, 5, p.hair); px(g, 1, 2 + dy, 2, 6, p.hair); px(g, 13, 2 + dy, 2, 6, p.hair);
   } else if (t === 'spike') {
-    px(g, 3, 1 + dy, 10, 4, p.hair); px(g, 3, dy, 2, 2, p.hair); px(g, 7, dy, 2, 2, p.hair); px(g, 11, dy, 2, 2, p.hair);
+    px(g, 3, 1 + dy, 10, 4, p.hair);
+    spike(g, 2.9, dy - 0.9, 2.4, 2.6, p.hair); spike(g, 6.8, dy - 1, 2.4, 2.7, p.hair); spike(g, 10.7, dy - 0.9, 2.4, 2.6, p.hair);
   } else {
     px(g, 3, 1 + dy, 10, 4, p.hair);
     if (t === 'long') { px(g, 2, 4 + dy, 2, 8, p.hair); px(g, 12, 4 + dy, 2, 8, p.hair); }
@@ -962,10 +1115,14 @@ function voyageHair(g, p, view, dy) {
 
 function voyageFace(g, p, view, dy) {
   if (view === 'back') return;
-  if (p.face === 'skull') { px(g, 4, 5 + dy, 3, 3, INK); px(g, 9, 5 + dy, 3, 3, INK); px(g, 6, 8 + dy, 4, 1, INK); return; }
+  if (p.face === 'skull') {
+    roundBox(g, 4, 5 + dy, 3, 3, 1.2, INK); roundBox(g, 9, 5 + dy, 3, 3, 1.2, INK);
+    px(g, 6, 8 + dy, 4, 0.5, INK); px(g, 6.6, 8.5 + dy, 0.5, 0.5, INK); px(g, 8.9, 8.5 + dy, 0.5, 0.5, INK);
+    return;
+  }
   const ex = view === 'side' ? 9 : 4;
-  px(g, ex, 5 + dy, 2, 2, INK); px(g, ex, 5 + dy, 1, 1, EYE_LIGHT);
-  if (view !== 'side') { px(g, 10, 5 + dy, 2, 2, INK); px(g, 10, 5 + dy, 1, 1, EYE_LIGHT); }
+  eye(g, ex, 5 + dy, 2, 2);
+  if (view !== 'side') eye(g, 10, 5 + dy, 2, 2);
   if (p.face === 'mask') px(g, 4, 7 + dy, 8, 2, p.accent);
   else if (p.face === 'beard') { px(g, 5, 8 + dy, 6, 2, p.hair); px(g, 6, 7 + dy, 4, 1, p.hair); }
   else if (p.face === 'snout') { px(g, 6, 7 + dy, 4, 2, '#e9aaae'); px(g, 7, 7 + dy, 2, 1, INK); }
@@ -982,23 +1139,29 @@ function voyageHead(g, p, view, dy) {
 
 function voyageBody(g, p, view, step, sitting) {
   const y = sitting ? 11 : 10;
-  px(g, sitting ? 3 : 4, y, sitting ? 10 : 8, sitting ? 6 : 6, p.shirt);
-  px(g, sitting ? 3 : 4, y, sitting ? 10 : 8, 1, p.shade);
-  px(g, 7, y + 1, 2, 4, p.accent);
+  const x0 = sitting ? 3 : 4, w = sitting ? 10 : 8;
+  roundBox(g, x0, y, w, 6, sitting ? 1 : 0.8, p.shirt);
+  clothShade(g, x0, y, w, 6, p.shirt);
+  px(g, x0, y, w, 1, p.shade);
+  px(g, 7, y + 1, 2, 4, p.accent);            // dải áo giữa ngực
+  px(g, 8.6, y + 1, 0.4, 4, darken(p.accent, 0.2));
   if (sitting) return;
   const arm = view === 'side' ? (step === 1 ? 10 : step === 2 ? 4 : 7) : 3;
-  px(g, arm, 11, view === 'side' ? 2 : 1, 4, p.shade); px(g, arm, 15, view === 'side' ? 2 : 1, 1, p.skin);
-  if (view !== 'side') { px(g, 12, 11, 1, 4, p.shade); px(g, 12, 15, 1, 1, p.skin); }
+  const aw = view === 'side' ? 2 : 1;
+  roundBox(g, arm, 11, aw, 4, 0.4, p.shade); roundBox(g, arm, 14.9, aw, 1.1, 0.4, p.skin);
+  if (view !== 'side') { roundBox(g, 12, 11, 1, 4, 0.4, p.shade); roundBox(g, 12, 14.9, 1, 1.1, 0.4, p.skin); }
   px(g, 5, 16, 2, 3, p.pants); px(g, 9, 16, 2, 3, p.pants);
+  px(g, 5, 16, 0.5, 3, lighten(p.pants, 0.1)); px(g, 10.5, 16, 0.5, 3, darken(p.pants, 0.12));
   const off = step === 1 ? 1 : step === 2 ? -1 : 0;
-  px(g, 5 - Math.max(0, off), 19, 2, 1, p.dark); px(g, 9 + Math.max(0, -off), 19, 2, 1, p.dark);
+  roundBox(g, 5 - Math.max(0, off), 18.85, 2, 1.15, 0.45, p.dark);
+  roundBox(g, 9 + Math.max(0, -off), 18.85, 2, 1.15, 0.45, p.dark);
 }
 
 function voyageWalk(g, p, view, step) { voyageHead(g, p, view, 0); voyageBody(g, p, view, step, false); }
 
 function voyageSit(g, p, arms) {
   const drop = arms === 'sleep' ? 2 : 0;
-  voyageHead(g, p, 'back', drop); voyageBody(g, p, 'back', 0, true);
+  voyageHead(g, p, arms === 'turn' ? 'front' : 'back', drop); voyageBody(g, p, 'back', 0, true);
   if (arms === 'typeA' || arms === 'typeB') {
     const up = arms === 'typeA'; px(g, 1, 12, 3, 3, p.shade); px(g, 12, 12, 3, 3, p.shade);
     px(g, 1, up ? 14 : 15, 3, 1, p.skin); px(g, 12, up ? 15 : 14, 3, 1, p.skin);
@@ -1011,6 +1174,7 @@ function drawVoyageFrame(g, p, key) {
     case 'u0': return voyageWalk(g, p, 'back', 0); case 'u1': return voyageWalk(g, p, 'back', 1); case 'u2': return voyageWalk(g, p, 'back', 2);
     case 's0': return voyageWalk(g, p, 'side', 0); case 's1': return voyageWalk(g, p, 'side', 1); case 's2': return voyageWalk(g, p, 'side', 2);
     case 'k0': return voyageSit(g, p, 'rest'); case 'k1': return voyageSit(g, p, 'typeA'); case 'k2': return voyageSit(g, p, 'typeB'); case 'k3': return voyageSit(g, p, 'sleep');
+    case 'kf': return voyageSit(g, p, 'turn');
     default: return voyageWalk(g, p, 'front', 0);
   }
 }
@@ -1066,7 +1230,10 @@ function ninjaHair(g, p, view, dy) {
   if (p.hood) { px(g, 2, dy, 12, 10, p.shirt); px(g, 3, 2 + dy, 10, 7, p.dark); }
   else if (view === 'back') { px(g, 3, dy, 10, long ? 11 : 8, p.hair); if (long) { px(g, 2, 4 + dy, 2, 8, p.hair); px(g, 12, 4 + dy, 2, 8, p.hair); } }
   else if (view === 'side') { px(g, 3, dy, 9, 5, p.hair); px(g, 3, 4 + dy, long ? 5 : 3, long ? 7 : 3, p.hair); }
-  else if (p.hairType === 'spike') { px(g, 3, 1 + dy, 10, 4, p.hair); px(g, 3, dy, 2, 2, p.hair); px(g, 7, dy, 2, 2, p.hair); px(g, 11, dy, 2, 2, p.hair); }
+  else if (p.hairType === 'spike') {
+    px(g, 3, 1 + dy, 10, 4, p.hair);
+    spike(g, 2.9, dy - 0.9, 2.4, 2.6, p.hair); spike(g, 6.8, dy - 1, 2.4, 2.7, p.hair); spike(g, 10.7, dy - 0.9, 2.4, 2.6, p.hair);
+  }
   else { px(g, 3, 1 + dy, 10, 4, p.hair); if (long) { px(g, 2, 4 + dy, 2, 8, p.hair); px(g, 12, 4 + dy, 2, 8, p.hair); } }
   if (p.ponytail) px(g, view === 'side' ? 1 : 12, 5 + dy, 3, 6, p.hair);
 }
@@ -1082,9 +1249,9 @@ function ninjaBand(g, p, view, dy) {
 function ninjaFace(g, p, view, dy) {
   if (view === 'back') return;
   const ex = view === 'side' ? 9 : 4;
-  if (p.oneEye && view !== 'side') px(g, 3, 5 + dy, 5, 2, p.dark);
-  else { px(g, ex, 6 + dy, 2, 2, INK); px(g, ex, 6 + dy, 1, 1, EYE_LIGHT); }
-  if (view !== 'side') { px(g, 10, 6 + dy, 2, 2, INK); px(g, 10, 6 + dy, 1, 1, EYE_LIGHT); }
+  if (p.oneEye && view !== 'side') roundBox(g, 3, 5 + dy, 5, 2, 0.5, p.dark);
+  else eye(g, ex, 6 + dy, 2, 2);
+  if (view !== 'side') eye(g, 10, 6 + dy, 2, 2);
   if (p.mask) px(g, 4, 8 + dy, 8, 2, p.shade); else px(g, 7, 8 + dy, 2, 1, p.dark);
   if (p.marks) { px(g, 2, 7 + dy, 2, 1, p.accent); px(g, 12, 7 + dy, 2, 1, p.accent); }
 }
@@ -1095,20 +1262,28 @@ function ninjaHead(g, p, view, dy) {
 
 function ninjaBody(g, p, view, step, sitting) {
   const y = sitting ? 11 : 10;
-  px(g, sitting ? 3 : 4, y, sitting ? 10 : 8, 6, p.shirt); px(g, sitting ? 3 : 4, y, sitting ? 10 : 8, 1, p.shade);
-  if (p.cloak) { px(g, 5, y + 2, 3, 2, p.accent); px(g, 10, y + 4, 2, 2, p.accent); }
-  else { px(g, 7, y + 1, 2, 4, p.accent); }
+  const x0 = sitting ? 3 : 4, w = sitting ? 10 : 8;
+  roundBox(g, x0, y, w, 6, sitting ? 1 : 0.8, p.shirt);
+  clothShade(g, x0, y, w, 6, p.shirt);
+  px(g, x0, y, w, 1, p.shade);
+  if (p.cloak) { roundBox(g, 5, y + 2, 3, 2, 0.8, p.accent); roundBox(g, 10, y + 4, 2, 2, 0.8, p.accent); }
+  else { px(g, 7, y + 1, 2, 4, p.accent); px(g, 8.6, y + 1, 0.4, 4, darken(p.accent, 0.2)); }
   if (sitting) return;
   const ax = view === 'side' ? (step === 1 ? 10 : step === 2 ? 4 : 7) : 3;
-  px(g, ax, 11, view === 'side' ? 2 : 1, 4, p.shade); px(g, ax, 15, view === 'side' ? 2 : 1, 1, p.skin);
-  if (view !== 'side') { px(g, 12, 11, 1, 4, p.shade); px(g, 12, 15, 1, 1, p.skin); }
+  const aw = view === 'side' ? 2 : 1;
+  roundBox(g, ax, 11, aw, 4, 0.4, p.shade); roundBox(g, ax, 14.9, aw, 1.1, 0.4, p.skin);
+  if (view !== 'side') { roundBox(g, 12, 11, 1, 4, 0.4, p.shade); roundBox(g, 12, 14.9, 1, 1.1, 0.4, p.skin); }
   px(g, 5, 16, 2, 3, p.pants); px(g, 9, 16, 2, 3, p.pants);
-  const off = step === 1 ? 1 : step === 2 ? -1 : 0; px(g, 5 - Math.max(0, off), 19, 2, 1, p.dark); px(g, 9 + Math.max(0, -off), 19, 2, 1, p.dark);
+  px(g, 5, 16, 0.5, 3, lighten(p.pants, 0.1)); px(g, 10.5, 16, 0.5, 3, darken(p.pants, 0.12));
+  const off = step === 1 ? 1 : step === 2 ? -1 : 0;
+  roundBox(g, 5 - Math.max(0, off), 18.85, 2, 1.15, 0.45, p.dark);
+  roundBox(g, 9 + Math.max(0, -off), 18.85, 2, 1.15, 0.45, p.dark);
 }
 
 function ninjaWalk(g, p, view, step) { ninjaHead(g, p, view, 0); ninjaBody(g, p, view, step, false); }
 function ninjaSit(g, p, arms) {
-  const drop = arms === 'sleep' ? 2 : 0; ninjaHead(g, p, 'back', drop); ninjaBody(g, p, 'back', 0, true);
+  const drop = arms === 'sleep' ? 2 : 0;
+  ninjaHead(g, p, arms === 'turn' ? 'front' : 'back', drop); ninjaBody(g, p, 'back', 0, true);
   if (arms === 'typeA' || arms === 'typeB') { const up = arms === 'typeA'; px(g,1,12,3,3,p.shade); px(g,12,12,3,3,p.shade); px(g,1,up?14:15,3,1,p.skin); px(g,12,up?15:14,3,1,p.skin); }
   else { px(g,2,13+drop,2,3,p.shade); px(g,12,13+drop,2,3,p.shade); }
 }
@@ -1119,6 +1294,7 @@ function drawNinjaFrame(g, p, key) {
     case 'u0': return ninjaWalk(g,p,'back',0); case 'u1': return ninjaWalk(g,p,'back',1); case 'u2': return ninjaWalk(g,p,'back',2);
     case 's0': return ninjaWalk(g,p,'side',0); case 's1': return ninjaWalk(g,p,'side',1); case 's2': return ninjaWalk(g,p,'side',2);
     case 'k0': return ninjaSit(g,p,'rest'); case 'k1': return ninjaSit(g,p,'typeA'); case 'k2': return ninjaSit(g,p,'typeB'); case 'k3': return ninjaSit(g,p,'sleep');
+    case 'kf': return ninjaSit(g,p,'turn');
     default: return ninjaWalk(g,p,'front',0);
   }
 }
@@ -1242,24 +1418,24 @@ const CREW_HAIR = {
   // Rối: ba chỏm lởm chởm trên đỉnh - đọc ra ngay cả khi quay lưng.
   messy: {
     front(g, p, dy) {
-      px(g, 4, dy, 2, 1, p.hairC);
-      px(g, 7, dy, 2, 1, p.hairC);
-      px(g, 10, dy, 2, 1, p.hairC);
+      spike(g, 3.7, dy - 0.7, 2.2, 2, p.hairC);
+      spike(g, 6.9, dy - 0.9, 2.2, 2.2, p.hairC);
+      spike(g, 10.1, dy - 0.7, 2.2, 2, p.hairC);
       headBlock(g, 1 + dy, 3, p.hairC);
       px(g, 4, 3 + dy, 8, 1, p.hairDark);
       px(g, 3, 4 + dy, 1, 3, p.hairC);
       px(g, 12, 4 + dy, 1, 3, p.hairC);
     },
     back(g, p, dy) {
-      px(g, 4, dy, 2, 1, p.hairC);
-      px(g, 7, dy, 2, 1, p.hairC);
-      px(g, 10, dy, 2, 1, p.hairC);
+      spike(g, 3.7, dy - 0.7, 2.2, 2, p.hairC);
+      spike(g, 6.9, dy - 0.9, 2.2, 2.2, p.hairC);
+      spike(g, 10.1, dy - 0.7, 2.2, 2, p.hairC);
       headBlock(g, 1 + dy, 7, p.hairC);
       px(g, 4, 8 + dy, 8, 1, p.hairDark);
     },
     side(g, p) {
-      px(g, 4, 0, 2, 1, p.hairC);
-      px(g, 8, 0, 2, 1, p.hairC);
+      spike(g, 3.7, -0.7, 2.2, 2, p.hairC);
+      spike(g, 7.7, -0.9, 2.2, 2.2, p.hairC);
       headBlock(g, 1, 4, p.hairC);
       px(g, 3, 4, 4, 3, p.hairC);
     },
@@ -1365,12 +1541,15 @@ function crewLegs(g, p, step) {
   const h = p.shorts ? 2 : 3;
   px(g, 5, 16, 2, h, p.pants);
   px(g, 9, 16, 2, h, p.pants);
+  px(g, 5, 16, 0.5, h, lighten(p.pants, 0.1));
+  px(g, 10.5, 16, 0.5, h, darken(p.pants, 0.12));
   if (p.shorts) {
     px(g, 5, 18, 2, 1, p.skin);
     px(g, 9, 18, 2, 1, p.skin);
+    px(g, 10.5, 18, 0.5, 1, p.skinDark);
   }
-  px(g, 5 - Math.max(0, off), 19, 2, 1, p.shoes);
-  px(g, 9 + Math.max(0, -off), 19, 2, 1, p.shoes);
+  roundBox(g, 5 - Math.max(0, off), 18.85, 2, 1.15, 0.45, p.shoes);
+  roundBox(g, 9 + Math.max(0, -off), 18.85, 2, 1.15, 0.45, p.shoes);
 }
 
 /** Thân người. `broad` nới ra 1 pixel mỗi bên - dấu hiệu duy nhất còn lại khi hai người
@@ -1378,13 +1557,14 @@ function crewLegs(g, p, step) {
 function crewTorso(g, p) {
   const b = p.broad ? 1 : 0;
   const x0 = 4 - b, w = 8 + b * 2;
-  px(g, x0, 10, w, 6, p.shirt);
+  roundBox(g, x0, 10, w, 6, 0.8, p.shirt);
+  clothShade(g, x0, 10, w, 6, p.shirt);
   px(g, x0, 10, w, 1, p.shirtDark);
   crewChest(g, p, x0, w, 10);
-  px(g, x0 - 1, 11, 1, 4, p.shirt);
-  px(g, x0 + w, 11, 1, 4, p.shirt);
-  px(g, x0 - 1, 15, 1, 1, p.skin);
-  px(g, x0 + w, 15, 1, 1, p.skin);
+  px(g, x0 - 1, 11, 1, 4, lighten(p.shirt, 0.06));
+  px(g, x0 + w, 11, 1, 4, darken(p.shirt, 0.1));
+  roundBox(g, x0 - 1, 14.9, 1, 1.1, 0.4, p.skin);
+  roundBox(g, x0 + w, 14.9, 1, 1.1, 0.4, p.skin);
 }
 
 function crewDown(g, p, step) {
@@ -1414,11 +1594,12 @@ function crewSide(g, p, step) {
     px(g, 8, 5, 1, 2, c);
     px(g, 13, 5, 1, 2, c);
   }
-  px(g, 4 - b, 10, 8 + b * 2, 6, p.shirt);
+  roundBox(g, 4 - b, 10, 8 + b * 2, 6, 0.8, p.shirt);
+  clothShade(g, 4 - b, 10, 8 + b * 2, 6, p.shirt);
   px(g, 4 - b, 10, 8 + b * 2, 1, p.shirtDark);
   const ax = step === 1 ? 10 : step === 2 ? 4 : 7;
-  px(g, ax, 11, 2, 4, p.shirtDark);
-  px(g, ax, 15, 2, 1, p.skin);
+  roundBox(g, ax, 11, 2, 4, 0.6, p.shirtDark);
+  roundBox(g, ax, 14.9, 2, 1.1, 0.45, p.skin);
   crewLegs(g, p, step);
 }
 
@@ -1427,19 +1608,28 @@ function crewSide(g, p, step) {
  * được. */
 function crewSit(g, p, arms) {
   const drop = arms === 'sleep' ? 2 : 0;
+  const turn = arms === 'turn';
   const b = p.broad ? 1 : 0;
   const x0 = 3 - b, w = 10 + b * 2;
   headBlock(g, 1 + drop, 9, p.skin);
-  CREW_HAIR[p.hair].back(g, p, drop);
+  if (turn) {
+    // Ngoái lại là lúc DUY NHẤT thấy được kính của người đang ngồi - ba trong năm người
+    // chỉ khác nhau ở gọng kính, nên đừng bỏ bước này đi.
+    CREW_HAIR[p.hair].front(g, p, drop); faceFront(g, p, drop); crewGlasses(g, p, drop);
+  } else CREW_HAIR[p.hair].back(g, p, drop);
 
-  px(g, x0, 10 + drop, w, 7, p.shirt);
+  roundBox(g, x0, 10 + drop, w, 7, 1, p.shirt);
+  clothShade(g, x0, 10 + drop, w, 7, p.shirt);
   px(g, x0, 10 + drop, w, 1, p.shirtDark);
-  if (p.chest === 'stripes') {
+  // Ngoái lại thì thấy ngực: hoạ tiết áo thay cho rãnh sống lưng.
+  if (turn) crewChest(g, p, x0, w, 10 + drop);
+  else px(g, x0 + w / 2 - 0.6, 10.6 + drop, 1.2, 5.4, darken(p.shirt, 0.09));
+  if (!turn && p.chest === 'stripes') {
     px(g, x0 + 2, 11 + drop, 1, 6, p.shirtDark);
     px(g, x0 + (w >> 1), 11 + drop, 1, 6, p.shirtDark);
     px(g, x0 + w - 3, 11 + drop, 1, 6, p.shirtDark);
   }
-  if (p.chest === 'jacket') {                     // khoác trắng hở lưng áo đen bên trong
+  if (!turn && p.chest === 'jacket') {            // khoác trắng hở lưng áo đen bên trong
     px(g, x0 + (w >> 1) - 1, 10 + drop, 2, 7, p.inner);
   }
 
@@ -1450,11 +1640,11 @@ function crewSit(g, p, arms) {
     px(g, x0 + w - 1, 15 + drop, 2, 1, p.skin);
     return;
   }
-  if (arms === 'rest') {
+  if (arms === 'rest' || turn) {
     px(g, x0 - 1, 12, 2, 4, p.shirtDark);
     px(g, x0 + w - 1, 12, 2, 4, p.shirtDark);
-    px(g, x0 - 1, 16, 2, 1, p.skin);
-    px(g, x0 + w - 1, 16, 2, 1, p.skin);
+    roundBox(g, x0 - 1, 15.9, 2, 1.1, 0.45, p.skin);
+    roundBox(g, x0 + w - 1, 15.9, 2, 1.1, 0.45, p.skin);
     return;
   }
   const up = arms === 'typeA';
@@ -1479,6 +1669,7 @@ function drawCrewFrame(g, p, key) {
     case 'k1': return crewSit(g, p, 'typeA');
     case 'k2': return crewSit(g, p, 'typeB');
     case 'k3': return crewSit(g, p, 'sleep');
+    case 'kf': return crewSit(g, p, 'turn');
     default: return crewDown(g, p, 0);
   }
 }
@@ -1532,7 +1723,11 @@ function drawImportedFrame(g, c, key) {
   else if (key === 'k1') dx = -1;                                 // gõ phím
   else if (key === 'k2') dx = 1;
   else if (key === 'k3') dy = 2;                                  // gục xuống
-  g.drawImage(c.canvas, dx, dy);
+  // Kéo về đúng khuôn của lưới con, KHÔNG vẽ 1:1: bộ nhập từ bản trước cất ở localStorage
+  // vẫn là ảnh 16x20, phải phóng lên mới nằm đúng chỗ; bộ nhập mới đã sẵn ở lưới con nên
+  // đây là phép sao chép nguyên si.
+  const S = SPRITE_SS;
+  g.drawImage(c.canvas, dx * S, dy * S, SPRITE_W * S, SPRITE_H * S);
 }
 
 /** Thêm một bộ do người dùng nhập. `chars` là [{id, name, canvas}]. */
@@ -1560,97 +1755,186 @@ function charAt(packId, i) {
 const CAT_W = 10;
 const CAT_H = 8;
 
-/* ------------------------------------------------------------- viền
+/* ------------------------------------------------------------- hậu kỳ: khối và viền
  *
- * Sprite trong mọi bộ pixel art tử tế đều có viền tối 1 pixel quanh silhouette - đó là thứ
- * tách nhân vật khỏi nền và làm hình "chắc" hẳn lên. Vẽ tay từng nét viền thì mỗi lần chỉnh
- * một hình chữ nhật lại phải chỉnh viền theo, nên làm hậu kỳ: quét alpha, chỗ nào trong
- * suốt mà chạm vào chỗ đặc thì tô. Một lần lúc dựng atlas, không tốn gì lúc chạy.
+ * Hai việc, làm trong CÙNG một lượt quét vì cả hai chỉ cần bản đồ alpha của ô:
+ *
+ * 1. ĐỔ BÓNG THEO MÉP. Mép trên-trái của silhouette được nâng sáng, mép dưới-phải bị hạ tối,
+ *    cộng một chênh sáng rất nhẹ theo đường chéo cả người. Đây là thứ biến mảng màu phẳng
+ *    thành khối có chiều, và nó chạy cho MỌI bộ mà không phải khai thêm màu cho ai: bóng và
+ *    sáng đều suy ra từ chính màu đang có.
+ * 2. VIỀN. Viền tối quanh silhouette là thứ tách nhân vật khỏi sàn. Hai điểm khác bản trước:
+ *    dày đúng MỘT pixel của lưới con (1/3 pixel gốc) thay vì một pixel gốc đặc, và màu viền
+ *    lấy từ chính màu nó đang chạm vào rồi hạ tối, chứ không phải một màu tím than dùng
+ *    chung. Viền đồng màu làm cái áo đỏ và mái tóc vàng cùng đóng khung một màu, nhìn như
+ *    hình dán; viền theo màu thì tóc có viền tóc, áo có viền áo.
+ *
+ * Làm bằng một lần getImageData cho CẢ atlas rồi quét từng ô: gọi getImageData 1500 lần
+ * (mỗi ô một lần) tốn hơn hẳn, mà kết quả y hệt.
  */
-const OUTLINE = '#2b2233';
+const RIM_LIGHT = 0.17;           // nâng sáng mép trên-trái
+const EDGE_SHADE = 0.20;          // hạ tối mép dưới-phải
+const FORM_GRAD = 0.05;           // chênh sáng theo đường chéo, rất nhẹ
+const OUTLINE_MIX = 0.52;         // viền = màu hàng xóm hạ tối chừng này
 
-function outlineCell(g, ox, oy, w, h) {
-  const img = g.getImageData(ox, oy, w, h);
-  const a = img.data;
-  const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < h && a[(y * w + x) * 4 + 3] > 128;
-  const mark = [];
+/** Hậu kỳ cho một ô trong bộ đệm pixel của atlas. `data` là mảng RGBA của cả atlas. */
+function finishCell(data, W, ox, oy, w, h, outline) {
+  const alpha = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const row = ((oy + y) * W + ox) * 4 + 3;
+    for (let x = 0; x < w; x++) alpha[y * w + x] = data[row + x * 4] > 128 ? 1 : 0;
+  }
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : alpha[y * w + x]);
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      if (solid(x, y)) continue;
-      if (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1)) mark.push([x, y]);
+      const i = ((oy + y) * W + ox + x) * 4;
+      if (alpha[y * w + x]) {
+        const up = at(x, y - 1), left = at(x - 1, y), down = at(x, y + 1), right = at(x + 1, y);
+        let f = 1 + FORM_GRAD * (1 - x / w - y / h);
+        if (!up || !left) f *= 1 + RIM_LIGHT;
+        else if (!down || !right) f *= 1 - EDGE_SHADE;
+        else if (!at(x, y + 2) || !at(x + 2, y)) f *= 1 - EDGE_SHADE * 0.35;
+        if (f !== 1) {
+          data[i] = Math.min(255, data[i] * f);
+          data[i + 1] = Math.min(255, data[i + 1] * f);
+          data[i + 2] = Math.min(255, data[i + 2] * f);
+        }
+        continue;
+      }
+      if (!outline) continue;
+      // Màu viền lấy trung bình các ô đặc kề bên - đó là chỗ "viền theo màu" đến từ.
+      let n = 0, r = 0, gg = 0, b = 0;
+      for (let k = 0; k < 4; k++) {
+        const nx = x + (k === 0 ? -1 : k === 1 ? 1 : 0);
+        const ny = y + (k === 2 ? -1 : k === 3 ? 1 : 0);
+        if (!at(nx, ny)) continue;
+        const j = ((oy + ny) * W + ox + nx) * 4;
+        r += data[j]; gg += data[j + 1]; b += data[j + 2]; n++;
+      }
+      if (!n) continue;
+      const k = 1 - OUTLINE_MIX;
+      data[i] = (r / n) * k;
+      data[i + 1] = (gg / n) * k;
+      data[i + 2] = (b / n) * k;
+      data[i + 3] = 255;
     }
   }
-  g.fillStyle = OUTLINE;
-  mark.forEach(([x, y]) => g.fillRect(ox + x, oy + y, 1, 1));
 }
 
-/** Atlas: mỗi nhân vật của mỗi bộ một hàng, mỗi khung hình một cột; con mèo ở hàng cuối. */
+/** Atlas: mỗi nhân vật của mỗi bộ một hàng, mỗi khung hình một cột; con mèo ở hàng cuối.
+ *
+ *  Hàng được xếp thành nhiều CỘT KHỐI khi quá cao: ở lưới con, hơn trăm nhân vật xếp thành
+ *  một dải dọc duy nhất là canvas cao hơn 8192 pixel - ngưỡng texture của kha khá GPU, vượt
+ *  qua là trình duyệt lặng lẽ bỏ tăng tốc phần cứng và cả khung nhìn giật. */
 function buildSpriteAtlas() {
+  const S = SPRITE_SS;
   const cols = FRAMES.length;
-  const rows = ALL_CHARS.length;
-  const cv = document.createElement('canvas');
-  // Chừa 1 pixel quanh mỗi ô để viền không tràn sang ô bên cạnh - thiếu chỗ này thì nhân
+  const rows = ALL_CHARS.length + 1;               // +1 cho hàng con mèo
+  // Chừa 1 pixel gốc quanh mỗi ô để viền không tràn sang ô bên cạnh - thiếu chỗ này thì nhân
   // vật nào cũng dính một vệt tối của hàng xóm.
-  const cw = SPRITE_W + 2;
-  const ch = SPRITE_H + 2;
-  cv.width = cols * cw;
-  cv.height = rows * ch + ch;
+  const cw = (SPRITE_W + 2) * S;
+  const ch = (SPRITE_H + 2) * S;
+  const perCol = Math.max(1, Math.floor(4096 / ch));
+  const groups = Math.ceil(rows / perCol);
+
+  const cv = document.createElement('canvas');
+  cv.width = cols * cw * groups;
+  cv.height = Math.min(rows, perCol) * ch;
   const g = cv.getContext('2d', { willReadFrequently: true });
   g.imageSmoothingEnabled = false;
 
+  /** Góc trên trái của một ô trong atlas. */
+  const originOf = (r, c) => [Math.floor(r / perCol) * cols * cw + c * cw, (r % perCol) * ch];
+
+  const cells = [];
   ALL_CHARS.forEach((entry, r) => {
     FRAMES.forEach((key, c) => {
+      const [ox, oy] = originOf(r, c);
       g.save();
-      g.translate(c * cw + 1, r * ch + 1);
+      g.translate(ox + S, oy + S);
+      // Bộ nhập từ ảnh vẽ bằng drawImage nên cần nội suy; nét vẽ tay thì không.
+      g.imageSmoothingEnabled = !!entry.pack.custom;
+      g.imageSmoothingQuality = 'high';
       entry.pack.draw(g, entry.char, key);
       g.restore();
       // Bộ nhập từ ảnh đã có viền sẵn trong ảnh gốc; tô thêm là viền đôi, dày cộp.
-      if (entry.pack.outline !== false) outlineCell(g, c * cw, r * ch, cw, ch);
+      cells.push([ox, oy, entry.pack.outline !== false]);
     });
   });
 
-  const catRow = rows * ch;
+  const catRow = ALL_CHARS.length;
   for (let i = 0; i < 2; i++) {
+    const [ox, oy] = originOf(catRow, i);
     g.save();
-    g.translate(i * cw + 1, catRow + 1);
+    g.translate(ox + S, oy + S);
+    g.imageSmoothingEnabled = false;
     drawCat(g, i);
     g.restore();
-    outlineCell(g, i * cw, catRow, cw, ch);
+    cells.push([ox, oy, true]);
   }
+
+  const img = g.getImageData(0, 0, cv.width, cv.height);
+  cells.forEach(([ox, oy, outline]) => finishCell(img.data, cv.width, ox, oy, cw, ch, outline));
+  g.putImageData(img, 0, 0);
 
   return {
     canvas: cv,
     cols,
-    rows,
-    /** Ô của một khung hình => tham số cho drawImage. Kèm luôn 1 pixel viền mỗi bên. */
+    rows: ALL_CHARS.length,
+    /** Ô của một khung hình => tham số cho drawImage. Kèm luôn 1 pixel gốc viền mỗi bên.
+     *  Kích thước trả về tính bằng pixel THẬT của atlas, chia SPRITE_SS ra pixel gốc. */
     cell(charIndex, frameKey) {
       const c = FRAME_INDEX[frameKey] == null ? 0 : FRAME_INDEX[frameKey];
-      const r = ((charIndex % rows) + rows) % rows;
-      return [c * cw, r * ch, cw, ch];
+      const n = ALL_CHARS.length || 1;
+      const [ox, oy] = originOf(((charIndex % n) + n) % n, c);
+      return [ox, oy, cw, ch];
     },
     catCell(step) {
-      return [(step ? 1 : 0) * cw, catRow, CAT_W + 2, CAT_H + 2];
+      const [ox, oy] = originOf(catRow, step ? 1 : 0);
+      return [ox, oy, (CAT_W + 2) * S, (CAT_H + 2) * S];
     },
   };
 }
 
 /** Vẽ một nhân vật ra canvas riêng, phóng `scale` lần - dùng cho ô xem mẫu ở bảng chọn.
- *  Vẽ thẳng chứ không cắt từ atlas: bảng chọn mở ra trước khi phòng kịp dựng atlas. */
+ *  Vẽ thẳng chứ không cắt từ atlas: bảng chọn mở ra trước khi phòng kịp dựng atlas.
+ *
+ *  Ô xem mẫu vẽ ở độ phân giải màn hình thật (`devicePixelRatio`) rồi thu lại bằng CSS: đây
+ *  là chỗ duy nhất trong tool có nhân vật đứng yên cho người ta soi, để nó răng cưa thì mọi
+ *  công vẽ nét ở trên coi như đổ đi. */
 function renderCharPreview(canvas, charIndex, scale) {
   const entry = ALL_CHARS[((charIndex % ALL_CHARS.length) + ALL_CHARS.length) % ALL_CHARS.length];
-  const w = SPRITE_W + 2;
-  const h = SPRITE_H + 2;
-  canvas.width = w * scale;
-  canvas.height = h * scale;
-  const g = canvas.getContext('2d', { willReadFrequently: true });
-  g.imageSmoothingEnabled = false;
-  g.setTransform(scale, 0, 0, scale, 0, 0);
-  g.clearRect(0, 0, w, h);
-  g.save();
-  g.translate(1, 1);
-  entry.pack.draw(g, entry.char, 'd0');
-  g.restore();
-  if (entry.pack.outline !== false) outlineCell(g, 0, 0, w, h);
+  const S = SPRITE_SS;
+  const w = (SPRITE_W + 2) * S;
+  const h = (SPRITE_H + 2) * S;
+
+  const cell = document.createElement('canvas');
+  cell.width = w;
+  cell.height = h;
+  const cg = cell.getContext('2d', { willReadFrequently: true });
+  cg.imageSmoothingEnabled = !!entry.pack.custom;
+  cg.imageSmoothingQuality = 'high';
+  cg.save();
+  cg.translate(S, S);
+  entry.pack.draw(cg, entry.char, 'd0');
+  cg.restore();
+  const img = cg.getImageData(0, 0, w, h);
+  finishCell(img.data, w, 0, 0, w, h, entry.pack.outline !== false);
+  cg.putImageData(img, 0, 0);
+
+  const dpr = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+  const cssW = (SPRITE_W + 2) * scale;
+  const cssH = (SPRITE_H + 2) * scale;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  const g = canvas.getContext('2d');
+  g.clearRect(0, 0, canvas.width, canvas.height);
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(cell, 0, 0, w, h, 0, 0, canvas.width, canvas.height);
 }
 
 /** Tên nhân vật để hiện trong bảng chọn. */

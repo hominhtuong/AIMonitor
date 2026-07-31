@@ -523,7 +523,10 @@ body.compact table { display: block; overflow-x: auto; white-space: nowrap; }
   background: var(--card); border: 1px solid var(--line); border-radius: 9px;
   font-size: 11px; color: var(--muted); cursor: pointer;
 }
-.skins .skin canvas { display: block; image-rendering: pixelated; }
+/* KHÔNG `image-rendering: pixelated` cho ô xem trước nhân vật: sprites.js vẽ chúng ở độ phân
+   giải màn hình thật rồi thu lại bằng CSS, nên ép lấy mẫu gần nhất là vứt đúng phần chi tiết
+   vừa vẽ ra. Ô xem trước KIỂU PHÒNG bên dưới thì ngược lại - nó vẽ ở pixel gốc. */
+.skins .skin canvas { display: block; }
 /* Mỗi ô xem trước ba nhân vật đầu của bộ - đủ để nhận ra bộ đó là người, thú hay slime mà
    không phải mở ra xem. */
 .skins .skin .strip { display: flex; gap: 2px; align-items: flex-end; }
@@ -563,7 +566,7 @@ body.compact .skins .skin { min-width: 54px; padding: 5px 6px 4px; }
 .sess .h2row { margin: 18px 16px 10px; }
 .agent-skins .lbl { font-size: 12px; color: var(--dim); margin-right: 3px; }
 .agent-skins button.pick { padding: 2px 3px; line-height: 0; border-radius: 7px; }
-.agent-skins button.pick canvas { display: block; image-rendering: pixelated; }
+.agent-skins button.pick canvas { display: block; }
 .agent-skins button.pick[aria-pressed="true"] {
   background: var(--info-bg); border-color: var(--accent-2);
 }

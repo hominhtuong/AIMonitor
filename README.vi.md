@@ -15,9 +15,9 @@ Nhìn rõ các công cụ AI đang làm gì với máy của bạn.
 [![Dependencies](https://img.shields.io/badge/dependencies-none-64748b)](https://github.com/hominhtuong/AIMonitor/blob/main/CLAUDE.md)
 [![Downloads](https://img.shields.io/github/downloads/hominhtuong/AIMonitor/total?color=f59e0b)](https://github.com/hominhtuong/AIMonitor/releases)
 
-<img src="assets/board.png" width="820" alt="Khung nhìn Văn phòng: mỗi agent AI đang chạy là một nhân vật ngồi ở bàn của mình">
+<img src="assets/demo.gif" width="656" alt="Khung nhìn Văn phòng: agent AI đi vào, ngồi xuống bàn làm việc, xong phiên thì đi ra">
 
-*Mọi agent AI đang chạy trên máy, mỗi đứa một bàn làm việc.*
+*Mọi agent AI đang chạy trên máy, mỗi đứa một bàn làm việc - ngay cạnh chỗ bạn viết code.*
 
 </div>
 
@@ -33,7 +33,7 @@ còn bao lâu nữa thì đụng hạn mức - và tắt được cái nào.
 Chạy hoàn toàn trên máy bạn. Không gửi dữ liệu đi đâu, không cần đăng nhập, không cài thêm gì
 ngoài Python (macOS và Linux có sẵn).
 
-![Giao diện AI Monitor](assets/screenshot-vi.png)
+<img src="assets/screenshot-vi.png" width="656" alt="Giao diện AI Monitor">
 
 ---
 
@@ -146,7 +146,7 @@ Ai cần cài offline thì tải file `.vsix` ở **Releases**, rồi vào Exten
 
 Đây là **một** phiên Claude Code duy nhất, mở cây con ra:
 
-![Một phiên và toàn bộ cây tiến trình của nó](assets/session-detail-vi.png)
+<img src="assets/session-detail-vi.png" width="656" alt="Một phiên và toàn bộ cây tiến trình của nó">
 
 Một phiên thôi mà kéo theo **hơn 1 GB RAM** rải trên hơn hai chục tiến trình:
 

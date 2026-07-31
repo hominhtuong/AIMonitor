@@ -15,9 +15,9 @@ See what your AI coding tools are really doing to your machine.
 [![Dependencies](https://img.shields.io/badge/dependencies-none-64748b)](https://github.com/hominhtuong/AIMonitor/blob/main/CLAUDE.md)
 [![Downloads](https://img.shields.io/github/downloads/hominhtuong/AIMonitor/total?color=f59e0b)](https://github.com/hominhtuong/AIMonitor/releases)
 
-<img src="assets/board.png" width="820" alt="The Office view: every running AI agent is a character at a desk">
+<img src="assets/demo.gif" width="656" alt="The Office view: AI agents walk in, sit down at a desk to work, and leave when their session ends">
 
-*Every AI agent running on your machine, sitting at its own desk.*
+*Every AI agent running on your machine, sitting at its own desk - live, next to your code.*
 
 </div>
 
@@ -34,7 +34,7 @@ can safely kill.
 Everything runs on your machine. No data leaves it, no account needed, nothing to install
 beyond Python (already present on macOS and Linux).
 
-![AI Monitor dashboard](assets/screenshot.png)
+<img src="assets/screenshot.png" width="656" alt="AI Monitor dashboard">
 
 ---
 
@@ -149,7 +149,7 @@ Offline installs can still grab the `.vsix` from **Releases** and use Extensions
 
 This is a **single** Claude Code session with its child tree expanded:
 
-![One session and its whole process tree](assets/session-detail.png)
+<img src="assets/session-detail.png" width="656" alt="One session and its whole process tree">
 
 One session. **1.15 GB of RAM** across more than twenty processes:
 
