@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.0.0
+
+- **Every character redrawn at three times the resolution.** Heads are round instead of
+  chamfered, ears and hair spikes taper to a point, and eyes have an iris, a highlight and a
+  reflection instead of being two solid squares. Shading follows the silhouette - lit along
+  the top-left edge, darker along the bottom-right - so a body reads as a body and not as a
+  flat patch of colour. The outline around each character is a third of its old thickness and
+  now takes the colour of whatever it touches: hair gets a hair-coloured contour, a red shirt
+  a red one. The uniform dark outline was what made the old characters look like stickers.
+
+- **The same treatment for characters you import.** A picture you bring in is now cut to the
+  finer format directly rather than being squeezed to 16x20 and blown back up, so an imported
+  set is as sharp as the drawn ones. Sets imported with an older version keep working.
+
+- **Hovering someone at work no longer knocks them out of their chair.** They turn around,
+  look at you for a second and go back to what they were doing. Hovering an idle character
+  still stops them where they stand, and they carry on when you move the mouse away.
+
+- Fixed: when a session ended abruptly its character could stay behind - seated at a desk or
+  frozen in the middle of the room - while the count above the room said the office was
+  empty. Anyone leaving now always finds the door, and a character that somehow gets stuck is
+  removed outright.
+
 ## 1.6.0
 
 - **Three more character sets and a new default.** *Voyage* (36 sailors), *Ninja* (36 shinobi)

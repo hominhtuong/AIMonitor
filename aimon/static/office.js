@@ -42,6 +42,10 @@ const DESK_X = [16, 64, 112, 160, 208];
 const WALK_SPEED = 26;              // pixel gốc / giây
 const BURST_SEC = 0.55;             // một sự kiện đã trôi qua được diễn trong ngần này giây
 const PULSE_MS = 1000;
+// Rời phòng lâu hơn ngần này giây thì xoá thẳng, không hỏi lý do. Đường ra dài nhất là ăn
+// mừng 2 giây rồi đi hết chiều ngang phòng (260 / 26 = 10 giây), nên 20 là rộng gấp đôi:
+// không cắt ngang màn ra cửa nào, mà cũng không để nhân vật ma nào ở lại quá vài giây.
+const LEAVE_TIMEOUT = 20;
 
 /* Màu theo hoạt cảnh - dùng cho màn hình máy tính, chấm trạng thái và bong bóng thoại.
  * Khoá `action` do backend chốt ở aimon/office.py, đừng tự thêm khoá mới ở đây. */
@@ -65,6 +69,7 @@ const OF = {
   atlas: null,
   scale: 3,
   dpr: 1,
+  spriteSmooth: false,   // nội suy khi phóng nhân vật? resize() chốt theo bậc phóng
   timer: null,
   raf: null,
   since: 0,
@@ -280,8 +285,10 @@ function loadCustomPacks() {
   const jobs = stored.map((p) => Promise.all(p.chars.map((c) => new Promise((res) => {
     const im = new Image();
     im.onload = () => {
+      // Lấy đúng kích thước của ảnh đã cất, KHÔNG ép về 16x20: bộ nhập từ bản trước là ảnh
+      // 16x20, bộ nhập từ bản này đã ở lưới con. Ép về một cỡ là một trong hai bị cắt cụt.
       const cv = document.createElement('canvas');
-      cv.width = SPRITE_W; cv.height = SPRITE_H;
+      cv.width = im.naturalWidth || SPRITE_W; cv.height = im.naturalHeight || SPRITE_H;
       cv.getContext('2d').drawImage(im, 0, 0);
       res({ id: c.id, name: c.name, canvas: cv });
     };
@@ -300,7 +307,11 @@ function importPackFile(file) {
   if (!file) return;
   readImageFile(file)
     .then((img) => {
-      const { cells, note, found } = sliceSheet(img, SPRITE_W, SPRITE_H);
+      // Cắt thẳng về khuôn của LƯỚI CON chứ không về 16x20 rồi phóng lên: ảnh người dùng
+      // đưa vào thường 100-200 pixel mỗi nhân vật, thu về 16 pixel là vứt đi gần hết chi
+      // tiết, và không có cách nào lấy lại. Thu về 48x60 thì bộ nhập vào cũng nét ngang các
+      // bộ vẽ tay thay vì là mảng màu lấm tấm giữa một căn phòng đã sắc nét.
+      const { cells, note, found } = sliceSheet(img, SPRITE_W * SPRITE_SS, SPRITE_H * SPRITE_SS);
       if (!cells.length) { toast(t('import.err_empty'), 'err'); return; }
 
       const base = (file.name || 'pack').replace(/\.[^.]+$/, '').slice(0, 24) || 'pack';
@@ -487,7 +498,9 @@ function newEntity(id, kind, charIndex) {
     queue: [],
     data: null,
     leaving: false,
+    leftAt: 0,                   // OF.clock lúc bị đánh dấu rời phòng - lưới an toàn ở step()
     cheer: 0,                    // giây còn lại của màn ăn mừng lúc xong việc
+    glance: 0,                   // giây còn lại của cú ngoái lại nhìn khi bị rê chuột vào
   };
 }
 
@@ -617,7 +630,12 @@ function syncAgents(payload) {
   OF.ents.forEach((e, id) => {
     if (seen.has(id) || e.leaving) return;
     e.leaving = true;
+    e.leftAt = OF.clock;
     e.spot = null;
+    // Thôi chào, thôi ngoái: phiên đã đóng thì không còn gì để đáp lại người rê chuột, mà
+    // hai cờ này lại chặn đúng nhánh cho họ đi ra.
+    e.greet = false;
+    e.glance = 0;
     if (e.kind !== 'agent') {
       e.desk = null;
       e.goal = 'exit';
@@ -722,6 +740,17 @@ function currentAction(e) {
 
 function step(e, dt) {
   e.anim += dt;
+  if (e.glance > 0) e.glance -= dt;
+
+  // LƯỚI AN TOÀN. Phiên tắt là nhân vật phải biến mất, chấm hết - người dùng nhìn vào phòng
+  // để biết máy mình đang chạy gì, một nhân vật ma ngồi lại ở bàn là con số trên đầu trang
+  // nói một đằng còn căn phòng nói một nẻo (đã gặp thật: header ghi "1 in the room" trong
+  // khi có 5 người trên màn hình).
+  //
+  // Dưới đây có nhánh dựng lại đường ra cho mọi ca kẹt đã biết, nhưng vẫn giữ cái chốt này:
+  // nó không cần biết vì sao kẹt. Ngưỡng rộng rãi so với đường đi dài nhất (ăn mừng 2 giây +
+  // đi hết chiều ngang phòng ~10 giây) nên nó không bao giờ cắt ngang một màn ra cửa tử tế.
+  if (e.leaving && OF.clock - e.leftAt > LEAVE_TIMEOUT) { OF.ents.delete(e.id); return; }
 
   if (e.burst) {
     e.burst.left -= dt;
@@ -765,6 +794,22 @@ function step(e, dt) {
       e.x += dx / dist * move;
       e.y += dy / dist * move;
       e.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    }
+    return;
+  }
+
+  // Hết đường mà vẫn còn trong phòng: dựng lại đường ra. Đây là chỗ vá GỐC của lỗi nhân vật
+  // ma - `setHover` xoá `path` và `goal` của người đang được rê chuột, người đang trên đường
+  // ra cửa mà dính cú đó thì đứng chôn chân giữa phòng vĩnh viễn, vì mọi nhánh phía dưới đều
+  // chỉ dành cho người còn đang làm việc. Người rời phòng chỉ có đúng một việc: ra tới cửa.
+  if (e.leaving) {
+    if (e.cheer <= 0) {
+      // Thứ tự y như nhánh ăn mừng: `routeTo` phải chạy lúc mode còn là 'sit' và `desk` còn
+      // đó, nếu không mất cú bước ngang khỏi ghế và nhân vật chui thẳng xuống xuyên qua ghế.
+      e.goal = 'exit';
+      routeTo(e, -22, AISLE_Y[1]);
+      e.mode = 'walk';
+      e.desk = null;
     }
     return;
   }
@@ -1088,6 +1133,10 @@ function frameFor(e) {
     return 's' + step;
   }
   if (e.mode !== 'sit') return 'd0';
+  // Ngoái lại nhìn người vừa rê chuột vào. Đặt TRƯỚC nhánh 'paused' và nhánh gõ phím: đang
+  // gõ mà ngoái lại vẫn phải thấy mặt, nếu không cú đáp lại chỉ hiện ra với người đang rảnh -
+  // tức gần như không bao giờ.
+  if (e.glance > 0) return 'kf';
   if (d.state === 'paused') return 'k3';
   const act = currentAction(e);
   if (act === 'rest') return 'k0';
@@ -1097,6 +1146,9 @@ function frameFor(e) {
 
 function drawEntity(g, e) {
   const [sx, sy, sw, sh] = OF.atlas.cell(e.charIndex, frameFor(e));
+  // Atlas vẽ ở lưới con (gấp SPRITE_SS lần), còn cảnh đo bằng pixel gốc - nên đích luôn là
+  // kích thước ô CHIA cho SPRITE_SS. Vẽ đúng sw/sh là nhân vật to gấp ba, tràn kín phòng.
+  const dw = sw / SPRITE_SS, dh = sh / SPRITE_SS;
   const flip = e.dir === 'left' && e.path.length;
   const small = e.kind === 'sub';
 
@@ -1107,22 +1159,41 @@ function drawEntity(g, e) {
 
   // Người ngồi không vẽ chân (chân khuất sau ghế), nên cái bóng ở đáy sprite hoá ra một
   // vệt tách rời lơ lửng dưới thân. Ngồi thì bóng cũng khuất sau ghế - bỏ luôn.
-  if (e.mode !== 'sit') px2(g, e.x + 3, e.y + SPRITE_H - 2, 10, 2, OF.pal.shadow);
+  //
+  // Bóng là hình BẦU DỤC chứ không phải hình chữ nhật: một thanh chữ nhật dưới chân trông
+  // như tấm ván nhân vật đang đứng lên, còn vệt bầu dục mờ dần ở mép mới ra bóng đổ. Đây là
+  // nét duy nhất trong phòng dùng đường cong - canvas khử răng cưa cho path bất kể
+  // imageSmoothing, nên nó mượt ở mọi bậc phóng.
+  if (e.mode !== 'sit') {
+    g.save();
+    // Không hạ thêm globalAlpha: OF.pal.shadow ĐÃ là màu có alpha (.16), nhân thêm lần nữa
+    // là cái bóng mờ tới mức không còn thấy trên nền sàn sáng.
+    g.fillStyle = OF.pal.shadow;
+    g.beginPath();
+    g.ellipse(e.x + SPRITE_W / 2, e.y + SPRITE_H - 0.6, 5, 1.6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
   g.save();
   // Ô trong atlas rộng hơn nhân vật 1 pixel mỗi bên để chứa viền, nên vẽ lệch -1: phần thân
   // vẫn rơi đúng vào (e.x, e.y), còn viền tràn ra ngoài như nó phải thế.
+  //
+  // Sub-agent bị thu 0.8 lần - tỷ lệ lẻ, nên luôn phải nội suy dù bậc phóng có chia hết hay
+  // không, nếu không những nét mảnh 1/3 pixel rơi rụng lỗ chỗ.
+  g.imageSmoothingEnabled = OF.spriteSmooth || small;
+  g.imageSmoothingQuality = 'high';
   if (small) {
     // sub-agent vẽ nhỏ hơn một chút để phân biệt với người gọi nó mà không cần chú thích
     g.translate(e.x + SPRITE_W / 2, ey + SPRITE_H);
     g.scale(0.8, 0.8);
     g.translate(-SPRITE_W / 2, -SPRITE_H);
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, sw, sh);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, dw, dh);
   } else if (flip) {
     g.translate(e.x + SPRITE_W, ey);
     g.scale(-1, 1);
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, sw, sh);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, dw, dh);
   } else {
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, e.x - 1, ey - 1, sw, sh);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, e.x - 1, ey - 1, dw, dh);
   }
   g.restore();
 }
@@ -1131,13 +1202,16 @@ function drawCatEntity(g) {
   const c = OF.cat;
   if (!c) return;
   const [sx, sy, sw, sh] = OF.atlas.catCell(Math.floor(c.anim * 5) % 2);
+  const dw = sw / SPRITE_SS, dh = sh / SPRITE_SS;
   g.save();
+  g.imageSmoothingEnabled = OF.spriteSmooth;
+  g.imageSmoothingQuality = 'high';
   if (c.flip) {
-    g.translate(c.x + sw - 2, c.y);
+    g.translate(c.x + dw - 2, c.y);
     g.scale(-1, 1);
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, sw, sh);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, dw, dh);
   } else {
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, c.x - 1, c.y - 1, sw, sh);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, c.x - 1, c.y - 1, dw, dh);
   }
   g.restore();
 }
@@ -1275,6 +1349,12 @@ function resize() {
   OF.canvas.height = ROOM_H * OF.scale * OF.dpr;
   OF.canvas.style.width = (ROOM_W * OF.scale) + 'px';
   OF.canvas.style.height = (ROOM_H * OF.scale) + 'px';
+  // Nhân vật vẽ ở lưới con, nên một pixel của atlas ra đúng (scale*dpr / SPRITE_SS) pixel màn
+  // hình. Chia hết thì phóng nguyên lần, tắt nội suy cho nét đanh. Không chia hết thì BẬT nội
+  // suy: lấy mẫu gần nhất ở tỷ lệ lẻ sẽ bỏ rơi hàng thì hàng không, và những nét mảnh 1/3
+  // pixel - viền, chấm loá trong mắt - biến mất chỗ có chỗ không, nhìn như hình bị rách.
+  // Đồ đạc trong phòng vẫn vẽ ở pixel gốc và vẫn tắt nội suy, chỉ nhân vật đi đường này.
+  OF.spriteSmooth = (OF.scale * OF.dpr) % SPRITE_SS !== 0;
   if (OF.ctx) OF.ctx.imageSmoothingEnabled = false;
   if (OF.on) draw();
 }
@@ -1313,10 +1393,26 @@ function deskAt(clientX, clientY) {
   return null;
 }
 
-/** Đặt người đang được rê chuột. Người cũ thôi chào, người mới bắt đầu chào - `greet` do
- *  step() đọc: đang chào thì đứng yên quay mặt ra, không tự đi tiếp.
+/** Đặt người đang được rê chuột. Đáp lại thế nào thì tuỳ họ ĐANG LÀM GÌ - và đó là toàn bộ
+ *  nội dung của hàm này:
  *
- * Hai chỗ bắt buộc phải qua hàm này chứ đừng sờ thẳng vào `OF.hover`:
+ * | Đang | Rê chuột vào | Bỏ chuột ra |
+ * | --- | --- | --- |
+ * | Ngồi làm việc | ngoái lại nhìn `GLANCE_SEC` giây rồi làm tiếp, **không rời ghế** | không đổi gì |
+ * | Rảnh, đi vòng vòng | dừng lại, quay mặt ra chờ | đi tiếp |
+ * | Đang rời phòng | không đáp lại gì | - |
+ *
+ * **Người đang ngồi thì tuyệt đối không đụng vào `path`/`goal`/`mode`.** Bản trước xoá cả ba
+ * cho mọi người, nên rê chuột vào một người đang gõ phím là `goal` mất, vòng sau step() thấy
+ * "có việc mà chưa về bàn" nên cho họ đứng dậy đi vòng qua hông bàn rồi ngồi lại - nhìn như
+ * nhân vật giật mình nhảy khỏi ghế. Đó cũng chính là cú xoá đã làm người đang trên đường ra
+ * cửa kẹt lại thành nhân vật ma.
+ *
+ * Cú ngoái lại TỰ HẾT sau `GLANCE_SEC`; rê chuột vào lần nữa thì diễn lại. Không cần gỡ lúc
+ * bỏ chuột ra - để nguyên cho họ nhìn hết một nhịp trông tự nhiên hơn là quay ngoắt đi giữa
+ * chừng.
+ *
+ * Ba chỗ bắt buộc phải qua hàm này chứ đừng sờ thẳng vào `OF.hover`:
  *
  * 1. **Rê chuột RA KHỎI canvas cũng phải gỡ `greet`.** Trước đây `mouseleave` chỉ xoá
  *    `OF.hover`, người được chào giữ `greet = true` vĩnh viễn và đứng chôn chân giữa phòng -
@@ -1324,18 +1420,25 @@ function deskAt(clientX, clientY) {
  * 2. **Gỡ `greet` phải kèm gỡ `e.goal`.** Lúc bắt đầu chào ta xoá `e.path` để họ dừng ngay
  *    giữa đường; nếu vẫn để `goal = 'desk'` thì nhánh "có việc thì về bàn" trong step() không
  *    bao giờ chạy lại (nó chỉ chạy khi `goal !== 'desk'`) và người đó kẹt luôn.
+ * 3. **Người `leaving` thì bỏ qua hết.** Xem bảng trên: giữ chân họ lại là sinh nhân vật ma.
  */
+const GLANCE_SEC = 1;
+
 function setHover(id) {
   if (id === OF.hover) return;
   const prev = OF.ents.get(OF.hover);
   if (prev) prev.greet = false;
   const now = OF.ents.get(id);
-  if (now && now.kind === 'agent') {
-    now.greet = true;
-    now.path = [];          // dừng ngay giữa đường, không đi nốt tới đích
-    now.goal = null;        // để step() cấp đích mới khi thôi chào
-    now.dir = 'down';       // quay mặt về phía người xem
-    if (now.mode !== 'sit') now.mode = 'idle';
+  if (now && now.kind === 'agent' && !now.leaving) {
+    if (now.mode === 'sit') {
+      now.glance = GLANCE_SEC;   // ngoái lại một nhịp, vẫn ngồi nguyên chỗ làm việc
+    } else {
+      now.greet = true;
+      now.path = [];          // dừng ngay giữa đường, không đi nốt tới đích
+      now.goal = null;        // để step() cấp đích mới khi thôi chào
+      now.dir = 'down';       // quay mặt về phía người xem
+      now.mode = 'idle';
+    }
   }
   OF.hover = id || null;
 }
@@ -1357,8 +1460,10 @@ function onClick(ev) {
   renderDetail();
   const e = OF.ents.get(id);
   // Bấm xong là thôi chào: chi tiết đã mở ra rồi, giữ họ đứng chờ nữa thì cả phòng đứng hình
-  // trong khi người dùng đang đọc bảng bên dưới.
-  if (e) { e.greet = false; e.goal = null; }
+  // trong khi người dùng đang đọc bảng bên dưới. Chỉ đụng tới người ĐANG ĐỨNG chờ - xoá
+  // `goal` của người đang ngồi làm việc là họ nhảy khỏi ghế, của người đang ra cửa là họ kẹt
+  // lại (xem setHover).
+  if (e && e.greet) { e.greet = false; e.goal = null; }
   const busy = e && (e.data || {}).state === 'busy';
   // Đang làm việc thì thứ người ta muốn xem là cây tiến trình; đang rảnh thì gần như chắc
   // chắn là muốn đổi nhân vật.

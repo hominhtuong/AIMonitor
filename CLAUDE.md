@@ -672,13 +672,63 @@ mực đen**:
   đáy) kèm một chấm loá trong tròng. Bản đầu vẽ khung vuông KÍN bốn cạnh cho hai mắt: cộng
   với tóc đen phía trên, cả cái đầu thành một khối đen đặc, không còn mặt mũi gì.
 
-**Viền tối 1 pixel làm hậu kỳ, đừng vẽ tay.** `outlineCell()` quét alpha của ô vừa vẽ, chỗ nào
-trong suốt mà chạm vào chỗ đặc thì tô. Nhờ vậy sửa một hình chữ nhật bất kỳ không phải sửa
-viền theo, và mọi bộ đều có cùng một kiểu viền. Đây là thứ tách nhân vật khỏi nền và là khác
-biệt lớn nhất giữa bản đầu (bẹt) với bản có nét như sprite thật.
+### Lưới con `SPRITE_SS` - chỗ nét vẽ đến từ
 
-Ô trong atlas vì thế **rộng hơn nhân vật 1 pixel mỗi bên**. `drawEntity` phải vẽ lệch `-1`,
-nếu không viền của hàng xóm dính sang và thân bị lệch nửa pixel.
+Toạ độ trong `sprites.js` vẫn là pixel gốc 16x20 (office.js đo phòng theo đơn vị đó), nhưng
+atlas được vẽ ở độ phân giải **gấp `SPRITE_SS` = 3 lần**. Mọi nét đi qua `px()`, và chỉ mình
+`px()` biết tới hệ số này - nên toạ độ lẻ 1/3 pixel là hợp lệ ở mọi chỗ khác trong file.
+
+Đó là thứ đổi hẳn chất lượng hình: đỉnh đầu bo theo cung tròn thật (`roundBox`) thay vì vát
+một pixel, tai và chỏm tóc thu nhọn dần (`spike`) thay vì là cái cột vuông, con mắt có đủ
+tròng - con ngươi - chấm loá - phản chiếu đáy (`eye`) thay vì một ô 2x2 đặc, và viền chỉ dày
+1/3 pixel gốc.
+
+Ba hệ quả bắt buộc nhớ:
+
+- `px()` phải bo **hai MÉP** (`round(x*SS)` và `round((x+w)*SS)`), không phải bo gốc rồi nhân
+  bề rộng. Bo kiểu sau thì ở toạ độ lẻ hai mảng liền nhau hở ra một khe, trên nền tối hiện
+  thành đường kẻ sáng chạy dọc thân người.
+- Không nét nào được vượt quá **1 pixel gốc** ra ngoài khung 16x20 - đó đúng bằng phần đệm
+  của ô. Vẽ chỏm tóc ở `y = -1.1` là 0.3 pixel của nó rơi sang ô hàng trên, và ô đó đã vẽ
+  xong rồi.
+- Atlas nặng gấp 9 lần (khoảng 1400x4100, dựng mất ~165ms). Vì thế hàng được xếp thành
+  **nhiều cột khối**, mỗi cột cao dưới 4096: hơn trăm nhân vật xếp thành một dải dọc duy nhất
+  là canvas vượt ngưỡng texture 8192 của kha khá GPU, vượt qua thì trình duyệt lặng lẽ bỏ
+  tăng tốc phần cứng và cả khung nhìn giật.
+
+### Hậu kỳ: khối và viền, một lượt quét
+
+`finishCell()` làm hai việc trên bản đồ alpha của ô, và cả hai đều chạy cho MỌI bộ mà không
+phải khai thêm màu cho ai - sáng và tối đều suy ra từ chính màu đang có (`lighten`/`darken`):
+
+1. **Đổ bóng theo mép**: mép trên-trái được nâng sáng, mép dưới-phải bị hạ tối, cộng một
+   chênh sáng rất nhẹ theo đường chéo. Đây là thứ biến mảng màu phẳng thành khối có chiều.
+   Phần KHỐI bên trong thân (vệt sáng dọc mép áo, mảng tối ở gấu) thì hậu kỳ không biết được,
+   nên có `clothShade()` gọi tay trong từng hàm thân.
+2. **Viền**: dày đúng **một pixel của lưới con**, và màu lấy từ chính màu nó đang chạm vào
+   rồi hạ tối - không phải một màu tím than dùng chung. Viền đồng màu làm cái áo đỏ và mái
+   tóc vàng cùng đóng khung một màu, nhìn như hình dán; viền theo màu thì tóc có viền tóc,
+   áo có viền áo.
+
+Làm bằng **một** lần `getImageData` cho cả atlas rồi quét từng ô. Gọi `getImageData` 1500 lần
+(mỗi ô một lần) chậm hơn hẳn mà kết quả y hệt.
+
+Ô trong atlas vì thế **rộng hơn nhân vật 1 pixel gốc mỗi bên**. `drawEntity` phải vẽ lệch
+`-1`, nếu không viền của hàng xóm dính sang và thân bị lệch nửa pixel.
+
+### Phóng to: khi nào nội suy
+
+Đồ đạc trong phòng vẫn vẽ ở pixel gốc và vẫn tắt nội suy. Riêng nhân vật thì `resize()` chốt
+`OF.spriteSmooth`: một pixel atlas ra đúng `scale * dpr / SPRITE_SS` pixel màn hình, **chia
+hết thì tắt nội suy** (phóng nguyên lần, nét đanh), **không chia hết thì bật**. Lấy mẫu gần
+nhất ở tỷ lệ lẻ sẽ bỏ rơi hàng thì hàng không, và những nét mảnh 1/3 pixel - viền, chấm loá
+trong mắt - biến mất chỗ có chỗ không, nhìn như hình bị rách. Sub-agent luôn bật vì nó bị thu
+0.8 lần, tỷ lệ lẻ ở mọi bậc phóng.
+
+Cũng vì vậy ô xem trước trong bảng chọn **không** để `image-rendering: pixelated` nữa:
+`renderCharPreview()` vẽ ở độ phân giải màn hình thật rồi thu lại bằng CSS, ép lấy mẫu gần
+nhất là vứt đúng phần chi tiết vừa vẽ ra. Ô xem trước KIỂU PHÒNG thì ngược lại - nó vẽ ở
+pixel gốc nên vẫn giữ `pixelated`.
 
 **Tỷ lệ chibi là thứ tạo ra cảm giác dễ thương, không phải thêm chi tiết** - 16x20 pixel không
 đủ chỗ cho chi tiết. Đầu chiếm 9/20 chiều cao, mắt 2x2 có chấm sáng trắng, má hồng. Bản đầu vẽ
@@ -690,6 +740,11 @@ khỏi thân, và đó là lỗi đã dính khi dựng tư thế ngồi.
 
 Người ngồi **không vẽ chân** (chân khuất sau ghế) nên `drawEntity` cũng không vẽ bóng cho họ:
 bóng nằm ở đáy sprite, mà đáy sprite lúc đó là khoảng trống, thành ra một vệt lơ lửng.
+
+Bóng của người đứng là hình **bầu dục**, và là nét duy nhất trong phòng dùng đường cong -
+canvas khử răng cưa cho path bất kể `imageSmoothing`, nên nó mượt ở mọi bậc phóng. Một thanh
+chữ nhật dưới chân trông như tấm ván nhân vật đang đứng lên. Đừng nhân thêm `globalAlpha`:
+`OF.pal.shadow` đã là màu có alpha (.16), nhân lần nữa là bóng mờ tới mức không còn thấy.
 
 Hai cái bẫy khi vẽ bộ mới:
 
@@ -749,19 +804,68 @@ phòng không ăn gì.
 xong không thấy gì đổi và tưởng nút hỏng - đúng phản hồi nhận được. Đang làm việc thì cuộn tới
 cây tiến trình, đang rảnh thì cuộn tới dãy đổi nhân vật.
 
-Rê chuột vào ai thì `e.greet = true`: `step()` cho họ đứng yên quay mặt ra chờ lệnh. Chỉ giữ
-khi `d.state === 'wander'` - có việc trở lại thì phải cho về bàn ngay.
+**Đáp lại chuột thế nào là tuỳ họ ĐANG LÀM GÌ**, và `setHover()` là chỗ duy nhất quyết định:
 
-**Gỡ `greet` phải đi qua `setHover()`, và luôn kèm gỡ `e.goal`.** Hai lỗi đã dính:
+| Đang | Rê chuột vào | Bỏ chuột ra |
+| --- | --- | --- |
+| Ngồi làm việc | ngoái lại nhìn `GLANCE_SEC` (1 giây) rồi làm tiếp, **không rời ghế** | không đổi gì |
+| Rảnh, đi vòng vòng | `e.greet = true`, dừng lại quay mặt ra chờ | đi tiếp |
+| Đang rời phòng | không đáp lại gì | - |
+
+**Người đang ngồi thì tuyệt đối không đụng vào `path` / `goal` / `mode`.** Bản trước xoá cả ba
+cho mọi người, nên rê chuột vào một người đang gõ phím là `goal` mất, vòng sau `step()` thấy
+"có việc mà chưa về bàn" nên cho họ đứng dậy đi vòng qua hông bàn rồi ngồi lại - nhìn như
+nhân vật giật mình nhảy khỏi ghế. Cú ngoái lại chỉ là `e.glance` đếm ngược, `frameFor()` đọc
+nó rồi trả khung `kf`; nó tự hết, không cần gỡ lúc bỏ chuột ra.
+
+Khung `kf` (ngồi quay mặt ra) phải có ở CẢ BẢY bộ - `sit(..., 'turn')` giữ nguyên cái thân
+ngồi, chỉ đổi đầu sang mặt trước và hoạ tiết lưng sang hoạ tiết ngực. Riêng bộ Năm anh em thì
+đây là lúc DUY NHẤT thấy được gọng kính của người đang ngồi, mà ba trong năm người chỉ khác
+nhau ở chỗ đó.
+
+**Gỡ `greet` phải đi qua `setHover()`, và luôn kèm gỡ `e.goal`.** Ba lỗi đã dính:
 
 1. `mouseleave` chỉ xoá `OF.hover` mà không gỡ `greet` của người đang được chào - họ đứng
    chôn chân giữa phòng vĩnh viễn, bỏ chuột ra rồi vẫn không đi tiếp.
 2. Lúc bắt đầu chào ta xoá `e.path` cho họ dừng ngay giữa đường. Nếu vẫn để `goal = 'desk'`
    thì nhánh "có việc thì về bàn" trong `step()` không bao giờ chạy lại - nó chỉ chạy khi
    `goal !== 'desk'` - và người đó kẹt luôn kể cả khi đã thôi chào.
+3. Cú xoá `path` + `goal` ấy giáng vào người đang **rời phòng** thì sinh nhân vật ma - xem
+   mục dưới.
 
-Bấm chọn một người cũng gỡ `greet`: bảng chi tiết đã mở rồi, giữ họ đứng chờ nữa thì cả phòng
-đứng hình trong khi người dùng đang đọc bảng bên dưới.
+Bấm chọn một người cũng gỡ `greet`, nhưng **chỉ khi họ đang thật sự chào** (`if (e.greet)`):
+bảng chi tiết đã mở rồi, giữ họ đứng chờ nữa thì cả phòng đứng hình trong khi người dùng đang
+đọc bảng bên dưới. Xoá `goal` của người đang ngồi làm việc là họ nhảy khỏi ghế, của người đang
+ra cửa là họ kẹt lại.
+
+### Nhân vật ma - phiên đã tắt mà người vẫn ngồi đó
+
+Đã gặp thật: header ghi *"1 in the room"* trong khi có 5 nhân vật trên màn hình, 3 người còn
+ngồi nguyên ở bàn kèm tên phiên. Dòng đếm bỏ qua ai đang `leaving`, nên con số ấy chính là
+bằng chứng: 4 người kia bị kẹt ở trạng thái `leaving`, không bao giờ đi hết ra cửa.
+
+Gốc rễ là `setHover()` xoá `path` và `goal` của người đang được rê chuột. Dính cú đó lúc đang
+rời phòng thì mọi nhánh còn lại của `step()` đều không nhận họ (chúng chỉ dành cho người còn
+đang làm việc), nên:
+
+- kẹt giữa đường ra cửa => đứng chôn chân giữa phòng, `mode = 'idle'`, `goal = null`;
+- kẹt lúc đang đi về ghế để ăn mừng => nhánh "có việc thì về bàn" tóm được, họ ngồi lại vào
+  bàn và ở đó vĩnh viễn - đúng ba nhân vật ma trong ảnh chụp.
+
+Hai lớp chặn, giữ cả hai:
+
+1. **`step()` xử người `leaving` TRƯỚC mọi nhánh khác**, kể cả trước `kind !== 'agent'`: hết
+   đường mà vẫn còn trong phòng thì dựng lại đường ra cửa. Người rời phòng chỉ có đúng một
+   việc. Thứ tự trong nhánh này phải y hệt nhánh ăn mừng - `routeTo` chạy lúc `mode` còn là
+   `'sit'` và `desk` còn đó, nếu không mất cú bước ngang khỏi ghế.
+2. **Lưới an toàn `LEAVE_TIMEOUT` (20 giây)**: `leaving` lâu hơn ngần đó thì xoá thẳng, không
+   cần biết vì sao kẹt. Đường ra dài nhất là ăn mừng 2 giây cộng đi hết chiều ngang phòng
+   (260 / 26 ≈ 10 giây) nên nó không bao giờ cắt ngang một màn ra cửa tử tế. Đừng gỡ lớp này
+   đi kể cả khi lớp 1 đã đủ: một nhân vật ma làm người dùng mất tin vào cả cái panel, còn
+   xoá nhầm sớm vài giây thì không ai nhận ra.
+
+`syncAgents` lúc đánh dấu `leaving` cũng phải gỡ `greet` và `glance`: phiên đã đóng thì không
+còn gì để đáp lại người rê chuột, mà hai cờ đó lại chặn đúng nhánh cho họ đi ra.
 
 ### Ăn mừng lúc xong việc
 
@@ -856,6 +960,13 @@ Bốn bước, mỗi bước một cái bẫy đã trả giá:
 
 Thu nhỏ phải **bật làm mượt** (lấy trung bình vùng) rồi mới cắt ngưỡng alpha. Nearest-neighbour
 từ 180px xuống 20px thì mỗi pixel đích chỉ lấy đúng một pixel nguồn, mất gần hết chi tiết.
+
+Và thu về khuôn của **lưới con** (48x60), không phải 16x20 rồi phóng lên: ảnh người dùng đưa
+vào thường 100-200 pixel mỗi nhân vật, ép xuống 16 pixel là vứt đi gần hết chi tiết mà không
+có cách nào lấy lại, rồi bộ nhập vào thành mảng màu lấm tấm giữa một căn phòng đã sắc nét.
+Bộ nhập từ bản cũ vẫn nằm ở `localStorage` dưới dạng ảnh 16x20, nên `loadCustomPacks()` lấy
+đúng kích thước ảnh đọc được chứ không ép về một cỡ, còn `drawImportedFrame` luôn kéo về
+khuôn lưới con - cùng một đường cho cả hai đời.
 
 Ảnh người dùng gần như luôn chỉ có một tư thế đứng, không đủ 13 khung hình. `drawImportedFrame`
 dựng chuyển động bằng cách xê dịch 1 pixel theo nhịp - đủ để nhìn ra đang đi hay đang gõ, mà
