@@ -106,13 +106,20 @@ function existsFile(p: string): boolean {
   }
 }
 
-/** Các thư mục cài mặc định, dùng khi Python có trên máy nhưng không có trên PATH. */
+/**
+ * Các thư mục cài mặc định, dùng khi Python có trên máy nhưng không có trên PATH.
+ *
+ * Ghép đường dẫn bằng `path.win32` / `path.posix` chứ KHÔNG bằng `path.join`: `path.join`
+ * theo hệ điều hành đang chạy, nên hàm nhận tham số `platform` mà lại ghép bằng dấu phân cách
+ * của máy khác là tự mâu thuẫn (chạy test cho 'darwin' trên Windows ra `/Users/me\.pyenv\...`).
+ */
 export function wellKnownPaths(platform: string, env: NodeJS.ProcessEnv, home: string): string[] {
   const out: string[] = [];
   if (platform === 'win32') {
+    const p = path.win32;
     const roots = [
-      env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Programs', 'Python'),
-      env.PROGRAMFILES && path.join(env.PROGRAMFILES, 'Python'),
+      env.LOCALAPPDATA && p.join(env.LOCALAPPDATA, 'Programs', 'Python'),
+      env.PROGRAMFILES && p.join(env.PROGRAMFILES, 'Python'),
       'C:\\',
     ].filter((x): x is string => Boolean(x));
     for (const root of roots) {
@@ -124,14 +131,14 @@ export function wellKnownPaths(platform: string, env: NodeJS.ProcessEnv, home: s
       }
       for (const name of entries) {
         if (!/^Python3\d+$/i.test(name)) continue;
-        out.push(path.join(root, name, 'python.exe'));
+        out.push(p.join(root, name, 'python.exe'));
       }
     }
   } else {
     out.push(
       '/opt/homebrew/bin/python3',
       '/usr/local/bin/python3',
-      path.join(home, '.pyenv', 'shims', 'python3'),
+      path.posix.join(home, '.pyenv', 'shims', 'python3'),
       '/usr/bin/python3'
     );
   }
