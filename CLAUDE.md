@@ -29,6 +29,12 @@ aimon/
   static/               index.html, style.css, app.js, i18n.js, favicon.svg
 mac/AIMonitor.swift     vỏ app macOS (WKWebView)
 windows/app_win.py      điểm vào bản .exe Windows
+vscode-extension/       vỏ extension VSCode (TypeScript)
+  src/extension.ts      activate/deactivate, đăng ký webview view
+  src/dashboardViewProvider.ts  bật server rồi nhúng dashboard vào iframe
+  src/serverManager.ts  spawn python, probe /api/version, chờ instance.json, SIGTERM
+  src/instanceFile.ts   đọc + kiểm tra ~/.aimon/instance.json
+  scripts/copy-aimon.js copy aimon/ + pricing.json + icon vào gói lúc build
 scripts/
   build_macos_app.sh    đóng gói AIMonitor.app (local + CI dùng chung)
   install_macos.sh      cài vào /Applications rồi tự kiểm tra
@@ -163,6 +169,18 @@ Push `main` => có artifact tải trong tab Actions. Đẩy tag `v*` => tạo Re
   không liên quan tới code. Thay bằng chạy server thẳng từ `Contents/Resources` - đó mới là
   thứ vỡ khi đóng gói sai.
 
+Ba kênh phát hành, ba workflow, cùng một quy tắc: **luôn chạy server từ chính bản đã đóng gói**
+chứ đừng chạy từ cây source, vì lỗi đóng gói chỉ lộ ra ở đó.
+
+| Workflow | Ra cái gì | Chạy trên |
+| --- | --- | --- |
+| `build-macos.yml` | `AIMonitor-macos.zip` | macos-latest |
+| `build-windows.yml` | `AIMonitor.exe` | windows-latest |
+| `build-vscode.yml` | `aimon-vscode-*.vsix` | ubuntu-latest, Python 3.9 (đúng sàn của repo) |
+
+`build-vscode.yml` giải nén VSIX rồi chạy server bên trong nó, soát cả danh sách file trong
+gói: thiếu `pricing.json` / `static/` hay lọt `__pycache__`, `.ts` là fail ngay.
+
 ## Ký app
 
 **Bắt buộc ký, kể cả ad-hoc.** `lipo -create` xoá chữ ký của từng lát, để nguyên thì bundle
@@ -230,6 +248,40 @@ DigiCert KeyLocker, SSL.com eSigner). Chứng chỉ OV còn phải tích luỹ u
 thời gian mới hết cảnh báo; EV hết ngay nhưng đắt hơn. Hiện `.exe` chưa ký - user bấm
 **More info => Run anyway** một lần.
 
+## Extension VSCode (vscode-extension/)
+
+Vỏ thứ ba, song song với app macOS và `.exe` Windows. Nó **không viết lại gì của `aimon/`**:
+chỉ spawn `python3 -m aimon.server --port 0` khi user mở panel lần đầu (lazy, không bật lúc
+VSCode khởi động), đợi `~/.aimon/instance.json`, probe `/api/version`, rồi nhúng dashboard
+vào `<iframe>` trong webview. Sửa gì trong `aimon/` là extension hưởng theo, không cần đụng
+tới TypeScript.
+
+`npm run package` copy `aimon/` vào `vscode-extension/aimon/` rồi mới đóng gói - giống cách
+app macOS copy code vào `Contents/Resources`. Đổi lại: sửa `aimon/` xong phải đóng gói lại
+mới thấy thay đổi trong extension đã cài.
+
+Bốn chỗ đã trả giá:
+
+1. **`pricing.json` nằm ở gốc repo, không nằm trong `aimon/`.** `claude.py` tìm nó ở thư mục
+   **cha** của `aimon/`, dưới extension chính là `vscode-extension/`. Quên copy thì tool vẫn
+   chạy, chỉ có mọi con số chi phí về 0 - hỏng lặng lẽ. CI vì thế đọc `/api/snapshot` và bắt
+   buộc có `totals`, không chỉ gọi `/api/version`.
+2. **Icon activity bar phải đơn sắc, không nền tô đầy.** VSCode mask icon đó theo kênh alpha:
+   bỏ hết màu, vùng nào không trong suốt thì thành silhouette. `favicon.svg` gốc có nền bo góc
+   tô đầy gần kín khung nên mask ra chỉ còn một khối vuông đặc. `copy-aimon.js` vẽ lại đường
+   nhịp + chấm tròn, bỏ nền. Icon marketplace (`package.json` -> `icon`) thì ngược lại: PNG
+   vuông, giữ nguyên màu.
+3. **`retainContextWhenHidden` là bắt buộc.** VSCode dispose webview view ngay khi user thu
+   gọn panel hoặc đổi container, mà `onDidDispose` lại bắn SIGTERM. Không giữ context thì
+   server bị giết và spawn lại liên tục, lần đọc đầu sau mỗi lần spawn còn cho %CPU sai vì
+   mất snapshot mồi.
+4. **`stdio` của stderr phải được đọc.** Để `'pipe'` mà không ai đọc thì buffer OS đầy là
+   server Python block khi ghi, treo vĩnh viễn. `serverManager.ts` đọc và giữ 2000 ký tự cuối
+   để hiện trong webview khi khởi động lỗi.
+
+Windows chỉ có `python` chứ thường không có `python3`, nên `DEFAULT_PYTHON_CANDIDATES` thử lần
+lượt hai tên; ENOENT ở tên đầu thì tự chuyển sang tên sau.
+
 ## Đa ngôn ngữ (static/i18n.js)
 
 Giao diện có tiếng Anh và tiếng Việt, đổi bằng dropdown `#lang`, lựa chọn lưu ở
@@ -283,6 +335,13 @@ API trả lỗi rõ ràng thay vì im lặng. Giữ nguyên guard này khi thêm
   Fix: chặn request có `Host` không thuộc `localhost` / `127.0.0.1` / `[::1]`.
 - `/api/action` và `/api/quit` không có xác thực. Chấp nhận được khi chỉ bind loopback, nhưng
   phải thêm token trước khi mở ra LAN (`--host 0.0.0.0`).
+- **Extension VSCode trên Windows để lại state rác.** Node gửi SIGTERM trên Windows là gọi
+  `TerminateProcess`, khối `finally` trong `server.py` không chạy nên `~/.aimon/instance.json`
+  còn nguyên. Lần bật sau `_running_instance()` vẫn probe lại nên không hỏng, chỉ bẩn.
+- **Nhiều cửa sổ VSCode dùng chung một server.** Cửa sổ mở panel trước sẽ spawn server, cửa sổ
+  sau probe thấy còn sống thì dùng lại (và không giữ `proc` nên không giết nhầm). Nhưng cửa sổ
+  đầu đóng panel là server chết, iframe cửa sổ sau trắng cho tới lần mở lại.
+- Extension chưa lên VSCode Marketplace, phải cài tay từ `.vsix`.
 
 ## Kiểm tra trước khi commit
 
@@ -291,4 +350,9 @@ python3 -m compileall -q aimon        # cú pháp
 /usr/bin/python3 -c "import sys; sys.path.insert(0,'.'); import aimon.server"   # 3.9 compat
 node --check aimon/static/app.js      # cú pháp JS
 ./scripts/install_macos.sh            # tự kiểm tra app macOS đầu-cuối
+
+cd vscode-extension && npm ci && npx tsc --noEmit && npm test && npm run package
 ```
+
+`compileall` sinh `__pycache__` trong `aimon/`; `copy-aimon.js` lọc bỏ nên gói vẫn sạch, đừng
+gỡ cái filter đó.

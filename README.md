@@ -115,6 +115,22 @@ To run from source instead, clone the repo and create a shortcut:
 powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1
 ```
 
+### VSCode
+
+If you would rather keep the dashboard next to your code, install the extension: an AI Monitor
+icon appears in the activity bar and the dashboard opens as a panel inside the editor.
+
+Download `aimon-vscode-*.vsix` from **Releases**, then:
+
+```bash
+code --install-extension aimon-vscode-0.1.1.vsix
+```
+
+Or inside VSCode: Extensions panel => `...` menu => **Install from VSIX...**
+
+The extension starts the same local server on first open, so it needs `python3` on your PATH.
+It is not on the Marketplace yet, so the `.vsix` file is the only way in for now.
+
 ---
 
 ## 3. Why you need this: one session, 20+ processes
