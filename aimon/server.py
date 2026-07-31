@@ -362,7 +362,12 @@ def main(argv=None) -> int:
 
     port = httpd.server_address[1]
     if port != args.port:
-        print(f"Cổng {args.port} đang bận => dùng cổng {port}.", flush=True)
+        # args.port == 0 là cố ý xin OS cấp cổng bất kỳ (extension VSCode chạy kiểu này),
+        # không phải cổng mong muốn bị chiếm - in "Cổng 0 đang bận" ở đó là sai.
+        if args.port == 0:
+            print(f"Đang dùng cổng {port} do hệ điều hành cấp.", flush=True)
+        else:
+            print(f"Cổng {args.port} đang bận => dùng cổng {port}.", flush=True)
 
     import platform
 
