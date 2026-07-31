@@ -2,7 +2,7 @@
   "name": "aimonitor",
   "displayName": "AI Monitor",
   "description": "See every AI process, token, and account limit on your machine, inside VSCode. Runs fully offline.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "mituultra",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -23,9 +23,22 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["AI", "Visualization", "Other"],
-  "keywords": ["claude", "claude code", "token usage", "ai monitor", "process monitor"],
-  "extensionKind": ["workspace", "ui"],
+  "categories": [
+    "AI",
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "claude code",
+    "token usage",
+    "ai monitor",
+    "process monitor"
+  ],
+  "extensionKind": [
+    "workspace",
+    "ui"
+  ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": true,
@@ -68,6 +81,26 @@
         "command": "aimon.restartServer",
         "title": "Restart Server",
         "category": "AI Monitor"
+      },
+      {
+        "command": "aimon.detectSettings",
+        "title": "Detect and Fill In Settings",
+        "category": "AI Monitor"
+      },
+      {
+        "command": "aimon.selectClaudeDir",
+        "title": "Select Claude Data Folder",
+        "category": "AI Monitor"
+      },
+      {
+        "command": "aimon.selectPricingFile",
+        "title": "Select Pricing File",
+        "category": "AI Monitor"
+      },
+      {
+        "command": "aimon.showResolvedConfig",
+        "title": "Show Settings In Use",
+        "category": "AI Monitor"
       }
     ],
     "configuration": {
@@ -77,7 +110,7 @@
           "type": "string",
           "default": "",
           "order": 1,
-          "markdownDescription": "Python interpreter used to run the AI Monitor server. Leave empty to detect one automatically - the `py` launcher, `PATH` and the standard install folders are all scanned. Set this only when the machine has several Python installs and you want a specific one. Run **AI Monitor: Select Python Interpreter** to pick from the list instead of typing a path."
+          "markdownDescription": "Python interpreter used to run the AI Monitor server. Filled in automatically the first time the extension runs; clear it to go back to detecting one every time. A path that stops working is detected and replaced on the next start, so this never leaves you stuck.\n\n[$(search) Detect again](command:aimon.selectPython)"
         },
         "aimon.serverPort": {
           "type": "number",
@@ -95,7 +128,10 @@
         },
         "aimon.openIn": {
           "type": "string",
-          "enum": ["tab", "panel"],
+          "enum": [
+            "tab",
+            "panel"
+          ],
           "enumDescriptions": [
             "Open the full dashboard as an editor tab",
             "Reveal the dashboard in the activity bar panel"
@@ -112,7 +148,12 @@
         },
         "aimon.statusBar.metric": {
           "type": "string",
-          "enum": ["both", "session", "weekly", "cost"],
+          "enum": [
+            "both",
+            "session",
+            "weekly",
+            "cost"
+          ],
           "enumDescriptions": [
             "Session and Weekly limits",
             "Session (5 hour) limit only",
@@ -125,7 +166,10 @@
         },
         "aimon.statusBar.alignment": {
           "type": "string",
-          "enum": ["right", "left"],
+          "enum": [
+            "right",
+            "left"
+          ],
           "default": "right",
           "order": 7,
           "markdownDescription": "Which side of the status bar to sit on. Takes effect after the window is reloaded."
@@ -140,7 +184,11 @@
         },
         "aimon.theme": {
           "type": "string",
-          "enum": ["auto", "dark", "light"],
+          "enum": [
+            "auto",
+            "dark",
+            "light"
+          ],
           "enumDescriptions": [
             "Follow the VSCode colour theme",
             "Always dark",
@@ -154,13 +202,43 @@
           "type": "string",
           "default": "",
           "order": 10,
-          "markdownDescription": "Folder holding your Claude Code data. Empty means `~/.claude`. Only applies to a server this extension starts itself."
+          "markdownDescription": "Folder holding your Claude Code data. Filled in automatically the first time the extension runs; empty means `~/.claude`. Only applies to a server this extension starts itself.\n\n[$(search) Detect again](command:aimon.selectClaudeDir)"
         },
         "aimon.pricingFile": {
           "type": "string",
           "default": "",
           "order": 11,
-          "markdownDescription": "Token price table used to work out cost. Empty means the `pricing.json` bundled with the extension. Only applies to a server this extension starts itself."
+          "markdownDescription": "Token price table used to work out cost. Filled in automatically the first time the extension runs; empty means the `pricing.json` bundled with the extension. The bundled path changes on every extension update and is refreshed for you. Only applies to a server this extension starts itself.\n\n[$(search) Detect again](command:aimon.selectPricingFile)"
+        },
+        "aimon.aiKinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "claude-code",
+              "codex",
+              "copilot",
+              "gemini",
+              "cursor",
+              "ollama",
+              "local-llm"
+            ],
+            "enumDescriptions": [
+              "Claude Code sessions",
+              "OpenAI Codex",
+              "GitHub Copilot",
+              "Gemini CLI",
+              "Cursor AI",
+              "Ollama",
+              "Other local LLM runners"
+            ]
+          },
+          "uniqueItems": true,
+          "default": [
+            "claude-code"
+          ],
+          "order": 8,
+          "markdownDescription": "Which kinds of AI agent the dashboard and the Office view start out showing. Most machines run background processes that get classified as AI without you ever launching them - Copilot helpers, editor-bundled Codex - and showing all of them buries the sessions you actually care about.\n\nThis is a starting point, not a lock: the **Show:** row at the top of the dashboard turns each kind on and off, and what you pick there wins and is remembered."
         }
       }
     }

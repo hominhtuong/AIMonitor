@@ -183,6 +183,23 @@ Lựa chọn được nhớ lại.
 
 Bên dưới là các phiên đã đóng, xem theo hôm nay hoặc 7 ngày.
 
+**Chỉ hiện loại agent bạn thật sự dùng.** Mặc định dashboard chỉ hiện Claude Code. Máy nào
+cũng sẵn một mớ tiến trình nền được xếp vào loại AI mà bạn không hề chạy - Copilot đi kèm VS
+Code chẳng hạn - bày hết ra chỉ tổ che mất thứ cần xem. Thanh **"Hiện:"** ngay dưới các tab
+liệt kê những loại đang có trên máy kèm số lượng; bấm để bật hoặc tắt từng loại, bấm "Tất cả
+loại" để xem hết. Lựa chọn được nhớ lại, và áp cho cả tab Văn phòng.
+
+**Tab "Văn phòng"** - vẫn từng ấy thông tin nhưng bày thành một văn phòng pixel nhỏ. Mỗi agent
+đang chạy là một nhân vật: có việc thì ngồi vào bàn làm, và màn hình của nó cho biết đang làm
+loại việc gì - xanh dương là sửa file, xanh lá là đọc và tìm kiếm, cam là chạy lệnh, tím là
+lấy dữ liệu web. Rảnh quá một phút rưỡi thì nhân vật đứng dậy đi vòng vòng. Sub-agent hiện ra
+thành người nhỏ hơn đứng cạnh bàn của người gọi nó. Bấm vào máy tính nào thì mở đầy đủ phiên
+đó, kèm cả cây tiến trình.
+
+Nhiều agent chạy cùng lúc thì nhìn cái này nhanh hơn đọc thẻ: biết ngay ai đang bận mà không
+phải đọc chữ nào. Phòng có mười bàn; đông hơn thì dòng đếm phía trên nói rõ còn bao nhiêu
+người chưa hiện.
+
 **Tab "Lịch sử phiên"** - trả lời "tác vụ nào ngốn nhiều nhất". Gộp theo project và theo từng
 phiên, có cột tỷ trọng, lọc và sắp xếp được. Tab này chỉ quét khi bạn mở nó.
 
@@ -258,12 +275,23 @@ Extension VSCode có bảng settings riêng (Extensions => AI Monitor). App macO
   "refresh_seconds": 5,
   "claude_dir": "~/work/.claude",
   "pricing_file": "~/bang-gia-rieng.json",
-  "port": 8899
+  "port": 8899,
+  "ai_kinds": ["claude-code", "gemini"]
 }
 ```
 
 Khoá nào cũng không bắt buộc. File hỏng hoặc không có thì dùng mặc định, không bao giờ làm
 dashboard không mở được. Nút sáng/tối ở đầu trang đè lên `theme` cho riêng máy đó.
+
+`ai_kinds` là loại agent hiện lúc mới mở - đặt `["*"]` để hiện tất cả. Giá trị hợp lệ:
+`claude-code`, `codex`, `copilot`, `gemini`, `cursor`, `ollama`, `local-llm`. Đây chỉ là điểm
+khởi đầu: thanh "Hiện:" trên trang vẫn bật tắt được và lựa chọn đó được nhớ.
+
+Trong extension VSCode, ba ô đường dẫn (Python, thư mục dữ liệu Claude, bảng giá) **tự được
+điền** sau lần chạy đầu, nên bạn nhìn là biết ngay tool đang dùng cái gì thay vì thấy ô trống.
+Mỗi ô có nút **Detect again** để dò lại và chọn từ danh sách. Đường dẫn nào chết - ví dụ bảng
+giá đi kèm sau khi extension cập nhật - sẽ tự được thay ở lần khởi động sau. Xoá trắng một ô
+là quay lại chế độ tự dò mỗi lần chạy, và extension sẽ không tự điền lại nữa.
 
 ---
 

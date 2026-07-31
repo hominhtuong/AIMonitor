@@ -64,6 +64,7 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         theme: resolveTheme(this.config.theme, editorIsLight(vscode.window.activeColorTheme.kind)),
         refreshSeconds: this.config.refreshSeconds,
         compact: true,
+        aiKinds: this.config.aiKinds,
       });
       view.webview.html = iframePage(url);
     } catch (err) {

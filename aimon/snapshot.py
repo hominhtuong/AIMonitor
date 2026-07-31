@@ -47,50 +47,58 @@ def protected_pids(procs: dict) -> set[int]:
     return prot
 
 
+def collect_roots(procs: dict, kids: dict, pid_map: dict) -> tuple[list[dict], set[str]]:
+    """Các tiến trình AI gốc + tập session_id đang sống.
+
+    Tách riêng vì `/api/pulse` (khung nhìn Văn phòng) cần đúng danh sách này. Để hai chỗ tự
+    dò lấy thì sớm muộn cũng lệch nhau: dashboard thấy 3 agent còn văn phòng thấy 4.
+    """
+    roots: list[dict] = []
+    live_sessions: set[str] = set()
+    for pid, p in procs.items():
+        if p["kind"] not in P.AI_ROOT_KINDS:
+            continue
+        parent = procs.get(p["ppid"])
+        if parent and parent["kind"] == p["kind"]:
+            continue  # chỉ lấy đỉnh của mỗi nhánh cùng loại
+        sid = _session_id_of(pid, p, pid_map) if p["kind"] == "claude-code" else None
+        if sid:
+            live_sessions.add(sid)
+        meta = pid_map.get(pid) or {}
+        node = P.build_tree(pid, procs, kids) or {}
+        supervisor = None
+        if parent and parent["kind"] in P.SUPERVISOR_KINDS:
+            supervisor = parent["name"]
+        roots.append(
+            {
+                "pid": pid,
+                "kind": p["kind"],
+                "label": p["label"],
+                "name": p["name"],
+                "cmd": p["cmd"],
+                "uptime": p["uptime"],
+                "paused": p["paused"],
+                "rss_kb": p["rss_kb"],
+                "cpu_pct": p["cpu_pct"],
+                "rss_tree_kb": node.get("rss_tree_kb", p["rss_kb"]),
+                "cpu_tree_pct": node.get("cpu_tree_pct", p["cpu_pct"]),
+                "session_id": sid,
+                "session_name": meta.get("name"),
+                "entrypoint": meta.get("entrypoint"),
+                "supervisor": supervisor,
+                "children": node.get("children", []),
+            }
+        )
+    return roots, live_sessions
+
+
 def build() -> dict:
     with _lock:
         procs = P.snapshot()
         kids = P.children_map(procs)
         pid_map = C.pid_sessions()
 
-        # ---- xác định các tiến trình AI gốc
-        roots: list[dict] = []
-        live_sessions: set[str] = set()
-        for pid, p in procs.items():
-            if p["kind"] not in P.AI_ROOT_KINDS:
-                continue
-            parent = procs.get(p["ppid"])
-            if parent and parent["kind"] == p["kind"]:
-                continue  # chỉ lấy đỉnh của mỗi nhánh cùng loại
-            sid = _session_id_of(pid, p, pid_map) if p["kind"] == "claude-code" else None
-            if sid:
-                live_sessions.add(sid)
-            meta = pid_map.get(pid) or {}
-            node = P.build_tree(pid, procs, kids) or {}
-            supervisor = None
-            if parent and parent["kind"] in P.SUPERVISOR_KINDS:
-                supervisor = parent["name"]
-            roots.append(
-                {
-                    "pid": pid,
-                    "kind": p["kind"],
-                    "label": p["label"],
-                    "name": p["name"],
-                    "cmd": p["cmd"],
-                    "uptime": p["uptime"],
-                    "paused": p["paused"],
-                    "rss_kb": p["rss_kb"],
-                    "cpu_pct": p["cpu_pct"],
-                    "rss_tree_kb": node.get("rss_tree_kb", p["rss_kb"]),
-                    "cpu_tree_pct": node.get("cpu_tree_pct", p["cpu_pct"]),
-                    "session_id": sid,
-                    "session_name": meta.get("name"),
-                    "entrypoint": meta.get("entrypoint"),
-                    "supervisor": supervisor,
-                    "children": node.get("children", []),
-                }
-            )
-
+        roots, live_sessions = collect_roots(procs, kids, pid_map)
         sessions = C.scan(live_ids=live_sessions)
         for r in roots:
             r["session"] = sessions.get(r["session_id"]) if r["session_id"] else None

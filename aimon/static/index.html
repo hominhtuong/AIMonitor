@@ -69,10 +69,19 @@
 
   <div class="tabs">
     <button data-tab="ai" class="on" data-i18n="tab.ai"></button>
+    <button data-tab="office" data-i18n="tab.office"></button>
     <button data-tab="hist" data-i18n="tab.hist"></button>
     <button data-tab="res" data-i18n="tab.res"></button>
     <button data-tab="net" data-i18n="tab.net"></button>
   </div>
+
+  <!-- Bộ lọc loại agent. Nằm DƯỚI thanh tab và chỉ hiện ở hai tab nó thật sự tác động
+       (AI & Agent, Văn phòng). Để phía trên thanh tab thì trông như nó lọc cả trang, kể cả
+       Lịch sử phiên và Cổng & Docker - hai chỗ nó không đụng tới.
+       Vẫn là MỘT bộ lọc dùng chung cho hai tab đó: cùng một danh sách agent nhìn hai kiểu,
+       tách làm hai giá trị riêng thì đổi ở tab này xong sang tab kia thấy số khác, không ai
+       hiểu vì sao. Nội dung do app.js dựng. -->
+  <div class="kindbar" id="kindbar" hidden></div>
 
   <section class="pane on" id="pane-ai">
     <h2 data-i18n="ai.title"></h2>
@@ -88,6 +97,20 @@
       <span class="hint" style="margin:0" data-i18n="ai.closed_hint"></span>
     </div>
     <div id="closed"></div>
+  </section>
+
+  <section class="pane" id="pane-office">
+    <div class="h2row">
+      <h2 data-i18n="office.title"></h2>
+      <span class="tag" id="office-count"></span>
+      <span class="hint" style="margin:0" data-i18n="office.hint"></span>
+    </div>
+    <!-- Canvas phải nằm NGOÀI mọi vùng do render()/morph() cập nhật. Nếu không thì cứ mỗi
+         lần làm mới nó bị thay bằng canvas mới: mất context, nhân vật nhảy về vị trí đầu.
+         Chỉ #office-detail bên dưới là vùng động. -->
+    <div class="office-stage"><canvas id="office-canvas"></canvas></div>
+    <div class="office-legend" id="office-legend"></div>
+    <div id="office-detail"></div>
   </section>
 
   <section class="pane" id="pane-hist">
@@ -176,5 +199,8 @@
 <script src="/api/config.js"></script>
 <script src="/static/i18n.js"></script>
 <script src="/static/app.js"></script>
+<!-- Nạp SAU app.js: office.js dùng lại t(), render(), esc(), kidRow() và S.snap của nó. -->
+<script src="/static/sprites.js"></script>
+<script src="/static/office.js"></script>
 </body>
 </html>

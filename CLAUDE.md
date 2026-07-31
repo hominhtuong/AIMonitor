@@ -30,6 +30,7 @@ aimon/
   server.py             HTTP server, routing, thao tác kill/pause, chọn cổng
   instance.py           state file ~/.aimon/instance.json (host/port/pid instance đang chạy)
   snapshot.py           gộp mọi collector thành 1 JSON cho /api/snapshot
+  office.py             payload nhẹ cho khung nhìn Văn phòng (/api/pulse)
   proc_util.py          gọi lệnh ngoài không nháy cửa sổ console trên Windows
   config_file.py        đọc ~/.aimon/config.json - cấu hình dùng chung cho cả ba vỏ
   collectors/
@@ -40,6 +41,7 @@ aimon/
     usage.py            hạn mức Session 5h / Weekly 7d, hiệu chỉnh % ước lượng
     ports.py            lsof / netstat + docker ps
   static/               index.html, style.css, app.js, i18n.js, favicon.svg
+                        office.js (khung nhìn Văn phòng), sprites.js (nhân vật pixel)
 mac/AIMonitor.swift     vỏ app macOS (WKWebView)
 windows/app_win.py      điểm vào bản .exe Windows
 vscode-extension/       vỏ extension VSCode (TypeScript)
@@ -413,11 +415,44 @@ nên đừng để logic vào đấy.
 Đường dẫn dữ liệu truyền qua biến môi trường `AIMON_CLAUDE_DIR` / `AIMON_PRICING` chứ không
 qua tham số dòng lệnh: cả ba vỏ đều spawn server nên đặt env là xong.
 
+### Tự dò và tự điền ba ô đường dẫn (autoConfig.ts + settingsPlan.ts)
+
+`pythonPath`, `claudeDataDir`, `pricingFile` để trống nghĩa là "tự dò", nhưng người mở bảng
+Settings nhìn thấy ba ô trắng thì hiểu là tool chưa lấy được dữ liệu. Vì vậy `activate()` bắn
+`syncDetectedSettings()` chạy nền (**không** `await` - dò Python phải chạy thử từng bản, chặn
+`activate` ở đó là cả cửa sổ VSCode đứng hình) để điền sẵn giá trị đang thật sự dùng.
+
+Đổi lại thì phải chịu chuyện đường dẫn tuyệt đối chết dần. Ba tình huống bắt buộc phân biệt,
+và đó là toàn bộ lý do `settingsPlan.ts` tồn tại:
+
+| Tình huống | Làm gì |
+| --- | --- |
+| Ô trống, chưa bao giờ điền | điền vào |
+| Ô trống vì người dùng tự xoá | **để yên** - xoá là ý muốn quay về tự dò |
+| Giá trị mình từng điền mà nay chết | lặng lẽ thay bằng bản mới dò được |
+| Giá trị người dùng tự gõ mà nay chết | chỉ cảnh báo một lần, không sửa đồ của người ta |
+
+Ca "người dùng tự xoá" là ca dễ làm sai nhất: không nhớ mình đã điền gì thì mỗi lần mở VSCode
+giá trị lại mọc ra, xoá mãi không được. Vì vậy `globalState['aimon.autoFilled']` giữ đúng cái
+mình đã ghi, và `planSettings()` so với nó chứ không so với "ô có trống hay không".
+
+`pricing.json` nằm trong thư mục cài extension, mà thư mục đó **đổi tên sau mỗi lần cập nhật
+extension** - nên đường dẫn cũ chết là chuyện chắc chắn xảy ra, không phải ngoại lệ hiếm. Ca
+`heal` chính là để lo việc đó; bỏ nó đi thì mọi con số chi phí về 0 sau lần update đầu tiên.
+
+Quyết định nằm ở `settingsPlan.ts` (**không** import `vscode`, có unit test); phần chạy lệnh
+dò, sờ ổ đĩa, ghi settings, hiện QuickPick nằm ở `autoConfig.ts`.
+
+Trong bảng Settings, mỗi ô có một dòng `[$(search) Detect again](command:aimon.selectXxx)` ở
+`markdownDescription` - VSCode render `command:` link thành nút bấm được ngay tại chỗ, không
+phải mở Command Palette.
+
 ## Cấu hình dùng chung (~/.aimon/config.json)
 
 Settings của VSCode chỉ tồn tại trong VSCode. Người dùng app macOS và bản `.exe` không có chỗ
 nào đổi nhịp làm mới hay trỏ dữ liệu Claude sang thư mục khác - file này là chỗ đó, server đọc
-nên cả ba vỏ đều hưởng. Khoá: `theme`, `refresh_seconds`, `claude_dir`, `pricing_file`, `port`.
+nên cả ba vỏ đều hưởng. Khoá: `theme`, `refresh_seconds`, `claude_dir`, `pricing_file`, `port`,
+`ai_kinds`.
 
 Thứ tự ưu tiên, mạnh trước:
 
@@ -437,6 +472,56 @@ khoảng đều bị bỏ qua và chạy bằng mặc định. Đã kiểm tra c
 Trang web nhận cấu hình qua `/api/config.js` - server sinh ra `window.AIMON_CONFIG = {...}`,
 `index.html` nạp nó **trước** `app.js`. Dùng JS chứ không dùng `fetch('/api/config')` để trang
 biết theme ngay lúc dựng, không vẽ nền tối rồi mới nháy sang nền sáng.
+
+## Lọc theo loại agent (`ai_kinds`)
+
+Mặc định **chỉ hiện Claude Code**. Máy nào cũng sẵn một mớ tiến trình bị `classify()` xếp vào
+AI mà người dùng không hề chạy - Copilot đi kèm VSCode, Codex đi kèm editor - bày hết ra thì
+che mất thứ cần theo dõi. Máy thật lúc viết phần này: 16 agent gốc, trong đó 9 là Copilot.
+
+Một bộ lọc, hai khung nhìn: thanh chip `#kindbar` dùng chung cho tab AI & Agent và tab Văn
+phòng. Tách làm hai giá trị riêng thì đổi ở tab này xong sang tab kia thấy số khác, không ai
+hiểu vì sao - vẫn là cùng một danh sách agent nhìn hai kiểu.
+
+Thanh nằm **dưới** thanh tab và `syncKindBar()` ẩn nó ở ba tab còn lại. Đặt phía trên thanh
+tab thì trông như nó lọc cả trang, kể cả Lịch sử phiên và Cổng & Docker - hai chỗ nó không hề
+đụng tới. `.kindbar` có `display:flex` nên thuộc tính `hidden` của HTML không tự ăn, phải khai
+`.kindbar[hidden] { display: none; }`.
+
+Thanh chỉ liệt kê loại **đang có mặt** cộng loại đang chọn, không bày cả bảy loại server biết -
+sáu cái trong đó không bao giờ có ai.
+
+Hai khung nhìn lọc ở hai chỗ khác nhau, và đó là chủ ý:
+
+- **Tab AI & Agent lọc ở trang** (`visibleAi()`). `/api/snapshot` trả toàn bộ, không cắt bớt.
+- **Tab Văn phòng lọc ở server** (`/api/pulse?kinds=`). Bắt buộc, vì phòng chỉ có `MAX_AGENTS`
+  chỗ: cắt trước rồi mới lọc thì agent bị ẩn vẫn chiếm suất và người dùng lọc còn mỗi Claude
+  Code lại thấy phòng trống một nửa.
+
+Ba cái bẫy đã dính:
+
+1. **`parse_qs` mặc định vứt tham số rỗng.** `?kinds=` (người dùng bỏ chọn hết) trở thành y
+   hệt "không gửi `kinds`", và server trả về **tất cả** - đúng ngược ý người dùng. Phải
+   `parse_qs(query, keep_blank_values=True)`, rồi phân biệt ba ca: vắng mặt và `*` là không
+   lọc, chuỗi rỗng là không khớp ai.
+2. **Thứ tự ưu tiên KHÁC theme, cố ý.** Với bộ lọc thì `localStorage > ?kinds= > config.json`:
+   bấm tắt Codex xong tải lại trang mà nó hiện lại thì cái nút coi như hỏng. Theme phải để
+   `?theme=` thắng vì dashboard buộc bám màu editor; bộ lọc không có ràng buộc đó, nên settings
+   VSCode chỉ đóng vai giá trị **khởi đầu**.
+3. **Phải nói rõ đang ẩn bao nhiêu.** Không có dòng "Bộ lọc đang ẩn N agent" thì người chỉ
+   dùng Gemini mở lên thấy trang trống và tưởng tool hỏng, chứ không nghĩ tới bộ lọc mặc định.
+   Vì lý do đó dòng này kèm luôn nút bật lại tất cả.
+
+Dòng đếm người trong phòng bỏ qua ai đang `leaving`: họ còn trên màn hình thêm vài giây cho
+hết đường ra cửa, đếm cả họ thì tắt một loại xong con số vẫn y nguyên, nhìn như lọc không ăn.
+
+**Bật/tắt phải nhìn ra từ xa.** Bản đầu chip tắt chỉ khác chip bật ở `opacity: .5` và một cái
+chấm rỗng - trên nền tối gần như không thấy gì. Giờ đổi cùng lúc ba thứ: nền, kiểu viền và màu
+chữ, và bám vào `[aria-pressed]` chứ không phải một class riêng. Đừng viết rule `.chip.pick
+.dot { background: ... }` - nó cùng độ đặc hiệu với `.chip[data-kind="..."] .dot` nhưng đứng
+sau nên sẽ xoá sạch màu riêng của từng loại.
+
+KPI ở đầu trang **không** lọc - nó mô tả cái máy, không mô tả danh sách đang xem.
 
 ## Đa ngôn ngữ (static/i18n.js)
 
@@ -492,6 +577,67 @@ cuộn, không mất trạng thái mở/đóng cây.
 Xác nhận thao tác dùng hộp thoại trong trang, **không dùng `confirm()`** - Chrome chặn dialog
 gốc sau vài lần và làm nút kill trông như hỏng.
 
+## Khung nhìn Văn phòng (office.py + static/office.js + static/sprites.js)
+
+Mỗi agent đang chạy là một nhân vật pixel trong một căn phòng: có việc thì ngồi vào bàn và
+diễn đúng việc đang làm, rảnh quá `WANDER_AFTER` (90 giây) thì đứng dậy đi vòng vòng, tắt thì
+đi ra cửa. Bấm vào máy tính của ai thì mở ra cây tiến trình và chi tiết phiên của người đó.
+
+**Endpoint riêng `/api/pulse`, nhịp 1 giây**, không nhét vào `/api/snapshot`. Dashboard 3 giây
+là vừa, còn hoạt cảnh chậm hơn thế thì agent gõ xong từ lâu nhân vật mới nhúc nhích; ngược
+lại kéo cả bảng tiến trình + cổng + Docker + hạn mức mỗi giây chỉ để vẽ hoạt hình là phí.
+
+Phần đắt duy nhất dùng chung là danh sách tiến trình, và `procs.cached()` lo việc đó: vòng nào
+gặp cache còn hạn thì dùng lại. Bỏ nó đi là mỗi giây có hai lần `ps` toàn máy, và `_prev_cpu`
+bị ghi đè hai lần nên %CPU của dashboard vỡ theo.
+
+**Poll thì bỏ lọt tool ngắn.** Một `Read` chạy 0.4 giây sinh ra rồi biến mất gọn trong khoảng
+giữa hai lần đọc, không bao giờ lọt vào `pending` - nhìn vào chỉ thấy nhân vật ngồi im trong
+khi agent thật đang làm liên tục. Vì vậy `claude.py` gắn thêm `tool` vào từng sự kiện và
+`events_since()` trả về mọi sự kiện sau một mốc; trang web xếp hàng rồi diễn lại từng nhịp
+`BURST_SEC`. Đây là lý do `_add_event` có tham số `tool` - đừng gỡ.
+
+Năm chỗ đã trả giá:
+
+1. **Canvas phải nằm ngoài tầm với của `morph()`.** app.js so DOM mỗi lần làm mới và thay
+   phần khác nhau. Để canvas vào vùng do `render()` quản lý thì cứ 3 giây nó bị thay bằng
+   canvas mới: mất context, nhân vật nhảy về vị trí đầu. Trong `index.html` canvas đứng
+   riêng, chỉ `#office-detail` là vùng động.
+2. **Trạng thái "đang ở đâu" phải theo ĐÍCH vừa tới, không theo việc có sở hữu bàn hay không.**
+   Người rời bàn đi vòng vòng vẫn giữ chỗ, nên `e.desk` khác null không có nghĩa là đang ngồi
+   ở bàn. Bản đầu lấy `e.desk` làm căn cứ nên đi vòng vòng xong là chuyển sang tư thế ngồi
+   ngay giữa lối đi, rồi kẹt luôn ở đó vì nhánh "quay về bàn" chỉ chạy khi chưa ngồi. Đó là
+   lý do có `e.goal`.
+3. **Chữ là toạ độ màn hình, phòng là toạ độ pixel gốc.** Hai hệ này co giãn khác nhau: ở bậc
+   phóng 1 (panel hẹp của VSCode) một cái tên rộng gấp đôi cái bàn. `drawBubbles()` vì thế
+   thoát sớm khi `scale < 2` - màu màn hình đã đủ nói ai đang làm gì.
+4. **Số bàn trong `office.js` phải khớp `MAX_AGENTS` trong `office.py`** (2 dãy x 5 = 10).
+   Lệch thì có agent không bao giờ được chia bàn, đứng mãi ngoài cửa.
+5. **Nền màn hình máy tính là thứ nói "bàn này có người" - không phải cái nhân vật.** Nhân vật
+   ngồi quay lưng nên chỉ nhô lên khỏi mặt bàn một mẩu nhỏ, lẫn vào màu gỗ. Bản đầu bàn có
+   người mà đang rảnh chỉ vẽ thêm đúng một chấm 4x1 pixel lên nền tối, nên nhìn lướt qua cả
+   phòng trông như không có ai - đúng phản hồi nhận được từ người dùng. Giờ có
+   `--of-screen-on`: 10 cái màn hình rải khắp phòng, cái nào sáng là cái đó có chủ đang ngồi.
+
+   Điều kiện là `ent.mode === 'sit'` chứ **không phải** `ent` khác null - cùng cái bẫy số 2:
+   người đi vòng vòng vẫn giữ bàn, lấy `ent` làm căn cứ thì có cảnh bàn sáng đèn trong khi chủ
+   nhân đang đứng giữa phòng.
+
+**Không có file ảnh nào.** Nhân vật vẽ bằng code trong `sprites.js`, bake một lần vào canvas
+ngoài màn hình lúc khởi động. Chủ ý chứ không phải tiết kiệm: thêm một file .png là thêm nó
+vào cả ba đường đóng gói lẫn bước soát danh sách file trong CI, quên một chỗ thì nhân vật
+biến mất mà tool vẫn chạy - đúng kiểu hỏng lặng lẽ `pricing.json` đã dính. Sprite pack có sẵn
+ngoài kia gần như luôn kèm giấy phép riêng cho phần asset, khác giấy phép phần code.
+
+Bảng ánh xạ tool -> hoạt cảnh (`ACTION_BY_TOOL`) nằm ở **backend**: cả ba vỏ dùng chung server,
+và đó là dữ liệu chứ không phải chuyện hiển thị. Câu chữ thì vẫn theo luật cũ - backend trả mã,
+`i18n.js` dựng câu. `office.js` có một bản `action_of_js` nhỏ chỉ dùng cho sự kiện phát lại;
+sửa bảng ở `office.py` thì sửa cả hai.
+
+Phóng to luôn theo **bội số nguyên** và kích thước canvas là `ROOM_W * scale`, không phải bề
+rộng khung chứa. Cho canvas `width:100%` là pixel art nhoè ngay, mà đó là thứ duy nhất khung
+nhìn này có để nhìn.
+
 ## Guard khi kill
 
 `snapshot.protected_pids()` chặn PID 0/1, chính AI Monitor và toàn bộ tiến trình cha của nó.
@@ -513,7 +659,7 @@ API trả lỗi rõ ràng thay vì im lặng. Giữ nguyên guard này khi thêm
 ```bash
 python3 -m compileall -q aimon        # cú pháp
 /usr/bin/python3 -c "import sys; sys.path.insert(0,'.'); import aimon.server"   # 3.9 compat
-node --check aimon/static/app.js      # cú pháp JS
+for f in aimon/static/*.js; do node --check "$f"; done   # cú pháp JS, TẤT CẢ file
 ./scripts/install_macos.sh            # tự kiểm tra app macOS đầu-cuối
 
 cd vscode-extension && npm ci && npx tsc --noEmit && npm test && npm run package

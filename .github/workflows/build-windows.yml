@@ -81,7 +81,12 @@ jobs:
           # đọc luôn snapshot: đây mới là chỗ lộ ra nếu đóng gói thiếu pricing.json / static
           $snap = Invoke-RestMethod "$url/api/snapshot" -TimeoutSec 30
           if (-not $snap.totals) { throw "Snapshot thiếu dữ liệu" }
+          # Soát tên khoá, không so $null: runner sạch thì agents là mảng rỗng hợp lệ.
+          $pulse = Invoke-RestMethod "$url/api/pulse" -TimeoutSec 30
+          if ($pulse.PSObject.Properties.Name -notcontains 'agents') { throw "Pulse thiếu agents" }
           Invoke-WebRequest "$url/static/app.js" -TimeoutSec 5 | Out-Null
+          Invoke-WebRequest "$url/static/office.js" -TimeoutSec 5 | Out-Null
+          Invoke-WebRequest "$url/static/sprites.js" -TimeoutSec 5 | Out-Null
           Write-Host "OK - exe chạy được, có đủ tài nguyên"
           Stop-Process -Id $p.Id -Force
 

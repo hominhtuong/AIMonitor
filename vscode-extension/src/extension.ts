@@ -5,6 +5,13 @@ import { AimonServerSession } from './serverSession';
 import { AimonStatusBar } from './statusBar';
 import { readConfig, updateConfig } from './config';
 import { findPythons } from './pythonFinder';
+import {
+  syncDetectedSettings,
+  detectAndFill,
+  pickClaudeDir,
+  pickPricingFile,
+  showResolvedConfig,
+} from './autoConfig';
 
 let session: AimonServerSession | undefined;
 let statusBar: AimonStatusBar | undefined;
@@ -35,6 +42,11 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand('aimon.selectPython', () => pickPython()),
+    vscode.commands.registerCommand('aimon.selectClaudeDir', () => pickClaudeDir()),
+    vscode.commands.registerCommand('aimon.selectPricingFile', () =>
+      pickPricingFile(context.extensionUri.fsPath)),
+    vscode.commands.registerCommand('aimon.detectSettings', () => detectAndFill(context)),
+    vscode.commands.registerCommand('aimon.showResolvedConfig', () => showResolvedConfig(context)),
 
     vscode.commands.registerCommand('aimon.restartServer', async () => {
       await session!.dispose();
@@ -62,6 +74,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   statusBar.start();
+
+  // Dò rồi điền sẵn ba ô đường dẫn, và dọn giá trị đã chết. Chạy nền, KHÔNG await: dò Python
+  // phải chạy thử từng bản nên mất vài giây, chặn activate() ở đó là cả cửa sổ VSCode đứng
+  // hình. Cũng không cần server chạy - dò là việc độc lập.
+  void syncDetectedSettings(context).catch(() => { /* dò hỏng thì cứ để trống, vẫn tự dò */ });
 }
 
 /**

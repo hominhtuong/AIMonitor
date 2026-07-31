@@ -54,6 +54,29 @@
   --flash: #a5b4fc;
   --th: #cbd5e1;
   --hover: #24314a;
+
+  /* Khung nhìn Văn phòng. office.js đọc mấy biến này bằng getComputedStyle rồi vẽ lên
+     canvas - canvas không nhận biến CSS trực tiếp, nhưng luật của repo vẫn phải giữ:
+     màu nằm ở đây, và THÊM BIẾN THÌ PHẢI THÊM Ở CẢ HAI BẢNG. */
+  --of-floor: #24324a;
+  --of-floor2: #1f2c42;
+  --of-wall: #33445f;
+  --of-wall2: #283549;
+  --of-sky: #4c7fb8;
+  --of-desk: #8a6144;
+  --of-desk2: #664532;
+  --of-screen: #0b1322;
+  /* Màn hình của bàn CÓ người nhưng đang rảnh. Phải sáng hơn --of-screen rõ rệt:
+     bàn có người mà màn hình tối thui thì nhìn lướt qua hệt bàn trống. */
+  --of-screen-on: #1c3352;
+  --of-metal: #4a5769;
+  --of-rug: #2e4159;
+  --of-plant: #2f8f5b;
+  --of-shadow: rgba(0, 0, 0, .28);
+  --of-bubble: #0b1322;
+  --of-bubble-fg: #e2e8f0;
+  --of-label: #dbe4f0;
+  --of-outline: #131c2b;
 }
 
 :root[data-theme="light"] {
@@ -106,6 +129,26 @@
   --flash: #4338ca;
   --th: #475569;
   --hover: #eef2f7;
+
+  /* Văn phòng, nền sáng: cùng bộ khoá với bảng trên. Thiếu một khoá ở đây thì office.js
+     rơi về giá trị dự phòng trong code và màu sẽ lệch hẳn khỏi phần còn lại của trang. */
+  --of-floor: #e6ddd0;
+  --of-floor2: #dbd0c0;
+  --of-wall: #f2ece4;
+  --of-wall2: #ddd3c6;
+  --of-sky: #9ec9ef;
+  --of-desk: #c08e5f;
+  --of-desk2: #9a6c45;
+  --of-screen: #22303f;
+  --of-screen-on: #3d5f8a;
+  --of-metal: #9aa7b6;
+  --of-rug: #cbd8e4;
+  --of-plant: #3a9e68;
+  --of-shadow: rgba(60, 45, 30, .16);
+  --of-bubble: #1f2937;
+  --of-bubble-fg: #f8fafc;
+  --of-label: #4a3b2c;
+  --of-outline: #7d6a55;
 }
 
 * { box-sizing: border-box; }
@@ -220,6 +263,38 @@ label.chk { color: var(--muted); font-size: 13px; display: inline-flex; align-it
 .chip[data-kind="copilot"] .dot { background: var(--amber); }
 .chip[data-kind="automation"] .dot { background: var(--violet); }
 .chip[data-kind="ollama"] .dot, .chip[data-kind="local-llm"] .dot { background: var(--violet); }
+.chip[data-kind="claude-code"] .dot { background: var(--accent); }
+.chip[data-kind="gemini"] .dot { background: var(--sky); }
+.chip[data-kind="cursor"] .dot { background: var(--red); }
+
+/* ------------------------------------------------- thanh lọc loại agent
+   Cùng hình dạng với .chips phía trên nhưng bấm được. Loại đang TẮT làm mờ hẳn và bỏ màu
+   chấm, để nhìn lướt qua biết ngay mình đang giấu cái gì - đây là chỗ người dùng sẽ quay
+   lại khi thấy dashboard trống hơn mong đợi. */
+/* Nằm dưới thanh tab: kéo lên sát đường gạch chân của tab để đọc ra ngay là "bộ lọc của
+   tab này", không phải một hàng điều khiển riêng lơ lửng giữa trang. */
+.kindbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: -8px 0 18px; }
+/* .kindbar đặt display:flex nên thuộc tính hidden của HTML không tự ăn - phải nói rõ. */
+.kindbar[hidden] { display: none; }
+.kindbar .lbl { font-size: 12px; color: var(--dim); }
+/* Bật và tắt phải nhìn ra ngay từ xa. Bản đầu chỉ đổi opacity .5 với một cái chấm rỗng -
+   trên nền tối gần như không thấy gì, người dùng không biết mình đang bật hay tắt cái nào.
+   Nên tách hẳn ba thứ cùng lúc: nền, viền và màu chữ. Chấm giữ nguyên màu riêng của từng
+   loại khi bật (đừng đặt .chip.pick .dot ở đây, nó sẽ đè mất mấy màu đó). */
+.chip.pick { cursor: pointer; }
+.chip.pick[aria-pressed="true"] {
+  background: var(--info-bg); border-color: var(--accent-2); color: var(--text); font-weight: 600;
+}
+.chip.pick[aria-pressed="false"] { background: none; border-style: dashed; color: var(--dim); }
+.chip.pick[aria-pressed="false"] b { color: var(--dim); font-weight: 400; }
+.chip.pick[aria-pressed="false"] .dot { background: transparent; box-shadow: inset 0 0 0 1px var(--dim); }
+.chip.pick:hover { border-color: var(--accent-2); color: var(--text); }
+.chip.ghost {
+  cursor: pointer; background: none; border-style: dashed; color: var(--dim); font-size: 12px;
+}
+.chip.ghost:hover { color: var(--text); border-color: var(--accent-2); }
+/* Dòng "bộ lọc đang ẩn N agent" - phải thấy được, nhưng không được ồn hơn dữ liệu thật. */
+.hint.filtered { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 
 /* ---------------------------------------------------------------- tabs */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
@@ -383,3 +458,47 @@ body.compact .ubox .pct { font-size: 18px; }
 body.compact .chips { gap: 6px; margin-bottom: 10px; }
 /* Bảng tiến trình cần bề ngang: cho cuộn ngang trong khung riêng thay vì ép cả trang rộng ra. */
 body.compact table { display: block; overflow-x: auto; white-space: nowrap; }
+
+/* ------------------------------------------------------------- khung nhìn Văn phòng
+   Sân khấu chỉ căn giữa cái canvas; kích thước thật do office.js đặt và luôn là bội số
+   nguyên của kích thước phòng. Đừng cho canvas `width:100%` - kéo giãn bằng CSS là pixel
+   art nhoè ngay, mà đó chính là thứ duy nhất khung nhìn này có để nhìn. */
+.office-stage {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  /* Khung hẹp hơn cả căn phòng ở bậc phóng nhỏ nhất thì cho cuộn ngang trong khung này,
+     đừng để nó đẩy rộng cả trang ra. Cùng cách xử lý với bảng tiến trình ở chế độ compact. */
+  overflow-x: auto;
+}
+
+#office-canvas {
+  display: block;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px var(--shadow);
+  image-rendering: pixelated;
+}
+
+.office-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.office-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.office-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--dim);
+}
+
+/* Panel hẹp: bỏ padding của sân khấu để phòng còn chỗ phóng to thêm một bậc. */
+body.compact .office-stage { padding: 4px; border-radius: 8px; }
+body.compact .office-legend { font-size: 11px; gap: 4px 10px; }

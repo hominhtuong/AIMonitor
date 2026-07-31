@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.4.0
+
+- **Only the agent kinds you use.** The dashboard and the Office view now start out showing
+  Claude Code alone. Most machines run background processes that get classified as AI without
+  you ever launching them - the Copilot helpers bundled with VS Code, for one - and showing all
+  of them buries the sessions you came to look at. A **Show:** row under the tabs lists the
+  kinds present with a count each; click to turn any of them on or off. Your choice is
+  remembered and covers both views. The starting set is the new `AI Kinds` setting.
+
+  Nothing disappears silently: whenever the filter hides something, the page says how many and
+  offers a one-click way to show everything.
+
+- **The path settings fill themselves in.** Python, Claude data folder and pricing file used to
+  sit empty, which reads as "the tool found nothing" rather than "detected automatically". They
+  are now filled with what is actually in use the first time the extension runs, and each has a
+  **Detect again** button in the settings page that scans and offers a list to pick from. Two
+  new commands, **Detect and Fill In Settings** and **Show Settings In Use**, do the same from
+  the Command Palette.
+
+  A path that stops working is repaired on the next start - which matters for the bundled
+  pricing file, since its folder is renamed by every extension update, and a stale path there
+  silently zeroes every cost on the dashboard. Clearing a box goes back to detecting each time,
+  and the extension will not fill it in again.
+
+- **Office view.** A new tab shows every running agent as a pixel character in a small office.
+  An agent with work to do sits at its desk, and its screen colour says what kind of work:
+  editing files, reading and searching, running commands, fetching the web, planning,
+  delegating. Leave one idle for 90 seconds and it gets up and wanders. Sub-agents appear as
+  smaller helpers beside whoever called them, and agents that shut down walk out of the room.
+  Click a computer to open that session in full, process tree included.
+
+  With several agents running it reads faster than the cards - you see who is busy without
+  reading a word. The room holds ten desks; the counter above it says how many are not shown.
+
+  It works in both the narrow panel and the editor tab, and follows your colour theme. There
+  are no image files: the characters are drawn in code, so nothing extra ships in the package.
+
 ## 1.3.0
 
 - **Status bar item.** AI Monitor now sits at the bottom of the window showing your Session and
