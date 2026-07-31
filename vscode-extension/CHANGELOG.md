@@ -1,8 +1,42 @@
 # Changelog
 
+## 1.6.0
+
+- **Three more character sets and a new default.** *Voyage* (36 sailors), *Ninja* (36 shinobi)
+  and *The Crew* (5) join the four existing sets, and Voyage is now what you get out of the
+  box - with 36 characters the room never repeats a face, while a set of ten starts over past
+  the tenth agent.
+
+- **Bring your own characters.** The **+** tile next to the sets takes any picture holding
+  several characters, lifts the background, cuts each one out and fits them to the office
+  format. The picture never leaves your machine - it is read in the page, never uploaded, and
+  sets you add are not part of the released extension.
+
+- **Rooms you can pick.** Four of them: Classic, Library, Loft and Garden. The furniture layout
+  is identical in all four - only the floor, walls and decor change - so switching rooms never
+  shifts a character or a desk by a pixel.
+
+- **Chairs you actually sit in.** Every desk has an office chair, and agents now walk in from
+  the side and sit down in it instead of rising up through it from below. Leaving works the
+  same way in reverse: step out sideways first, then head for the door.
+
+- **A little celebration when a session finishes.** The agent throws confetti and bounces in
+  its own chair for two seconds before getting up and walking out. Sessions used to just
+  vanish at the door with nothing marking that the work was done.
+
+- **Clicking a character now does something you can see.** It opens that agent's panel *and*
+  scrolls to the part you wanted: the process tree if the agent is working, the character
+  picker if it is idle. Hovering someone who is wandering makes them stop and turn to face
+  you - and they now go back to what they were doing as soon as you move the mouse away or
+  click, instead of standing there forever.
+
+- Fixed: the character picker and the process-tree heading sat flush against the edge of the
+  session card instead of lining up with everything else in it. The office cat also kept
+  crossing in front of people's faces; it now stays in the strip below their feet.
+
 ## 1.5.0
 
-- **Four character sets, and every agent gets a different one.** The office crew was redrawn
+- **Five character sets, and every agent gets a different one.** The office crew was redrawn
   from scratch in a chibi style - head nearly half the height, big eyes with a highlight,
   blushed cheeks, and a dark outline around the silhouette - after the honest feedback that the
   old ones were not cute. There are four sets of ten now:
@@ -12,6 +46,7 @@
   - **Pets** - cat, rabbit, dog, black cat, sheep, cow, pig, chick, duckling, frog
   - **Slimes** - ten coloured blobs, some with a leaf, a crown or a cherry on top
   - **Mascots** - ten round mascots, each under a different hat
+  - **Voyage** - thirty-six sailors: straw hats, goggles, horns, beards and masks
 
   Pick a set under the room and the whole room switches to it, each agent taking a *different*
   character from it; once the set runs out it starts over. Click any character in the room and

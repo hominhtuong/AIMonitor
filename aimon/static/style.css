@@ -71,6 +71,8 @@
   --of-screen-on: #1c3352;
   --of-metal: #4a5769;
   --of-rug: #2e4159;
+  --of-chair: #46506b;
+  --of-chair2: #313a50;
   --of-plant: #2f8f5b;
   --of-shadow: rgba(0, 0, 0, .28);
   --of-bubble: #0b1322;
@@ -143,6 +145,8 @@
   --of-screen-on: #3d5f8a;
   --of-metal: #9aa7b6;
   --of-rug: #cbd8e4;
+  --of-chair: #9aa8bd;
+  --of-chair2: #74839a;
   --of-plant: #3a9e68;
   --of-shadow: rgba(60, 45, 30, .16);
   --of-bubble: #1f2937;
@@ -539,6 +543,7 @@ body.compact table { display: block; overflow-x: auto; white-space: nowrap; }
 }
 .skins .skin .del:hover { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger-fg); }
 /* Ô "thêm bộ": nét đứt để đọc ra ngay đây là chỗ trống chờ thêm, không phải một bộ có sẵn. */
+.skins .skin.room canvas { border-radius: 4px; image-rendering: pixelated; }
 .skins .skin.add { border-style: dashed; justify-content: center; }
 .skins .skin.add .plus { font-size: 22px; line-height: 1; color: var(--dim); height: 40px; display: flex; align-items: center; }
 .skins .skin.add:hover .plus { color: var(--accent-2); }
@@ -552,6 +557,10 @@ body.compact .skins .skin { min-width: 54px; padding: 5px 6px 4px; }
 
 /* Dãy đổi nhân vật cho riêng một agent, nằm trong bảng chi tiết khi bấm vào một người. */
 .agent-skins { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 10px 0 2px; }
+/* Trong thẻ phiên, mọi khối phải thụt vào 16px như .grid / .doing. Hai khối dưới đây sinh ra
+   cho bảng chi tiết Văn phòng nên mang margin ngang 0 của mặc định, và dính sát mép thẻ. */
+.sess .agent-skins { margin: 12px 16px 4px; }
+.sess .h2row { margin: 18px 16px 10px; }
 .agent-skins .lbl { font-size: 12px; color: var(--dim); margin-right: 3px; }
 .agent-skins button.pick { padding: 2px 3px; line-height: 0; border-radius: 7px; }
 .agent-skins button.pick canvas { display: block; image-rendering: pixelated; }

@@ -15,6 +15,10 @@ Nhìn rõ các công cụ AI đang làm gì với máy của bạn.
 [![Dependencies](https://img.shields.io/badge/dependencies-none-64748b)](https://github.com/hominhtuong/AIMonitor/blob/main/CLAUDE.md)
 [![Downloads](https://img.shields.io/github/downloads/hominhtuong/AIMonitor/total?color=f59e0b)](https://github.com/hominhtuong/AIMonitor/releases)
 
+<img src="assets/board.png" width="820" alt="Khung nhìn Văn phòng: mỗi agent AI đang chạy là một nhân vật ngồi ở bàn của mình">
+
+*Mọi agent AI đang chạy trên máy, mỗi đứa một bàn làm việc.*
+
 </div>
 
 ---
@@ -196,13 +200,14 @@ lấy dữ liệu web. Rảnh quá một phút rưỡi thì nhân vật đứng 
 thành người nhỏ hơn đứng cạnh bàn của người gọi nó. Bấm vào máy tính nào thì mở đầy đủ phiên
 đó, kèm cả cây tiến trình.
 
-Có **bốn bộ nhân vật**, mỗi bộ mười người: Văn phòng, Thú cưng, Slime, Mascot. Mở mục **Bộ
-nhân vật** ngay dưới căn phòng là thấy cả bốn kèm hình xem trước; chọn một bộ thì cả phòng đổi
+Có **bảy bộ nhân vật**: Văn phòng, Thú cưng, Slime, Mascot mỗi bộ mười người, Năm anh em năm
+người, Hải trình và Nhẫn giả mỗi bộ ba mươi sáu người. Mở mục **Bộ
+nhân vật** ngay dưới căn phòng là thấy hết kèm hình xem trước; chọn một bộ thì cả phòng đổi
 theo, mỗi agent một nhân vật khác nhau, đông quá thì quay vòng dùng lại. Bấm vào một nhân vật
 trong phòng thì bảng chi tiết hiện thêm dãy nhân vật của bộ đó - bấm một cái là đổi riêng cho
 người đó thôi. Cả hai lựa chọn đều được nhớ lại.
 
-Muốn dùng nhân vật của riêng mình thì bấm nút **+** cạnh bốn bộ và chọn một tấm ảnh bất kỳ có
+Muốn dùng nhân vật của riêng mình thì bấm nút **+** cạnh các bộ có sẵn và chọn một tấm ảnh có
 nhiều nhân vật. Tool tự tách nền, tự cắt từng nhân vật và đưa về đúng khuôn. **Ảnh không rời
 khỏi máy bạn**: đọc ngay trong trang, không gửi đi đâu, và bộ bạn thêm không nằm trong bản phát
 hành. Ảnh nền phẳng và các nhân vật cách nhau thì tách chuẩn nhất - xem

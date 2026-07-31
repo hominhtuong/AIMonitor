@@ -70,7 +70,14 @@ jobs:
           for p in packs:
               n = i18n.count("'office.pack_%s':" % p)
               assert n == 2, f'office.pack_{p} co {n} ban dich, phai co 2 (en + vi)'
-          print(f'{len(packs)} bo, khop ca ba noi va du 2 ban dich')
+          # Kiểu phòng chỉ khai ở office.js nên không có gì để đối chiếu chéo, nhưng nhãn
+          # vẫn phải đủ hai ngôn ngữ - thiếu thì bảng chọn hiện ra chữ "office.room_loft".
+          rooms = re.findall(r"^\s*id: '(\w+)',$", open('aimon/static/office.js', encoding='utf-8').read(), re.M)
+          assert rooms, 'khong doc duoc kieu phong nao tu office.js'
+          for r in rooms:
+              n = i18n.count("'office.room_%s':" % r)
+              assert n == 2, f'office.room_{r} co {n} ban dich, phai co 2 (en + vi)'
+          print(f'{len(packs)} bo, {len(rooms)} kieu phong, khop va du 2 ban dich')
           PY
 
       - name: Đóng gói .vsix
