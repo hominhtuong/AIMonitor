@@ -59,7 +59,9 @@ jobs:
           # Thiếu bất kỳ thứ nào dưới đây thì extension vẫn cài được nhưng chết lúc chạy
           # hoặc lên store thiếu thông tin, nên bắt ngay tại đây.
           for f in extension/dist/extension.js extension/pricing.json \
-                   extension/aimon/server.py extension/aimon/static/app.js \
+                   extension/aimon/server.py extension/aimon/office.py \
+                   extension/aimon/static/app.js \
+                   extension/aimon/static/office.js extension/aimon/static/sprites.js \
                    extension/media/icon.svg extension/images/icon.png \
                    extension/README.md extension/CHANGELOG.md extension/LICENSE.txt; do
             echo "$files" | grep -qx "$f" || { echo "THIẾU $f"; exit 1; }
@@ -103,9 +105,15 @@ jobs:
           echo "url=$url"
           curl -fsS "$url/api/version" | head -c 300; echo
           curl -fsS "$url/static/app.js" -o /dev/null
+          curl -fsS "$url/static/office.js" -o /dev/null
+          curl -fsS "$url/static/sprites.js" -o /dev/null
           # totals rỗng nghĩa là pricing.json không nằm đúng chỗ claude.py đi tìm
           curl -fsS "$url/api/snapshot" \
             | python -c "import json,sys; d=json.load(sys.stdin); assert d.get('totals'), 'snapshot thiếu totals'; print('totals OK')"
+          # Khung nhìn Văn phòng: phải có khoá `agents`, kể cả khi máy build không chạy AI
+          # nào (lúc đó là danh sách rỗng). Thiếu hẳn khoá nghĩa là office.py hỏng.
+          curl -fsS "$url/api/pulse" \
+            | python -c "import json,sys; d=json.load(sys.stdin); assert 'agents' in d, 'pulse thiếu agents'; print('pulse OK')"
           # Tắt qua /api/quit chứ không kill: chính đường extension dùng, và là cách duy
           # nhất dọn được instance.json trên Windows.
           curl -fsS -X POST "$url/api/quit" -o /dev/null
@@ -200,8 +208,17 @@ jobs:
           Write-Host "url=$url"
           Invoke-RestMethod "$url/api/version" -TimeoutSec 5 | ConvertTo-Json -Compress | Write-Host
           Invoke-WebRequest "$url/static/app.js" -TimeoutSec 5 | Out-Null
+          Invoke-WebRequest "$url/static/office.js" -TimeoutSec 5 | Out-Null
+          Invoke-WebRequest "$url/static/sprites.js" -TimeoutSec 5 | Out-Null
           $snap = Invoke-RestMethod "$url/api/snapshot" -TimeoutSec 30
           if (-not $snap.totals) { throw "Snapshot thiếu totals - pricing.json không đúng chỗ" }
+          # /api/pulse gọi PowerShell + CIM qua proc_util để liệt kê tiến trình - đây là chỗ
+          # lộ ra nếu đường đó hỏng riêng trên Windows.
+          # Soát TÊN KHOÁ chứ không so $null: runner không chạy AI nào nên agents là mảng
+          # rỗng, mà PowerShell coi mảng rỗng gần như $null tuỳ ngữ cảnh - so kiểu đó thì
+          # job đỏ vì máy build sạch, không phải vì code hỏng.
+          $pulse = Invoke-RestMethod "$url/api/pulse" -TimeoutSec 30
+          if ($pulse.PSObject.Properties.Name -notcontains 'agents') { throw "Pulse thiếu agents" }
 
           # Đây là lý do job này tồn tại: trên Windows, giết tiến trình KHÔNG chạy khối
           # finally của server.py nên instance.json ở lại. Extension vì thế gọi /api/quit.
@@ -250,8 +267,12 @@ jobs:
           echo "url=$url"
           curl -fsS "$url/api/version"; echo
           curl -fsS "$url/static/app.js" -o /dev/null
+          curl -fsS "$url/static/office.js" -o /dev/null
+          curl -fsS "$url/static/sprites.js" -o /dev/null
           curl -fsS "$url/api/snapshot" \
             | /usr/bin/python3 -c "import json,sys; d=json.load(sys.stdin); assert d.get('totals'), 'snapshot thiếu totals'; print('totals OK')"
+          curl -fsS "$url/api/pulse" \
+            | /usr/bin/python3 -c "import json,sys; d=json.load(sys.stdin); assert 'agents' in d, 'pulse thiếu agents'; print('pulse OK')"
           curl -fsS -X POST "$url/api/quit" -o /dev/null
           sleep 2
           if [ -f "$state" ]; then

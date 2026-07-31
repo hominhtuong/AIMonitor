@@ -75,6 +75,7 @@ export class DashboardPanel {
         theme: resolveTheme(this.config.theme, editorIsLight(vscode.window.activeColorTheme.kind)),
         refreshSeconds: this.config.refreshSeconds,
         compact: false,
+        aiKinds: this.config.aiKinds,
       });
       this.panel.webview.html = iframePage(url);
     } catch (err) {

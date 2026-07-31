@@ -186,6 +186,24 @@ at the top right. Your choice is remembered.
 
 Below that are closed sessions, viewable for today or the last 7 days.
 
+**Only the agent kinds you actually use.** The dashboard starts out showing Claude Code alone.
+Every machine runs background processes that get classified as AI without you ever launching
+them - the Copilot helpers bundled with VS Code, for one - and showing all of them buries what
+you came to look at. The **"Show:"** row just below the tabs lists the kinds present on this
+machine with a count each; click one to turn it on or off, or "All types" to see everything.
+Your choice is remembered, and it applies to the Office tab too.
+
+**"Office" tab** - the same information as a tiny pixel office. Every running agent is a
+character: it sits at a desk and works when it has something to do, and its screen shows what
+kind of work that is - blue for editing files, green for reading and searching, amber for
+running commands, purple for fetching the web. Leave an agent idle for a minute and a half and
+it gets up and wanders around. Sub-agents show up as smaller helpers standing next to whoever
+called them. Click any computer to open that session in full, process tree included.
+
+It is a quicker read than the cards when several agents run at once: you see who is busy
+without reading a word. The room holds ten desks; if more agents are running, the count above
+the room says how many are not shown.
+
 **"Session history" tab** - answers "which task burned the most?". Grouped by project and by
 session, with a share column, filtering and sorting. This tab only scans when you open it.
 
@@ -262,13 +280,26 @@ the Windows build read `~/.aimon/config.json`, which you create yourself:
   "refresh_seconds": 5,
   "claude_dir": "~/work/.claude",
   "pricing_file": "~/my-prices.json",
-  "port": 8899
+  "port": 8899,
+  "ai_kinds": ["claude-code", "gemini"]
 }
 ```
 
 Every key is optional. A broken or missing file just means defaults - it never stops the
 dashboard from starting. The light/dark button in the header overrides `theme` for that
 machine.
+
+`ai_kinds` is the set of agent kinds shown on open - use `["*"]` for all of them. Valid values:
+`claude-code`, `codex`, `copilot`, `gemini`, `cursor`, `ollama`, `local-llm`. It is a starting
+point only: the "Show:" row on the page still turns kinds on and off, and that choice is what
+gets remembered.
+
+In the VSCode extension the three path settings (Python, Claude data folder, pricing file) are
+**filled in for you** after the first run, so you can see what the tool is actually using
+instead of three blank boxes. Each one has a **Detect again** button that scans and lets you
+pick from a list. A path that stops working - the bundled pricing file after an extension
+update, say - is replaced on the next start. Clearing a box puts it back to detecting every
+time, and the extension will not fill it in again.
 
 ---
 

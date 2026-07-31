@@ -89,6 +89,28 @@ test('dashboardUrl carries the settings the page reads', () => {
   assert.equal(parsed.searchParams.get('compact'), '1');
 });
 
+test('dashboardUrl gửi kèm bộ lọc loại agent', () => {
+  const u = dashboardUrl('http://127.0.0.1:8899/', {
+    theme: 'dark',
+    refreshSeconds: 3,
+    compact: false,
+    aiKinds: ['claude-code', 'codex'],
+  });
+  assert.equal(new URL(u).searchParams.get('kinds'), 'claude-code,codex');
+});
+
+test('không có loại nào thì KHÔNG gửi kinds', () => {
+  // Gửi `kinds=` rỗng là ra lệnh cho server "ẩn hết". Ở đây ý là "không ép gì cả", nên
+  // tham số phải vắng mặt hẳn để trang tự lấy lựa chọn đã lưu.
+  const u = dashboardUrl('http://127.0.0.1:8899/', {
+    theme: 'dark',
+    refreshSeconds: 3,
+    compact: false,
+    aiKinds: [],
+  });
+  assert.equal(new URL(u).searchParams.has('kinds'), false);
+});
+
 test('the tab view asks for no compact flag at all', () => {
   const u = dashboardUrl('http://127.0.0.1:8899/', {
     theme: 'dark',

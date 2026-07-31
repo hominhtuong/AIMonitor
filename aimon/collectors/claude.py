@@ -185,8 +185,13 @@ def _brief(name: str, inp) -> str:
     return name
 
 
-def _add_event(state: dict, ts: float, kind: str, text: str) -> None:
-    state["events"].append({"ts": ts, "kind": kind, "text": text[:160]})
+def _add_event(state: dict, ts: float, kind: str, text: str, tool: str = "") -> None:
+    # `tool` để khung nhìn Văn phòng biết diễn hoạt cảnh nào cho sự kiện đã trôi qua giữa hai
+    # lần đọc. Tool chạy dưới 1 giây thì không bao giờ lọt vào `pending`, chỉ còn thấy ở đây.
+    ev = {"ts": ts, "kind": kind, "text": text[:160]}
+    if tool:
+        ev["tool"] = tool
+    state["events"].append(ev)
     if len(state["events"]) > MAX_EVENTS:
         del state["events"][: len(state["events"]) - MAX_EVENTS]
 
@@ -305,7 +310,7 @@ def _process(state: dict, d: dict, light: bool) -> None:
                     "ts": ts or time.time(),
                     "done_ts": None,
                 }
-            _add_event(state, ts, "tool", brief)
+            _add_event(state, ts, "tool", brief, tool=name)
         return
 
     if typ == "user" and not light:
@@ -322,7 +327,8 @@ def _process(state: dict, d: dict, light: bool) -> None:
                         state["agents"][tid]["done_ts"] = ts or time.time()
                     if pend:
                         dur = max(0.0, (ts or time.time()) - pend["ts"])
-                        _add_event(state, ts, "result", f"{pend['name']} xong ({dur:.1f}s)")
+                        _add_event(state, ts, "result", f"{pend['name']} xong ({dur:.1f}s)",
+                                   tool=pend["name"])
                 elif blk.get("type") == "text" and isinstance(blk.get("text"), str):
                     texts.append(blk["text"])
             if texts and not had_result and not side:
@@ -689,3 +695,27 @@ def events(session_id: str) -> list[dict]:
         if state["session_id"] == session_id:
             return list(reversed(state["events"]))
     return []
+
+
+def events_since(since: float, limit: int = 80) -> list[dict]:
+    """Sự kiện của MỌI phiên sau mốc `since`, theo thứ tự thời gian tăng dần.
+
+    Khung nhìn Văn phòng poll theo nhịp cố định, nên tool nào chạy xong trước lần đọc kế
+    tiếp sẽ không bao giờ xuất hiện trong `pending` - nhìn vào chỉ thấy agent ngồi im
+    trong khi thật ra nó đang làm liên tục. Danh sách này để phát lại đúng những nhịp đó.
+
+    `since = 0` trả về rỗng: mới mở khung nhìn thì không có gì để phát lại, và trả cả lịch
+    sử 7 ngày ra thì vừa nặng vừa vô nghĩa.
+    """
+    if since <= 0:
+        return []
+    out: list[dict] = []
+    with _LOCK:
+        for state in _STATE.values():
+            sid = state["session_id"]
+            for e in state["events"]:
+                ts = e.get("ts") or 0
+                if ts > since:
+                    out.append({"session": sid, **e})
+    out.sort(key=lambda e: e["ts"])
+    return out[-limit:]

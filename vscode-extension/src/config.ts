@@ -22,6 +22,7 @@ export interface AimonConfig {
   theme: ThemeChoice;
   claudeDataDir: string;
   pricingFile: string;
+  aiKinds: string[];
 }
 
 export function readConfig(): AimonConfig {
@@ -38,6 +39,7 @@ export function readConfig(): AimonConfig {
     theme: (c.get<ThemeChoice>('theme') ?? 'auto'),
     claudeDataDir: (c.get<string>('claudeDataDir') ?? '').trim(),
     pricingFile: (c.get<string>('pricingFile') ?? '').trim(),
+    aiKinds: c.get<string[]>('aiKinds') ?? ['claude-code'],
   };
 }
 

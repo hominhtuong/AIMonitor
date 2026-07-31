@@ -37,6 +37,7 @@ from .collectors import ports as PO  # noqa: E402
 from .collectors import procs as P  # noqa: E402
 from . import instance as INST  # noqa: E402
 from . import config_file as CFG  # noqa: E402
+from . import office as OFF  # noqa: E402
 from . import proc_util as PU  # noqa: E402
 from . import snapshot as SNAP  # noqa: E402
 
@@ -46,7 +47,7 @@ BASE = os.path.join(sys._MEIPASS, "aimon") if getattr(sys, "frozen", False) else
 STATIC_DIR = os.path.join(BASE, "static")
 IS_WINDOWS = sys.platform.startswith("win")
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 DEFAULT_PORT = 8899
 PORT_SCAN_TRIES = 20  # 8899..8919 rồi mới xin cổng ngẫu nhiên
@@ -206,6 +207,31 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/snapshot":
             try:
                 return self._json(SNAP.build())
+            except Exception as e:
+                return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
+        if route == "/api/pulse":
+            # Khung nhìn Văn phòng, nhịp ~1 giây. Nhẹ hơn /api/snapshot nhiều: không bảng
+            # tiến trình, không cổng, không Docker, không hạn mức.
+            # keep_blank_values BẮT BUỘC: mặc định parse_qs vứt thẳng tham số có giá trị rỗng,
+            # nên `?kinds=` (người dùng bỏ chọn hết) trở thành y hệt "không gửi kinds" và
+            # server lại trả về tất cả - đúng ngược ý người dùng.
+            q = parse_qs(u.query, keep_blank_values=True)
+            try:
+                since = float((q.get("since") or ["0"])[0])
+            except ValueError:
+                since = 0.0
+            # KHÔNG có tham số = không lọc; `?kinds=*` cũng là không lọc; `?kinds=` (rỗng) là
+            # người dùng bỏ chọn hết, phải trả về danh sách rỗng chứ không phải tất cả. Vì vậy
+            # phải phân biệt "vắng mặt" với "rỗng", không dùng được `or [""]`.
+            #
+            # Bộ lọc do trang web quyết (nó mới biết người dùng vừa bấm gì), server chỉ áp
+            # dụng - nhờ vậy hai cửa sổ VSCode lọc khác nhau được dù dùng chung một server.
+            raw_kinds = q.get("kinds")
+            kinds = None
+            if raw_kinds is not None and raw_kinds[0] != "*":
+                kinds = {k for k in raw_kinds[0].split(",") if k}
+            try:
+                return self._json(OFF.build(since, kinds))
             except Exception as e:
                 return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
         if route == "/api/events":

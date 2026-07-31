@@ -80,11 +80,21 @@ export function severityOf(u: UsageSummary | null): 'ok' | 'warn' | 'danger' {
  */
 export function dashboardUrl(
   base: string,
-  opts: { theme: 'dark' | 'light'; refreshSeconds: number; compact: boolean }
+  opts: {
+    theme: 'dark' | 'light';
+    refreshSeconds: number;
+    compact: boolean;
+    /** Loại agent hiện lúc mở lần đầu. Bỏ trống = để trang tự quyết. */
+    aiKinds?: string[];
+  }
 ): string {
   const u = new URL(base);
   u.searchParams.set('theme', opts.theme);
   u.searchParams.set('refresh', String(opts.refreshSeconds));
   if (opts.compact) u.searchParams.set('compact', '1');
+  // Khác `theme`: đây chỉ là giá trị KHỞI ĐẦU. Lựa chọn người dùng bấm trên trang được lưu
+  // lại và thắng tham số này ở lần mở sau - bấm tắt một loại xong tải lại mà nó hiện lại
+  // thì cái nút coi như hỏng. `theme` phải thắng vì dashboard buộc bám màu của editor.
+  if (opts.aiKinds && opts.aiKinds.length) u.searchParams.set('kinds', opts.aiKinds.join(','));
   return u.toString();
 }

@@ -21,7 +21,50 @@ const S = {
   fx: true,
   hist: null,        // kết quả /api/sessions - nạp lười, không nằm trong vòng 3 giây
   histBusy: false,
+  // Loại agent đang được hiện. Mặc định chỉ Claude Code: máy nào cũng có sẵn một mớ tiến
+  // trình bị phân loại là AI mà người dùng không hề chạy (Copilot của VSCode, Codex đi kèm
+  // editor), bày hết ra thì che mất thứ thật sự cần theo dõi.
+  kinds: new Set(['claude-code']),
 };
+
+/* ------------------------------------------------------- lọc theo loại agent */
+const KINDS_KEY = 'aimon.kinds';
+
+/** Nhãn của một loại. Nhãn chung (Other, Browser) thì dịch, tên sản phẩm thì giữ nguyên -
+ *  bảng tên lấy từ server nên không phải giữ bản sao thứ hai của KIND_LABELS ở đây. */
+function kindName(kind) {
+  const key = 'kind.' + kind;
+  const v = t(key);
+  if (v !== key) return v;
+  const known = (window.AIMON_CONFIG || {}).known_kinds || {};
+  return known[kind] || kind;
+}
+
+function knownKinds() {
+  return Object.keys((window.AIMON_CONFIG || {}).known_kinds || {});
+}
+
+/** Chuỗi "a,b" hoặc "*" => tập loại. `*` nghĩa là tất cả những loại server biết. */
+function parseKinds(str) {
+  const parts = String(str == null ? '' : str).split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.includes('*')) return new Set(knownKinds());
+  return new Set(parts);
+}
+
+/** Tham số gửi cho /api/pulse. Chuỗi rỗng là hợp lệ và có nghĩa "không chọn loại nào" -
+ *  server phân biệt được với việc không gửi tham số. */
+function kindsParam() {
+  return Array.from(S.kinds).sort().join(',');
+}
+
+function saveKinds() {
+  try { localStorage.setItem(KINDS_KEY, kindsParam()); } catch (e) { /* chế độ riêng tư */ }
+}
+
+/** Chỉ giữ những agent thuộc loại đang chọn. */
+function visibleAi() {
+  return ((S.snap && S.snap.ai) || []).filter((r) => S.kinds.has(r.kind));
+}
 
 /* ------------------------------------------------------------- tiện ích */
 const $ = (sel) => document.querySelector(sel);
@@ -289,6 +332,7 @@ function renderAll() {
   renderUsage();
   renderKpis();
   renderChips();
+  renderKindBar();
   renderLive();
   renderClosed();
   renderRes();
@@ -404,6 +448,36 @@ function renderKpis() {
       <div class="n" data-flash="1">${esc(c.n)}</div>
       <div class="l">${esc(c.l)}</div><div class="s">${esc(c.s)}</div>
     </div>`).join(''));
+}
+
+/** Thanh lọc loại agent. Dùng chung cho tab AI & Agent và tab Văn phòng - một bộ lọc, hai
+ *  khung nhìn, để không ai phải chỉnh hai lần.
+ *
+ *  Chỉ liệt kê loại ĐANG có mặt cộng với loại đang chọn. Bày cả bảy loại server biết thì
+ *  thanh này dài gấp ba mà sáu cái trong đó không bao giờ có ai. */
+function renderKindBar() {
+  const counts = {};
+  ((S.snap && S.snap.ai) || []).forEach((r) => { counts[r.kind] = (counts[r.kind] || 0) + 1; });
+  const all = new Set(Object.keys(counts));
+  S.kinds.forEach((k) => all.add(k));
+  const list = Array.from(all).sort();
+  if (!list.length) { render('#kindbar', ''); return; }
+
+  const everything = knownKinds();
+  const isAll = everything.length > 0 && everything.every((k) => S.kinds.has(k));
+
+  render('#kindbar',
+    `<span class="lbl" data-key="kb-lbl">${t('filter.title')}</span>` +
+    list.map((k) => {
+      const on = S.kinds.has(k);
+      // Trạng thái bật/tắt đi qua aria-pressed, CSS bám vào đó - vừa đúng cho trình đọc màn
+      // hình vừa khỏi phải giữ thêm một class chỉ để đổi màu.
+      return `<button class="chip pick" data-key="kb-${esc(k)}"
+        data-kind="${esc(k)}" aria-pressed="${on}"
+        title="${esc(t(on ? 'filter.click_hide' : 'filter.click_show', { name: kindName(k) }))}"
+        ><i class="dot"></i>${esc(kindName(k))}${counts[k] ? ' <b>' + counts[k] + '</b>' : ''}</button>`;
+    }).join('') +
+    (isAll ? '' : `<button class="chip ghost" data-key="kb-all" data-kind="*">${t('filter.all')}</button>`));
 }
 
 function renderChips() {
@@ -526,10 +600,18 @@ function sessionCard(r) {
 }
 
 function renderLive() {
-  const list = S.snap.ai;
-  render('#live', list.length
+  const list = visibleAi();
+  const hidden = ((S.snap && S.snap.ai) || []).length - list.length;
+  // Nói rõ có bao nhiêu agent bị bộ lọc giấu đi. Không có dòng này thì người chỉ dùng Gemini
+  // mở lên thấy trang trống và tưởng tool hỏng, chứ không nghĩ tới bộ lọc mặc định.
+  const note = hidden > 0
+    ? `<div class="hint filtered" data-key="live-hidden">${esc(t('filter.hidden', { n: hidden }))}
+        <button class="mini" data-kind="*">${t('filter.all')}</button></div>`
+    : '';
+  render('#live', (list.length
     ? list.map(sessionCard).join('')
-    : `<div class="empty" data-key="live-empty">${t('ai.none')}</div>`);
+    : `<div class="empty" data-key="live-empty">${t(hidden > 0 ? 'filter.all_hidden' : 'ai.none')}</div>`
+  ) + note);
 }
 
 function renderClosed() {
@@ -717,6 +799,20 @@ function renderNet() {
 }
 
 /* ------------------------------------------------------------- sự kiện */
+/* Bấm chip loại agent: bật/tắt loại đó. `*` là bật hết. */
+document.addEventListener('click', (ev) => {
+  const chip = ev.target.closest('button[data-kind]');
+  if (!chip) return;
+  const k = chip.dataset.kind;
+  if (k === '*') knownKinds().forEach((x) => S.kinds.add(x));
+  else if (S.kinds.has(k)) S.kinds.delete(k);
+  else S.kinds.add(k);
+  saveKinds();
+  if (S.snap) { renderKindBar(); renderLive(); renderKpis(); }
+  // Văn phòng lọc ở phía server (phải lọc trước khi cắt còn 10 chỗ), nên phải gọi lại
+  if (typeof officeKindsChanged === 'function') officeKindsChanged();
+});
+
 document.addEventListener('click', (ev) => {
   const btn = ev.target.closest('button[data-act]');
   if (!btn) return;
@@ -736,11 +832,21 @@ document.addEventListener('click', (ev) => {
   act(a, +btn.dataset.pid, btn.dataset.label, btn.dataset.sup);
 });
 
+/* Bộ lọc loại agent chỉ tác động tới hai tab này, nên chỉ hiện ở đó. Bày nó ra lúc đang xem
+ * Lịch sử phiên hay Cổng & Docker là hứa một điều không có thật. */
+const KIND_TABS = new Set(['ai', 'office']);
+
+function syncKindBar() {
+  const el = $('#kindbar');
+  if (el) el.hidden = !KIND_TABS.has(S.tab);
+}
+
 document.querySelectorAll('.tabs button').forEach((b) => {
   b.addEventListener('click', () => {
     S.tab = b.dataset.tab;
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
     document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'pane-' + S.tab));
+    syncKindBar();
     if (S.tab === 'hist') loadHistory();
   });
 });
@@ -780,6 +886,8 @@ function schedule() {
 function onLangChange() {
   if (S.snap) renderAll();
   if (S.hist) renderHist();
+  // office.js nạp sau file này nên hàm có thể chưa tồn tại lúc trang mới dựng
+  if (typeof officeRefresh === 'function') officeRefresh();
 }
 $('#lang').addEventListener('change', (e) => setLang(e.target.value));
 
@@ -795,6 +903,9 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   const b = $('#theme');
   if (b) b.textContent = theme === 'light' ? '☾' : '☀';
+  // Khung nhìn Văn phòng vẽ lên canvas nên không tự đổi màu theo CSS như phần còn lại:
+  // phải đọc lại bảng màu rồi vẽ lại, nếu không căn phòng vẫn giữ nguyên nền cũ.
+  if (typeof officeRefresh === 'function') officeRefresh();
 }
 
 function setTheme(theme, remember) {
@@ -843,9 +954,28 @@ function applyEmbedOptions() {
   }
 
   if (q.get('compact') === '1') document.body.classList.add('compact');
+
+  /* Bộ lọc loại agent. Thứ tự KHÁC theme một chỗ, và cố ý: lựa chọn người dùng bấm trên
+   * trang đứng TRƯỚC `?kinds=` của extension.
+   *
+   *   localStorage  >  ?kinds=  >  config.json ai_kinds  >  mặc định trong code
+   *
+   * Theme phải để `?theme=` thắng vì dashboard bắt buộc bám theo màu của editor. Bộ lọc thì
+   * không có ràng buộc đó - bấm tắt Codex xong tải lại trang mà nó hiện lại thì cái nút coi
+   * như hỏng. Settings của VSCode vì thế đóng vai giá trị KHỞI ĐẦU, không phải ép buộc. */
+  let saved = null;
+  try { saved = localStorage.getItem(KINDS_KEY); } catch (e) { /* bỏ qua */ }
+  const cfgKinds = (window.AIMON_CONFIG || {}).ai_kinds;
+  const source = saved != null ? saved
+    : (q.get('kinds') != null ? q.get('kinds')
+      : (Array.isArray(cfgKinds) ? cfgKinds.join(',') : 'claude-code'));
+  const picked = parseKinds(source);
+  // Chuỗi rỗng đã lưu là hợp lệ (người dùng bỏ chọn hết); chỉ nguồn HỎNG mới rơi về mặc định
+  if (picked.size || saved != null) S.kinds = picked;
 }
 
 applyEmbedOptions();
 applyStaticI18n();
+syncKindBar();
 loadSnapshot();
 schedule();

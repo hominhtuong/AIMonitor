@@ -24,6 +24,9 @@ else:
 # pid -> (cpu_seconds, wall_clock) của lần snapshot trước, để tính %CPU tức thời
 _prev_cpu: dict[int, tuple[float, float]] = {}
 
+# Kết quả lần snapshot gần nhất, để `cached()` dùng lại. Xem chú thích ở cached().
+_last: tuple[float, dict] | None = None
+
 AI_ROOT_KINDS = {"claude-code", "codex", "copilot", "gemini", "cursor", "ollama", "local-llm"}
 
 KIND_LABELS = {
@@ -202,9 +205,27 @@ def snapshot() -> dict[int, dict]:
             "cmd": cmd,
         }
 
+    global _last
     _prev_cpu.clear()
     _prev_cpu.update(cur_cpu)
+    _last = (now, procs)
     return procs
+
+
+def cached(max_age: float = 2.0) -> dict[int, dict]:
+    """Dùng lại kết quả `snapshot()` gần nhất nếu còn mới hơn `max_age` giây.
+
+    Có hai vòng làm mới cùng chạy: dashboard gọi `/api/snapshot` mỗi 3 giây, khung nhìn Văn
+    phòng gọi `/api/pulse` mỗi 1 giây. Cả hai đều cần danh sách tiến trình, mà `ps` (hoặc
+    PowerShell trên Windows) là phần đắt nhất của cả hai. Không dùng chung thì mỗi giây có
+    tới hai lần liệt kê toàn bộ tiến trình của máy.
+
+    Vòng nào gặp cache còn hạn thì dùng lại, hết hạn thì tự đi lấy - nên `_prev_cpu` cũng
+    chỉ bị ghi đè đúng một lần cho mỗi lần đọc thật, %CPU không bị chia nhỏ thêm.
+    """
+    if _last is not None and time.monotonic() - _last[0] < max_age:
+        return _last[1]
+    return snapshot()
 
 
 def children_map(procs: dict[int, dict]) -> dict[int, list[int]]:
