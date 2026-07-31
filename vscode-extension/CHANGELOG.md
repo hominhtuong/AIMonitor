@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.3.0
+
+- **Status bar item.** AI Monitor now sits at the bottom of the window showing your Session and
+  Weekly limits at a glance, turning amber past 70% and red past 90%. Click it to open the
+  dashboard. It never starts anything by itself - it shows numbers when a server is already
+  running and stays a plain label otherwise, so opening VSCode costs nothing.
+- **The dashboard opens as an editor tab**, with the full-width layout. The activity bar panel
+  now runs a compact layout built for a narrow column instead of squeezing the wide one into
+  it. Both share one server.
+- **Light theme.** The dashboard follows your VSCode colour theme by default, or you can pin
+  it to light or dark. The standalone macOS and Windows builds get a light/dark toggle in the
+  header that follows the operating system on first run.
+- **Settings**, under Extensions => AI Monitor:
+  - Which Python to use, with an **AI Monitor: Select Python Interpreter** command that lists
+    every interpreter found on the machine with its version. Leave it empty to keep
+    auto-detecting.
+  - Server port, and whether to reuse a server that is already running.
+  - Refresh interval, colour theme, where the status bar opens the dashboard.
+  - Where your Claude data lives and which price table to use.
+- New commands: **Open Dashboard in a Tab**, **Select Python Interpreter**, **Restart Server**.
+
 ## 1.2.4
 
 Fixes for Windows, all reported from a real machine running 1.2.3.

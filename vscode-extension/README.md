@@ -26,6 +26,31 @@ telemetry.
 
 ![One session and its whole process tree](https://raw.githubusercontent.com/hominhtuong/AIMonitor/main/assets/session-detail.png)
 
+## Two ways in
+
+- **Status bar.** AI Monitor sits at the bottom of the window with your Session and Weekly
+  limits, amber past 70% and red past 90%. Click it to open the dashboard. It never starts
+  anything on its own - it shows numbers when a server is already running and stays a plain
+  label otherwise, so opening VSCode costs nothing.
+- **Activity bar icon.** Opens the same dashboard in the side panel, in a compact layout built
+  for a narrow column. The editor tab gets the full-width layout instead. Both share one
+  server.
+
+## Settings
+
+Extensions => AI Monitor, or search `@ext:mituultra.aimonitor` in Settings.
+
+| Setting | What it does |
+| --- | --- |
+| `aimon.pythonPath` | Pin a specific interpreter. Empty = auto-detect. Run **AI Monitor: Select Python Interpreter** to pick from a list of everything found, with versions |
+| `aimon.serverPort` | Fix the port instead of letting the OS choose |
+| `aimon.reuseRunningInstance` | Share a server with the standalone app and other VSCode windows |
+| `aimon.openIn` | Whether the status bar opens the editor tab or the side panel |
+| `aimon.statusBar.*` | Show or hide it, which numbers it shows, which side it sits on |
+| `aimon.refreshSeconds` | How often the dashboard refreshes |
+| `aimon.theme` | Follow the VSCode theme, or pin light or dark |
+| `aimon.claudeDataDir`, `aimon.pricingFile` | Point at a different Claude data folder or price table |
+
 ## Setup
 
 Install the extension and open the panel. That is the whole setup.

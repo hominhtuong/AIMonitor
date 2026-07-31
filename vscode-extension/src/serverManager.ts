@@ -46,9 +46,22 @@ function isEnoent(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as NodeJS.ErrnoException).code === 'ENOENT';
 }
 
-function spawnOnce(candidate: string, aimonParentDir: string): ChildProcess {
+/** Tuỳ chọn lấy từ settings, áp cho server do extension tự bật. */
+export interface SpawnOptions {
+  /** 0 = để hệ điều hành cấp cổng trống. */
+  port?: number;
+  claudeDataDir?: string;
+  pricingFile?: string;
+}
+
+function spawnOnce(
+  candidate: string,
+  aimonParentDir: string,
+  options: SpawnOptions = {}
+): ChildProcess {
   const [bin, ...prefixArgs] = candidate.trim().split(/\s+/);
-  const proc = spawn(bin, [...prefixArgs, '-m', 'aimon.server', '--port', '0'], {
+  const port = String(options.port ?? 0);
+  const proc = spawn(bin, [...prefixArgs, '-m', 'aimon.server', '--port', port], {
     cwd: aimonParentDir,
     // stdout không cần đọc -> 'ignore'. stderr PHẢI được đọc: nếu để 'pipe' mà không ai đọc,
     // buffer OS đầy sẽ làm server Python block ghi vĩnh viễn.
@@ -61,6 +74,10 @@ function spawnOnce(candidate: string, aimonParentDir: string): ChildProcess {
       // ép UTF-8, hai biến này là lớp phòng thứ hai cho ai đang chạy bản aimon/ cũ hơn.
       PYTHONIOENCODING: 'utf-8',
       PYTHONUTF8: '1',
+      // Đường dẫn dữ liệu truyền qua env chứ không qua tham số dòng lệnh: cả ba vỏ đều
+      // spawn server nên đặt env là xong, không phải kéo tham số qua từng lớp.
+      ...(options.claudeDataDir ? { AIMON_CLAUDE_DIR: options.claudeDataDir } : {}),
+      ...(options.pricingFile ? { AIMON_PRICING: options.pricingFile } : {}),
     },
   });
   const info: SpawnInfo = { pythonBin: candidate, stderr: '', enoent: false, exited: false, exitCode: null };
@@ -236,7 +253,8 @@ export class PythonNotFoundError extends Error {
 export async function startWithDiscoveredPython(
   aimonParentDir: string,
   discover: () => Promise<PythonFound[]> = () => findPythons(),
-  timeoutPerCandidateMs = 15000
+  timeoutPerCandidateMs = 15000,
+  options: SpawnOptions = {}
 ): Promise<StartedServer> {
   const pythons = await discover();
   if (pythons.length === 0) throw new PythonNotFoundError();
@@ -244,7 +262,7 @@ export async function startWithDiscoveredPython(
   const problems: string[] = [];
   for (const py of pythons) {
     const candidate = [py.command, ...py.args].join(' ');
-    const proc = spawnOnce(candidate, aimonParentDir);
+    const proc = spawnOnce(candidate, aimonParentDir, options);
     const outcome = await waitForSpawnOutcome(proc);
     if (outcome === 'error') {
       problems.push(describeFailure(proc));

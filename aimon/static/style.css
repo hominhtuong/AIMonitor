@@ -1,3 +1,8 @@
+/* Nền tối là mặc định. Nền sáng bật bằng data-theme="light" trên <html>, do app.js đặt theo
+   thứ tự: tham số ?theme= của vỏ nhúng => lựa chọn đã lưu => prefers-color-scheme của hệ.
+
+   MỌI màu phải đi qua biến ở đây. Viết thẳng mã màu vào rule là chỗ đó sẽ sai ở một trong hai
+   nền - đó chính là lý do trước kia không làm được nền sáng. */
 :root {
   --bg: #0f172a;
   --card: #1e293b;
@@ -12,6 +17,95 @@
   --amber: #f59e0b;
   --red: #ef4444;
   --violet: #8b5cf6;
+
+  /* Màu nhãn: nền mờ + chữ nổi. Trước đây viết cứng trong từng rule nên không đổi theme được. */
+  --warn-bg: #422006;
+  --warn-fg: #fde68a;
+  --warn-line: #854d0e;
+  --danger-bg: #450a0a;
+  --danger-fg: #fecaca;
+  --danger-line: #7f1d1d;
+  --info-bg: #1e1b4b;
+  --info-fg: #c7d2fe;
+  --ok-bg: #052e2b;
+  --ok-fg: #a7f3d0;
+  --shadow: rgba(0, 0, 0, .35);
+  --inset: #0b1220;
+  --shadow-lg: rgba(0, 0, 0, .55);
+  --header-bg: rgba(15, 23, 42, .94);
+  --overlay: rgba(2, 6, 18, .68);
+  --ring-green: rgba(16, 185, 129, .18);
+  --accent-2: #6366f1;
+  --accent-hover: #4338ca;
+  --hot: #f87171;
+  --heavy: #fca5a5;
+  --sess-active: #3f4c86;
+  --info-line: #3f3f9e;
+  --ok-line: #14532d;
+  --doing-bg: #1a2436;
+  --doing-line: #2c3d5c;
+  --doing-run-bg: #2a2413;
+  --surface-2: #182236;
+  --surface-3: #131c2e;
+  --line-2: #202d45;
+  --line-3: #1c273c;
+  --ev-tool: #bfdbfe;
+  --ev-prompt: #fbcfe8;
+  --flash: #a5b4fc;
+  --th: #cbd5e1;
+  --hover: #24314a;
+}
+
+:root[data-theme="light"] {
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --card2: #f8fafc;
+  --line: #d8e0ea;
+  --text: #0f172a;
+  --muted: #52627a;
+  --dim: #7c8aa0;
+  --accent: #4338ca;
+  --sky: #0369a1;
+  --green: #047857;
+  --amber: #b45309;
+  --red: #dc2626;
+  --violet: #6d28d9;
+
+  --warn-bg: #fef3c7;
+  --warn-fg: #7c4a03;
+  --warn-line: #f0c060;
+  --danger-bg: #fee2e2;
+  --danger-fg: #991b1b;
+  --danger-line: #fca5a5;
+  --info-bg: #e0e7ff;
+  --info-fg: #3730a3;
+  --ok-bg: #d1fae5;
+  --ok-fg: #065f46;
+  --shadow: rgba(15, 23, 42, .12);
+  --inset: #eef2f7;
+  --shadow-lg: rgba(15, 23, 42, .22);
+  --header-bg: rgba(241, 245, 249, .94);
+  --overlay: rgba(15, 23, 42, .38);
+  --ring-green: rgba(4, 120, 87, .16);
+  --accent-2: #6366f1;
+  --accent-hover: #3730a3;
+  --hot: #dc2626;
+  --heavy: #b91c1c;
+  --sess-active: #a5b4fc;
+  --info-line: #c7d2fe;
+  --ok-line: #a7f3d0;
+  --doing-bg: #f8fafc;
+  --doing-line: #dbe3ee;
+  --doing-run-bg: #fdf6e3;
+  --surface-2: #f8fafc;
+  --surface-3: #f4f7fb;
+  --line-2: #e4eaf2;
+  --line-3: #eaeef4;
+  --ev-tool: #1d4ed8;
+  --ev-prompt: #a21caf;
+  --flash: #4338ca;
+  --th: #475569;
+  --hover: #eef2f7;
 }
 
 * { box-sizing: border-box; }
@@ -33,7 +127,7 @@ body {
 /* ---------------------------------------------------------------- header */
 header {
   position: sticky; top: 0; z-index: 30;
-  background: rgba(15, 23, 42, .94);
+  background: var(--header-bg);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
@@ -61,7 +155,7 @@ header {
   font-size: 11px; color: var(--muted); margin-bottom: 4px; white-space: nowrap;
 }
 .meter .lbl span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
-.bar { background: #0b1220; border: 1px solid var(--line); border-radius: 6px; height: 9px; overflow: hidden; }
+.bar { background: var(--inset); border: 1px solid var(--line); border-radius: 6px; height: 9px; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 6px; transition: width .45s ease; }
 .bar.g > i { background: var(--green); }
 .bar.a > i { background: var(--amber); }
@@ -85,10 +179,10 @@ select {
 }
 button { cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 button:hover { background: var(--card2); }
-button.warn:hover { border-color: var(--amber); color: #fde68a; }
-button.danger:hover { border-color: var(--red); color: #fecaca; }
-button.primary { background: var(--accent); border-color: #6366f1; }
-button.primary:hover { background: #4338ca; }
+button.warn:hover { border-color: var(--amber); color: var(--warn-fg); }
+button.danger:hover { border-color: var(--red); color: var(--danger-fg); }
+button.primary { background: var(--accent); border-color: var(--accent-2); }
+button.primary:hover { background: var(--accent-hover); }
 button.mini { padding: 3px 8px; font-size: 12px; }
 label.chk { color: var(--muted); font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 
@@ -111,8 +205,8 @@ label.chk { color: var(--muted); font-size: 13px; display: inline-flex; align-it
 .kpi .n { font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .kpi .l { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .kpi .s { color: var(--dim); font-size: 11px; margin-top: 4px; }
-.kpi.hot { border-color: #7f1d1d; }
-.kpi.hot .n { color: #f87171; }
+.kpi.hot { border-color: var(--danger-line); }
+.kpi.hot .n { color: var(--hot); }
 
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 .chip {
@@ -146,21 +240,21 @@ h2:first-child { margin-top: 0; }
 
 /* ---------------------------------------------------------------- session card */
 .sess { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 12px; overflow: hidden; }
-.sess.active { border-color: #3f4c86; }
-.sess.paused { border-color: #854d0e; }
+.sess.active { border-color: var(--sess-active); }
+.sess.paused { border-color: var(--warn-line); }
 .sess > .top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; flex-wrap: wrap; }
 .sess .st { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
-.sess.active .st { background: var(--green); box-shadow: 0 0 0 3px rgba(16, 185, 129, .18); }
+.sess.active .st { background: var(--green); box-shadow: 0 0 0 3px var(--ring-green); }
 .sess.paused .st { background: var(--amber); }
 .sess .ttl { font-weight: 600; }
 .sess .path { color: var(--muted); font-size: 12.5px; }
 .badge {
   font-size: 11px; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line);
-  background: #0b1220; color: var(--muted); white-space: nowrap;
+  background: var(--inset); color: var(--muted); white-space: nowrap;
 }
-.badge.model { color: #c7d2fe; border-color: #3f3f9e; }
-.badge.branch { color: #a7f3d0; border-color: #14532d; }
-.badge.warn { color: #fde68a; border-color: #854d0e; }
+.badge.model { color: var(--info-fg); border-color: var(--info-line); }
+.badge.branch { color: var(--ok-fg); border-color: var(--ok-line); }
+.badge.warn { color: var(--warn-fg); border-color: var(--warn-line); }
 .badge.dim { color: var(--dim); }
 .sess .acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -171,33 +265,33 @@ h2:first-child { margin-top: 0; }
 .ctx { padding: 0 16px 12px; }
 .ctx .lbl { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
 
-.doing { margin: 0 16px 12px; background: #1a2436; border: 1px solid #2c3d5c; border-radius: 10px; padding: 8px 12px; font-size: 13px; }
-.doing.run { border-color: #854d0e; background: #2a2413; }
-.doing code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: #fde68a; }
+.doing { margin: 0 16px 12px; background: var(--doing-bg); border: 1px solid var(--doing-line); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+.doing.run { border-color: var(--warn-line); background: var(--doing-run-bg); }
+.doing code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--warn-fg); }
 .doing .el { color: var(--muted); font-size: 12px; }
 .doing .idle { color: var(--dim); }
 
-.kids { border-top: 1px solid var(--line); background: #182236; }
-.kid { display: flex; align-items: center; gap: 10px; padding: 7px 16px; font-size: 13px; border-bottom: 1px solid #202d45; }
+.kids { border-top: 1px solid var(--line); background: var(--surface-2); }
+.kid { display: flex; align-items: center; gap: 10px; padding: 7px 16px; font-size: 13px; border-bottom: 1px solid var(--line-2); }
 .kid:last-child { border-bottom: none; }
 .kid .cmd { color: var(--dim); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42vw; }
 .kid .num { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.kid.heavy .num { color: #fca5a5; }
+.kid.heavy .num { color: var(--heavy); }
 .kid .acts { display: flex; gap: 5px; }
 .kid .ind { color: var(--dim); white-space: pre; }
 
-.events { border-top: 1px solid var(--line); background: #131c2e; padding: 10px 16px; max-height: 340px; overflow: auto; }
-.ev { display: flex; gap: 10px; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid #1c273c; }
+.events { border-top: 1px solid var(--line); background: var(--surface-3); padding: 10px 16px; max-height: 340px; overflow: auto; }
+.ev { display: flex; gap: 10px; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid var(--line-3); }
 .ev:last-child { border-bottom: none; }
 .ev .t { color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ev .x { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ev.tool .x { color: #bfdbfe; }
-.ev.prompt .x { color: #fbcfe8; }
+.ev.tool .x { color: var(--ev-tool); }
+.ev.prompt .x { color: var(--ev-prompt); }
 
 /* Khi 1 con số vừa đổi: CHỈ chữ sáng lên rồi mờ dần về màu cũ.
    Tuyệt đối không đổi màu nền - nhiều ô đổi cùng lúc sẽ thành nháy cả trang. */
 [data-flash="1"] { transition: color 1.1s ease-out; }
-[data-flash="1"].upd { transition: none; color: #a5b4fc; }
+[data-flash="1"].upd { transition: none; color: var(--flash); }
 @media (prefers-reduced-motion: reduce) {
   [data-flash="1"], [data-flash="1"].upd { transition: none; color: inherit; }
 }
@@ -206,13 +300,13 @@ h2:first-child { margin-top: 0; }
 .tbl-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; font-size: 13px; }
 th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
-th { background: var(--card2); color: #cbd5e1; font-weight: 600; font-size: 12px; }
+th { background: var(--card2); color: var(--th); font-weight: 600; font-size: 12px; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: #24314a; }
+tbody tr:hover { background: var(--hover); }
 td .cmd { color: var(--dim); font-size: 11.5px; display: block; max-width: 520px; overflow: hidden; text-overflow: ellipsis; }
-tr.heavy td.num.rss { color: #fca5a5; font-weight: 600; }
-tr.ai td.nm { color: #c7d2fe; }
+tr.heavy td.num.rss { color: var(--heavy); font-weight: 600; }
+tr.ai td.nm { color: var(--info-fg); }
 
 #pane-net th:first-child, #pane-net td:first-child { width: 80px; }
 #pane-net th:nth-child(2), #pane-net td:nth-child(2) { width: 130px; }
@@ -234,15 +328,15 @@ tr.ai td.nm { color: #c7d2fe; }
 .empty { color: var(--dim); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center; }
 
 /* ---------------------------------------------------------------- modal */
-#modal { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(2, 6, 18, .68); }
+#modal { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: var(--overlay); }
 #modal[hidden] { display: none; }
 #modal .box {
   background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px;
-  width: min(460px, 92vw); box-shadow: 0 24px 60px rgba(0, 0, 0, .55); animation: pop .16s ease;
+  width: min(460px, 92vw); box-shadow: 0 24px 60px var(--shadow-lg); animation: pop .16s ease;
 }
 #modal h3 { margin: 0 0 8px; font-size: 16px; }
 #modal p { margin: 0 0 6px; color: var(--muted); font-size: 13.5px; white-space: pre-wrap; }
-#modal .warnline { color: #fde68a; font-size: 12.5px; margin-top: 8px; }
+#modal .warnline { color: var(--warn-fg); font-size: 12.5px; margin-top: 8px; }
 #modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 /* ---------------------------------------------------------------- toast */
@@ -250,10 +344,10 @@ tr.ai td.nm { color: #c7d2fe; }
 .toast {
   background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent);
   border-radius: 10px; padding: 10px 14px; font-size: 13px; max-width: 400px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .4); animation: pop .18s ease;
+  box-shadow: 0 8px 24px var(--shadow-lg); animation: pop .18s ease;
 }
 .toast.ok { border-left-color: var(--green); }
-.toast.err { border-left-color: var(--red); color: #fecaca; }
+.toast.err { border-left-color: var(--red); color: var(--danger-fg); }
 @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .foot { color: var(--dim); font-size: 11.5px; text-align: center; margin-top: 34px; }
@@ -266,3 +360,26 @@ tr.ai td.nm { color: #c7d2fe; }
 /* Chọn ngôn ngữ: 1 dropdown, hiện đúng ngôn ngữ đang dùng. Gọn hơn hai lá cờ đứng cạnh
    nhau, và dùng chung style select nên cao bằng các nút bên cạnh. */
 #lang { cursor: pointer; }
+
+/* ------------------------------------------------------------- compact
+   Panel ở activity bar của VSCode chỉ rộng vài trăm pixel. Bày nguyên bố cục của cửa sổ
+   rộng vào đó thì chữ chồng lên nhau và bảng phải cuộn ngang - nên panel chạy ?compact=1,
+   còn tab trong editor thì không. Đây là chỗ duy nhất phân biệt hai khung nhìn. */
+body.compact .wrap { padding: 10px 12px 40px; }
+body.compact header .meter,
+body.compact header .tag.procs,
+body.compact .brand .tag,
+body.compact #quit,
+body.compact #theme { display: none; }
+body.compact .hd { padding: 8px 12px; gap: 8px; }
+body.compact .brand h1 { font-size: 15px; }
+body.compact .brand img { width: 24px; height: 24px; }
+body.compact .usage { grid-template-columns: 1fr; gap: 8px; margin: 10px 0 6px; }
+body.compact .kpis { grid-template-columns: repeat(auto-fit, minmax(124px, 1fr)); gap: 8px; }
+body.compact .kpi { padding: 10px 12px; }
+body.compact .kpi .n { font-size: 18px; }
+body.compact .ubox { padding: 11px 12px; }
+body.compact .ubox .pct { font-size: 18px; }
+body.compact .chips { gap: 6px; margin-bottom: 10px; }
+/* Bảng tiến trình cần bề ngang: cho cuộn ngang trong khung riêng thay vì ép cả trang rộng ra. */
+body.compact table { display: block; overflow-x: auto; white-space: nowrap; }

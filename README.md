@@ -132,6 +132,10 @@ editor. Install and open it - that is the whole setup. The extension finds Pytho
 was installed without being added to `PATH`. If the machine has no Python 3.9+ at all, the
 panel says so and gives you a **Download Python** button and a **Try again** button.
 
+AI Monitor also sits in the status bar at the bottom of the window showing your Session and
+Weekly limits; clicking it opens the dashboard as a full editor tab. Settings live under
+Extensions => AI Monitor - which Python to use, refresh interval, light or dark, and more.
+
 Offline installs can still grab the `.vsix` from **Releases** and use Extensions panel =>
 `...` menu => **Install from VSIX...**
 

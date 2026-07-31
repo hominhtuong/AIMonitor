@@ -783,6 +783,67 @@ function onLangChange() {
 }
 $('#lang').addEventListener('change', (e) => setLang(e.target.value));
 
+/* ------------------------------------------------- giao diện sáng / tối */
+const THEME_KEY = 'aimon.theme';
+
+function systemTheme() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+    ? 'light' : 'dark';
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const b = $('#theme');
+  if (b) b.textContent = theme === 'light' ? '☾' : '☀';
+}
+
+function setTheme(theme, remember) {
+  if (remember) { try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* chế độ riêng tư */ } }
+  applyTheme(theme);
+}
+
+$('#theme').addEventListener('click', () => {
+  setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true);
+});
+
+/* Tham số do vỏ nhúng truyền vào (extension VSCode): ?theme=, ?refresh=, ?compact=1.
+ *
+ * Khi có ?theme= thì ẩn nút đổi giao diện: dashboard phải bám theo theme của editor, để hai
+ * nguồn quyết định không đá nhau. Mở bằng app macOS / .exe thì không có tham số nào, lúc đó
+ * lấy lựa chọn đã lưu, chưa có thì theo cài đặt sáng/tối của hệ điều hành. */
+function applyEmbedOptions() {
+  const q = new URLSearchParams(location.search);
+
+  const theme = q.get('theme');
+  if (theme === 'light' || theme === 'dark') {
+    setTheme(theme, false);
+    const b = $('#theme');
+    if (b) b.hidden = true;
+  } else {
+    let saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* bỏ qua */ }
+    setTheme(saved === 'light' || saved === 'dark' ? saved : systemTheme(), false);
+  }
+
+  const refresh = Number(q.get('refresh'));
+  if (Number.isFinite(refresh) && refresh > 0) {
+    S.interval = Math.round(refresh * 1000);
+    const sel = $('#interval');
+    if (sel) {
+      if (![...sel.options].some((o) => +o.value === S.interval)) {
+        const o = document.createElement('option');
+        o.value = String(S.interval);
+        o.textContent = (S.interval / 1000) + 's';
+        sel.appendChild(o);
+      }
+      sel.value = String(S.interval);
+    }
+  }
+
+  if (q.get('compact') === '1') document.body.classList.add('compact');
+}
+
+applyEmbedOptions();
 applyStaticI18n();
 loadSnapshot();
 schedule();

@@ -2,7 +2,7 @@
   "name": "aimonitor",
   "displayName": "AI Monitor",
   "description": "See every AI process, token, and account limit on your machine, inside VSCode. Runs fully offline.",
-  "version": "1.2.4",
+  "version": "1.3.0",
   "publisher": "mituultra",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -52,6 +52,117 @@
           "type": "webview"
         }
       ]
+    },
+    "commands": [
+      {
+        "command": "aimon.openDashboard",
+        "title": "Open Dashboard in a Tab",
+        "category": "AI Monitor"
+      },
+      {
+        "command": "aimon.selectPython",
+        "title": "Select Python Interpreter",
+        "category": "AI Monitor"
+      },
+      {
+        "command": "aimon.restartServer",
+        "title": "Restart Server",
+        "category": "AI Monitor"
+      }
+    ],
+    "configuration": {
+      "title": "AI Monitor",
+      "properties": {
+        "aimon.pythonPath": {
+          "type": "string",
+          "default": "",
+          "order": 1,
+          "markdownDescription": "Python interpreter used to run the AI Monitor server. Leave empty to detect one automatically - the `py` launcher, `PATH` and the standard install folders are all scanned. Set this only when the machine has several Python installs and you want a specific one. Run **AI Monitor: Select Python Interpreter** to pick from the list instead of typing a path."
+        },
+        "aimon.serverPort": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 65535,
+          "order": 2,
+          "markdownDescription": "Port for the local server. `0` lets the operating system pick a free one, which is what you want unless a firewall rule needs a fixed port."
+        },
+        "aimon.reuseRunningInstance": {
+          "type": "boolean",
+          "default": true,
+          "order": 3,
+          "markdownDescription": "Reuse an AI Monitor server that is already running - the standalone app, or another VSCode window - instead of starting a second one. Turn this off to always get a private server for this window."
+        },
+        "aimon.openIn": {
+          "type": "string",
+          "enum": ["tab", "panel"],
+          "enumDescriptions": [
+            "Open the full dashboard as an editor tab",
+            "Reveal the dashboard in the activity bar panel"
+          ],
+          "default": "tab",
+          "order": 4,
+          "markdownDescription": "What the status bar item opens. The editor tab is the full-width dashboard; the activity bar panel is a compact version made for a narrow column."
+        },
+        "aimon.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 5,
+          "markdownDescription": "Show AI Monitor in the status bar at the bottom of the window."
+        },
+        "aimon.statusBar.metric": {
+          "type": "string",
+          "enum": ["both", "session", "weekly", "cost"],
+          "enumDescriptions": [
+            "Session and Weekly limits",
+            "Session (5 hour) limit only",
+            "Weekly (7 day) limit only",
+            "Today's cost"
+          ],
+          "default": "both",
+          "order": 6,
+          "markdownDescription": "What the status bar item shows while a server is running."
+        },
+        "aimon.statusBar.alignment": {
+          "type": "string",
+          "enum": ["right", "left"],
+          "default": "right",
+          "order": 7,
+          "markdownDescription": "Which side of the status bar to sit on. Takes effect after the window is reloaded."
+        },
+        "aimon.refreshSeconds": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 60,
+          "order": 8,
+          "markdownDescription": "How often the dashboard refreshes, in seconds. Raise it on a busy machine - each refresh lists every running process."
+        },
+        "aimon.theme": {
+          "type": "string",
+          "enum": ["auto", "dark", "light"],
+          "enumDescriptions": [
+            "Follow the VSCode colour theme",
+            "Always dark",
+            "Always light"
+          ],
+          "default": "auto",
+          "order": 9,
+          "markdownDescription": "Colour scheme of the dashboard."
+        },
+        "aimon.claudeDataDir": {
+          "type": "string",
+          "default": "",
+          "order": 10,
+          "markdownDescription": "Folder holding your Claude Code data. Empty means `~/.claude`. Only applies to a server this extension starts itself."
+        },
+        "aimon.pricingFile": {
+          "type": "string",
+          "default": "",
+          "order": 11,
+          "markdownDescription": "Token price table used to work out cost. Empty means the `pricing.json` bundled with the extension. Only applies to a server this extension starts itself."
+        }
+      }
     }
   },
   "scripts": {

@@ -129,6 +129,10 @@ nên máy cài Python mà quên tick "Add to PATH" vẫn chạy bình thường.
 có Python 3.9 trở lên thì panel mới báo, kèm nút **Tải Python** và nút **Thử lại**: cài xong
 bấm Thử lại là xong.
 
+AI Monitor còn nằm ở thanh trạng thái dưới cùng cửa sổ, hiện luôn % Session và Weekly; bấm
+vào là dashboard mở thành một tab riêng với bố cục đầy đủ. Phần cài đặt nằm ở Extensions =>
+AI Monitor: chọn Python, nhịp làm mới, giao diện sáng/tối, và một số thứ khác.
+
 Ai cần cài offline thì tải file `.vsix` ở **Releases**, rồi vào Extensions panel => nút `...`
 => **Install from VSIX...**
 

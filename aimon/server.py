@@ -45,7 +45,7 @@ BASE = os.path.join(sys._MEIPASS, "aimon") if getattr(sys, "frozen", False) else
 STATIC_DIR = os.path.join(BASE, "static")
 IS_WINDOWS = sys.platform.startswith("win")
 
-VERSION = "1.2.4"
+VERSION = "1.3.0"
 
 DEFAULT_PORT = 8899
 PORT_SCAN_TRIES = 20  # 8899..8919 rồi mới xin cổng ngẫu nhiên

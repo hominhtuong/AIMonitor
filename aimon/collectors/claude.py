@@ -29,7 +29,10 @@ import time
 from datetime import datetime
 
 HOME = os.path.expanduser("~")
-CLAUDE_DIR = os.path.join(HOME, ".claude")
+# AIMON_CLAUDE_DIR cho ai để dữ liệu Claude Code ở chỗ khác. Dùng biến môi trường chứ không
+# thêm tham số dòng lệnh: cả ba vỏ (app macOS, .exe, extension VSCode) đều spawn server nên
+# đặt env là xong, không phải kéo tham số qua từng lớp.
+CLAUDE_DIR = os.environ.get("AIMON_CLAUDE_DIR") or os.path.join(HOME, ".claude")
 PROJECTS_DIR = os.path.join(CLAUDE_DIR, "projects")
 SESSIONS_DIR = os.path.join(CLAUDE_DIR, "sessions")
 
@@ -39,6 +42,8 @@ BASE = (
     if getattr(sys, "frozen", False)
     else os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
+# AIMON_PRICING trỏ thẳng tới file giá riêng, để ai sửa giá không phải đụng vào gói cài.
+PRICING_FILE = os.environ.get("AIMON_PRICING") or os.path.join(BASE, "pricing.json")
 
 MAX_EVENTS = 60
 AGENT_TOOLS = {"Agent", "Task"}
@@ -67,7 +72,7 @@ def pricing() -> dict:
     global _PRICING
     if _PRICING is None:
         try:
-            with open(os.path.join(BASE, "pricing.json"), encoding="utf-8") as f:
+            with open(PRICING_FILE, encoding="utf-8") as f:
                 _PRICING = json.load(f)
         except Exception:
             _PRICING = {"models": {}, "default": {"input": 5, "output": 25, "context": 1000000}}

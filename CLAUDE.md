@@ -46,6 +46,10 @@ vscode-extension/       vỏ extension VSCode (TypeScript)
   src/dashboardViewProvider.ts  bật server rồi nhúng dashboard vào iframe
   src/serverManager.ts  spawn python, probe /api/version, chờ instance.json, SIGTERM
   src/pythonFinder.ts   dò Python thật trên máy rồi kiểm tra phiên bản bằng cách chạy thử
+  src/serverSession.ts  một server dùng chung cho panel, tab và thanh trạng thái
+  src/statusBar.ts      nút ở thanh trạng thái, hiện % hạn mức
+  src/dashboardPanel.ts dashboard mở thành tab trong editor
+  src/config.ts         đọc settings; src/usage.ts các hàm thuần (test được, không cần vscode)
   src/instanceFile.ts   đọc + kiểm tra ~/.aimon/instance.json
   scripts/copy-aimon.js copy aimon/ + pricing.json + icon vào gói lúc build
 scripts/
@@ -380,6 +384,34 @@ publish đầu, sau đó thì không** - muốn đổi là phải đăng extensi
 PAT của Azure DevOps hết hạn tối đa 1 năm, hết hạn thì bước publish fail với 401 - lúc đó tạo
 token mới rồi cập nhật secret, không phải lỗi code.
 
+### Settings, thanh trạng thái và hai khung nhìn
+
+Settings khai ở `contributes.configuration`, VSCode tự vẽ bảng - không phải viết giao diện.
+`config.ts` là chỗ DUY NHẤT đọc settings; rải `getConfiguration` khắp nơi thì giá trị mặc định
+thành hai nguồn sự thật với `package.json`.
+
+Ba nơi cùng cần server nên có `AimonServerSession` **đếm người giữ**: panel, tab và thanh
+trạng thái đều `acquire`/`release`, server chỉ tắt khi không còn ai. Trước đây provider của
+sidebar tự giữ tiến trình, thêm tab vào là ai đóng trước cũng giết nó.
+
+**Thanh trạng thái không bao giờ tự bật server.** Nó gọi `peek()` - chỉ đọc instance.json rồi
+probe - nên mở VSCode lên không phát sinh tiến trình Python nào. Có server sẵn (app macOS,
+.exe, hay cửa sổ VSCode khác) thì hiện số, chưa có thì nằm im; bấm vào mới bật.
+
+Hai khung nhìn khác nhau ở đúng một tham số: panel hẹp chạy `?compact=1`, tab rộng thì không.
+Đừng nhân đôi frontend - `body.compact` trong `style.css` lo phần bố cục hẹp.
+
+Cấu hình truyền cho trang web qua **query param** (`?theme=&refresh=&compact=`), không qua
+file. Lý do: hai khung nhìn trong cùng một cửa sổ phải khác nhau được, và settings của VSCode
+không được đè lên cấu hình của app macOS / .exe đang dùng chung server.
+
+Hàm thuần (đọc snapshot, dựng chuỗi, ghép URL) nằm ở `usage.ts` và **không import `vscode`** -
+nhờ vậy unit test nạp được bằng node. File nào import `vscode` là file đó không test được,
+nên đừng để logic vào đấy.
+
+Đường dẫn dữ liệu truyền qua biến môi trường `AIMON_CLAUDE_DIR` / `AIMON_PRICING` chứ không
+qua tham số dòng lệnh: cả ba vỏ đều spawn server nên đặt env là xong.
+
 ## Đa ngôn ngữ (static/i18n.js)
 
 Giao diện có tiếng Anh và tiếng Việt, đổi bằng dropdown `#lang`, lựa chọn lưu ở
@@ -411,6 +443,19 @@ dịch mấy nhãn chung như Other/Browser/Editor.
 
 Cẩn thận đặt biến tên `t` trong `app.js` - nó che mất hàm dịch. `frag()` từng dính, nay đổi
 thành `tpl`; `renderUsage`/`renderKpis` dùng `tot` cho `snap.totals`.
+
+## Giao diện sáng / tối (static/style.css)
+
+Nền tối là mặc định, nền sáng bật bằng `data-theme="light"` trên `<html>`. `app.js` chọn theo
+thứ tự: `?theme=` do vỏ nhúng truyền => lựa chọn đã lưu ở localStorage => `prefers-color-scheme`.
+
+**Mọi màu phải đi qua biến trong hai khối `:root`.** Viết thẳng mã màu vào rule là chỗ đó sẽ
+sai ở một trong hai nền - đó đúng là lý do trước kia không làm được nền sáng: 35 mã màu nằm
+rải rác trong file. Thêm biến thì phải thêm ở CẢ HAI bảng, thiếu một bên là màu rơi về giá trị
+kế thừa và hỏng lặng lẽ.
+
+Có `?theme=` thì nút đổi sáng/tối tự ẩn: dashboard phải bám theo theme của editor, để hai
+nguồn quyết định không đá nhau.
 
 ## Frontend (static/app.js)
 
