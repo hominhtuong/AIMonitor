@@ -1,0 +1,78 @@
+import { test } from 'node:test';
+import * as assert from 'node:assert/strict';
+import * as http from 'node:http';
+import { spawnAimonServer, probeVersion, waitForServer, getSpawnInfo } from '../src/serverManager';
+
+test('probeVersion resolves true when server responds 200', async () => {
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200);
+    res.end('{}');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const port = (address as { port: number }).port;
+
+  const alive = await probeVersion('127.0.0.1', port);
+  assert.equal(alive, true);
+
+  server.close();
+});
+
+test('probeVersion resolves false when nothing listens', async () => {
+  const alive = await probeVersion('127.0.0.1', 1, 200);
+  assert.equal(alive, false);
+});
+
+test('waitForServer resolves once readFn returns a probeable instance', async () => {
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200);
+    res.end('{}');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const port = (address as { port: number }).port;
+
+  let calls = 0;
+  const readFn = () => {
+    calls += 1;
+    if (calls < 3) return null;
+    return { host: '127.0.0.1', port, pid: 999 };
+  };
+
+  const instance = await waitForServer(10, 2000, readFn);
+  assert.equal(instance.port, port);
+  assert.ok(calls >= 3);
+
+  server.close();
+});
+
+test('waitForServer throws after timeout when readFn never returns a valid instance', async () => {
+  await assert.rejects(() => waitForServer(10, 100, () => null));
+});
+
+test('spawnAimonServer does not crash when the binary does not exist', async () => {
+  // spawnAimonServer đã tự await sự kiện 'spawn'/'error' bên trong (waitForSpawnOutcome),
+  // nên khi Promise trả về đã resolve thì sự kiện 'error' cho candidate cuối cùng đã bắn rồi
+  // (once-listener không bắn lại lần hai) - test chỉ cần đọc SpawnInfo, không chờ sự kiện nữa.
+  const proc = await spawnAimonServer('.', ['this-binary-does-not-exist-xyz']);
+  const info = getSpawnInfo(proc);
+  assert.ok(info);
+  assert.equal(info?.enoent, true);
+});
+
+test('spawnAimonServer falls back to next candidate on ENOENT', async () => {
+  const proc = await spawnAimonServer('.', ['this-binary-does-not-exist-xyz', 'this-one-either']);
+  const info = getSpawnInfo(proc);
+  assert.ok(info);
+  assert.equal(info?.pythonBin, 'this-one-either');
+  assert.equal(info?.enoent, true);
+});
+
+test('waitForServer includes ENOENT hint in timeout message when proc spawn info is available', async () => {
+  const proc = await spawnAimonServer('.', ['this-binary-does-not-exist-xyz']);
+  await assert.rejects(
+    () => waitForServer(10, 50, () => null, proc),
+    /not found on PATH/
+  );
+});

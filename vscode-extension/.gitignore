@@ -1,0 +1,8 @@
+node_modules/
+dist/
+out/
+aimon/
+media/
+images/
+pricing.json
+*.vsix
