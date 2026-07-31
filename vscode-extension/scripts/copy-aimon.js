@@ -5,8 +5,17 @@ const repoRoot = path.join(__dirname, '..', '..');
 const aimonSrc = path.join(repoRoot, 'aimon');
 const aimonDest = path.join(__dirname, '..', 'aimon');
 
+// Lọc __pycache__ / *.pyc: ai chạy `python3 -m compileall aimon` (bước kiểm tra trước khi
+// commit trong CLAUDE.md) là thư mục gốc có bytecode, copy nguyên si thì VSIX phình gấp đôi
+// và mang theo .pyc biên dịch cho đúng phiên bản Python của máy build - vô dụng ở máy người
+// dùng vì Python đối chiếu magic number rồi bỏ qua.
+function keep(src) {
+  const name = path.basename(src);
+  return name !== '__pycache__' && !name.endsWith('.pyc');
+}
+
 fs.rmSync(aimonDest, { recursive: true, force: true });
-fs.cpSync(aimonSrc, aimonDest, { recursive: true });
+fs.cpSync(aimonSrc, aimonDest, { recursive: true, filter: keep });
 console.log(`copied ${aimonSrc} -> ${aimonDest}`);
 
 // Icon activity bar PHẢI đơn sắc, không nền tô đầy: VSCode render icon này bằng cách mask
