@@ -1,7 +1,7 @@
 name: Build VSCode extension
 
 # Push lên main => có sẵn file .vsix để tải trong tab Actions.
-# Đẩy tag v* => đính kèm .vsix vào Release.
+# Đẩy tag v* => đính kèm .vsix vào Release VÀ publish lên VSCode Marketplace.
 #
 # Node và esbuild chỉ là công cụ lúc build, giống PyInstaller bên Windows: code trong
 # aimon/ vẫn chỉ dùng stdlib Python. Người cài extension chỉ cần có python3 trên PATH.
@@ -20,13 +20,12 @@ on:
 permissions:
   contents: write
 
-defaults:
-  run:
-    working-directory: vscode-extension
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-extension
     steps:
       - uses: actions/checkout@v4
 
@@ -57,11 +56,12 @@ jobs:
           echo "gói: $vsix"
           files=$(unzip -Z1 "$vsix")
 
-          # Thiếu bất kỳ thứ nào dưới đây thì extension vẫn cài được nhưng chết lúc chạy,
-          # nên bắt ngay tại đây thay vì để người dùng phát hiện.
+          # Thiếu bất kỳ thứ nào dưới đây thì extension vẫn cài được nhưng chết lúc chạy
+          # hoặc lên store thiếu thông tin, nên bắt ngay tại đây.
           for f in extension/dist/extension.js extension/pricing.json \
                    extension/aimon/server.py extension/aimon/static/app.js \
-                   extension/media/icon.svg extension/images/icon.png; do
+                   extension/media/icon.svg extension/images/icon.png \
+                   extension/README.md extension/CHANGELOG.md extension/LICENSE.txt; do
             echo "$files" | grep -qx "$f" || { echo "THIẾU $f"; exit 1; }
           done
 
@@ -100,22 +100,134 @@ jobs:
           # totals rỗng nghĩa là pricing.json không nằm đúng chỗ claude.py đi tìm
           curl -fsS "$url/api/snapshot" \
             | python -c "import json,sys; d=json.load(sys.stdin); assert d.get('totals'), 'snapshot thiếu totals'; print('totals OK')"
-          pkill -f 'aimon.server' || true
+          # Tắt qua /api/quit chứ không kill: chính đường extension dùng, và là cách duy
+          # nhất dọn được instance.json trên Windows.
+          curl -fsS -X POST "$url/api/quit" -o /dev/null
+          sleep 2
+          if [ -f "$HOME/.aimon/instance.json" ]; then
+            echo "instance.json không được dọn sau /api/quit"; exit 1
+          fi
+          echo "OK - tắt êm, state đã dọn"
 
       - uses: actions/upload-artifact@v4
         with:
           name: AIMonitor-vscode
           path: vscode-extension/*.vsix
 
-      - name: Đính kèm vào Release khi đẩy tag
-        if: startsWith(github.ref, 'refs/tags/v')
+  # Chạy đúng file .vsix mà job build vừa tạo, trên Windows thật. Đây là chỗ duy nhất bắt
+  # được các lỗi chỉ có ở Windows: tên binary Python, alias Microsoft Store, dọn state.
+  windows-check:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Unit test trên Windows
+        working-directory: vscode-extension
+        run: |
+          npm ci
+          npm test
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: AIMonitor-vscode
+          path: vsix
+
+      - name: Chạy thử server trong gói trên Windows
+        shell: pwsh
+        run: |
+          $vsix = (Get-ChildItem vsix/*.vsix)[0].FullName
+          Expand-Archive -Path $vsix -DestinationPath vsix-extracted -Force
+          Push-Location vsix-extracted/extension
+          $p = Start-Process -FilePath python -ArgumentList '-m','aimon.server','--port','0','--new' `
+                             -PassThru -RedirectStandardError "$env:TEMP\aimon-err.log"
+          $state = "$env:USERPROFILE\.aimon\instance.json"
+          $url = $null
+          foreach ($i in 1..30) {
+            Start-Sleep -Seconds 1
+            if (Test-Path $state) {
+              $url = (Get-Content $state -Raw | ConvertFrom-Json).url
+              if ($url) { break }
+            }
+          }
+          if (-not $url) {
+            Write-Host "--- stderr server ---"
+            if (Test-Path "$env:TEMP\aimon-err.log") { Get-Content "$env:TEMP\aimon-err.log" }
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            throw "Server trong gói không khởi động được trên Windows"
+          }
+          Write-Host "url=$url"
+          Invoke-RestMethod "$url/api/version" -TimeoutSec 5 | ConvertTo-Json -Compress | Write-Host
+          Invoke-WebRequest "$url/static/app.js" -TimeoutSec 5 | Out-Null
+          $snap = Invoke-RestMethod "$url/api/snapshot" -TimeoutSec 30
+          if (-not $snap.totals) { throw "Snapshot thiếu totals - pricing.json không đúng chỗ" }
+
+          # Đây là lý do job này tồn tại: trên Windows, giết tiến trình KHÔNG chạy khối
+          # finally của server.py nên instance.json ở lại. Extension vì thế gọi /api/quit.
+          Invoke-RestMethod -Method Post "$url/api/quit" -TimeoutSec 5 | Out-Null
+          Start-Sleep -Seconds 3
+          if (Test-Path $state) { throw "instance.json không được dọn sau /api/quit" }
+          Write-Host "OK - Windows chạy được và tắt êm, state đã dọn"
+          Pop-Location
+
+  release:
+    needs: [build, windows-check]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    # Context `secrets` KHÔNG dùng được trong `if` của step (GitHub chỉ cho github/env/needs/
+    # ...), nên map sang env ở cấp job rồi mới kiểm tra `env.X != ''`.
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: AIMonitor-vscode
+          path: vsix
+
+      - name: Đính kèm vào Release
         uses: softprops/action-gh-release@v2
         with:
-          files: vscode-extension/*.vsix
+          files: vsix/*.vsix
           body: |
             ## VSCode
 
-            Tải file `.vsix` rồi cài bằng `code --install-extension <file>.vsix`, hoặc
-            trong VSCode: Extensions => nút `...` => **Install from VSIX...**
+            Cài từ Marketplace: tìm **AI Monitor** trong tab Extensions, hoặc
+
+            ```bash
+            code --install-extension mituultra.aimonitor
+            ```
+
+            File `.vsix` bên dưới dành cho ai cần cài offline.
 
             Cần có `python3` trên PATH. Extension không kèm Python.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Publish CHÍNH file .vsix vừa được hai job trên kiểm tra, không build lại - build lại
+      # là phát hành thứ chưa ai chạy thử.
+      - name: Publish lên VSCode Marketplace
+        if: env.VSCE_PAT != ''
+        run: npx --yes @vscode/vsce@2 publish --packagePath $(ls vsix/*.vsix)
+
+      - name: Cảnh báo khi chưa có VSCE_PAT
+        if: env.VSCE_PAT == ''
+        run: |
+          echo "::warning::Chưa đặt secret VSCE_PAT nên KHÔNG publish lên Marketplace. Release chỉ có file .vsix."
+          echo "Chưa publish lên Marketplace: thiếu secret \`VSCE_PAT\`." >> "$GITHUB_STEP_SUMMARY"
+
+      # Open VSX là store của VSCodium/Cursor/Windsurf - cùng file .vsix, khác nơi đăng.
+      # Bỏ qua nếu chưa có token. ovsx tự đọc biến môi trường OVSX_PAT.
+      - name: Publish lên Open VSX
+        if: env.OVSX_PAT != ''
+        run: npx --yes ovsx publish $(ls vsix/*.vsix)
