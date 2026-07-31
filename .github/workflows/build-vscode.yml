@@ -196,8 +196,55 @@ jobs:
           Write-Host "OK - Windows chạy được và tắt êm, state đã dọn"
           Pop-Location
 
+  # Cùng một file .vsix, chạy trên macOS. KHÔNG dùng setup-python ở đây: bản Python quan
+  # trọng với repo này là /usr/bin/python3 (3.9.6) - thứ duy nhất chắc chắn có mặt trên máy
+  # người dùng macOS, và cũng là thứ app macOS dùng. setup-python sẽ cài một Python khác rồi
+  # kiểm tra nhầm sang nó. macos-14 là runner Apple Silicon.
+  macos-check:
+    needs: build
+    runs-on: macos-14
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: AIMonitor-vscode
+          path: vsix
+
+      - name: Chạy thử server trong gói bằng /usr/bin/python3
+        run: |
+          /usr/bin/python3 --version
+          vsix=$(ls vsix/*.vsix)
+          rm -rf extracted && mkdir extracted
+          unzip -q "$vsix" -d extracted
+          cd extracted/extension
+          /usr/bin/python3 -m aimon.server --port 0 --new > /tmp/aimon-macos.log 2>&1 &
+          state="$HOME/.aimon/instance.json"
+          url=""
+          for i in $(seq 1 30); do
+            sleep 1
+            if [ -f "$state" ]; then
+              url=$(/usr/bin/python3 -c "import json;print(json.load(open('$state'))['url'])" 2>/dev/null || true)
+              [ -n "$url" ] && break
+            fi
+          done
+          if [ -z "$url" ]; then
+            echo "--- log server ---"; cat /tmp/aimon-macos.log
+            exit 1
+          fi
+          echo "url=$url"
+          curl -fsS "$url/api/version"; echo
+          curl -fsS "$url/static/app.js" -o /dev/null
+          curl -fsS "$url/api/snapshot" \
+            | /usr/bin/python3 -c "import json,sys; d=json.load(sys.stdin); assert d.get('totals'), 'snapshot thiếu totals'; print('totals OK')"
+          curl -fsS -X POST "$url/api/quit" -o /dev/null
+          sleep 2
+          if [ -f "$state" ]; then
+            echo "instance.json không được dọn sau /api/quit"
+            exit 1
+          fi
+          echo "OK - macOS chạy được và tắt êm, state đã dọn"
+
   release:
-    needs: [build, windows-check]
+    needs: [build, windows-check, macos-check]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     # Context `secrets` KHÔNG dùng được trong `if` của step (GitHub chỉ cho github/env/needs/

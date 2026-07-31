@@ -176,13 +176,27 @@ chứ đừng chạy từ cây source, vì lỗi đóng gói chỉ lộ ra ở �
 | --- | --- | --- |
 | `build-macos.yml` | `AIMonitor-macos.zip` | macos-latest |
 | `build-windows.yml` | `AIMonitor.exe` | windows-latest |
-| `build-vscode.yml` | `aimonitor-*.vsix` + publish lên Marketplace | ubuntu-latest rồi windows-latest, Python 3.9 (đúng sàn của repo) |
+| `build-vscode.yml` | `aimonitor-*.vsix` + publish lên Marketplace | ubuntu + windows + macOS, Python 3.9 (đúng sàn của repo) |
 
-`build-vscode.yml` có ba job nối tiếp: `build` (tsc, unit test, đóng gói, soát danh sách file
-trong gói, chạy server trên Linux), `windows-check` (tải đúng file `.vsix` đó về
-windows-latest rồi chạy lại server bằng `python` thật), `release` (chỉ khi đẩy tag: đính kèm
-`.vsix` vào Release rồi publish). Thiếu `pricing.json` / `static/` hay lọt `__pycache__`,
-`.ts` là fail ngay ở job đầu.
+`build-vscode.yml` có năm job:
+
+| Job | Làm gì |
+| --- | --- |
+| `build` | tsc, unit test, đóng gói, soát danh sách file trong gói, chạy server trên Linux |
+| `check-pat` | `vsce verify-pat mituultra` - biết token hỏng **trước** khi đẩy tag |
+| `windows-check` | tải đúng file `.vsix` đó về windows-latest, chạy lại server bằng `python` thật |
+| `macos-check` | như trên nhưng trên macos-14, bằng `/usr/bin/python3` |
+| `release` | chỉ khi đẩy tag: đính kèm `.vsix` vào Release rồi publish |
+
+Thiếu `pricing.json` / `static/` hay lọt `__pycache__`, `.ts` là fail ngay ở `build`.
+
+`macos-check` **không** dùng `setup-python`: bản Python quan trọng với repo này là
+`/usr/bin/python3` (3.9.6), thứ duy nhất chắc chắn có trên máy người dùng macOS.
+`setup-python` sẽ cài một Python khác rồi kiểm tra nhầm sang nó. Cũng vì thế không đặt được
+`python-version: 3.9` cho macos-14 - runner Apple Silicon không có bản 3.9 arm64 dựng sẵn.
+
+Đừng viết `[ -f "$state" ] && { echo ...; exit 1; }` trong các bước bash: dưới `bash -e` của
+GitHub, nhánh AND-list này dễ làm bước fail nhầm khi điều kiện sai. Dùng `if ... fi`.
 
 ## Ký app
 
