@@ -1,0 +1,121 @@
+name: Build VSCode extension
+
+# Push lên main => có sẵn file .vsix để tải trong tab Actions.
+# Đẩy tag v* => đính kèm .vsix vào Release.
+#
+# Node và esbuild chỉ là công cụ lúc build, giống PyInstaller bên Windows: code trong
+# aimon/ vẫn chỉ dùng stdlib Python. Người cài extension chỉ cần có python3 trên PATH.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'vscode-extension/**'
+      - 'aimon/**'
+      - 'pricing.json'
+      - '.github/workflows/build-vscode.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: vscode-extension
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 3.9 là sàn của repo (app macOS chạy bằng /usr/bin/python3 3.9.6). Server bundle
+      # trong VSIX phải chạy được ở đúng phiên bản đó, không phải phiên bản mới nhất.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - run: npm ci
+
+      - name: Kiểm tra kiểu
+        run: npx tsc --noEmit
+
+      - name: Unit test
+        run: npm test
+
+      - name: Đóng gói .vsix
+        run: npm run package
+
+      - name: Soát nội dung gói
+        run: |
+          vsix=$(ls *.vsix)
+          echo "gói: $vsix"
+          files=$(unzip -Z1 "$vsix")
+
+          # Thiếu bất kỳ thứ nào dưới đây thì extension vẫn cài được nhưng chết lúc chạy,
+          # nên bắt ngay tại đây thay vì để người dùng phát hiện.
+          for f in extension/dist/extension.js extension/pricing.json \
+                   extension/aimon/server.py extension/aimon/static/app.js \
+                   extension/media/icon.svg extension/images/icon.png; do
+            echo "$files" | grep -qx "$f" || { echo "THIẾU $f"; exit 1; }
+          done
+
+          # Rác không được lọt: .pyc biên dịch cho Python của máy build, và source .ts
+          # (đã bundle vào dist/extension.js rồi).
+          if echo "$files" | grep -E '__pycache__|\.pyc$|\.ts$|\.map$'; then
+            echo "Có file rác trong gói"
+            exit 1
+          fi
+          echo "OK - gói đủ và sạch"
+
+      # Chạy thật server đã bundle: đây mới là chỗ lộ ra nếu copy-aimon.js thiếu
+      # pricing.json hay static/, chứ /api/version thì thiếu gì cũng vẫn trả 200.
+      - name: Chạy thử server trong gói
+        run: |
+          vsix=$(ls *.vsix)
+          rm -rf /tmp/vsix-check && mkdir -p /tmp/vsix-check
+          unzip -q "$vsix" -d /tmp/vsix-check
+          cd /tmp/vsix-check/extension
+          python -m aimon.server --port 0 --new > /tmp/aimon-server.log 2>&1 &
+          url=""
+          for i in $(seq 1 30); do
+            sleep 1
+            if [ -f "$HOME/.aimon/instance.json" ]; then
+              url=$(python -c "import json;print(json.load(open('$HOME/.aimon/instance.json'))['url'])" 2>/dev/null || true)
+              [ -n "$url" ] && break
+            fi
+          done
+          if [ -z "$url" ]; then
+            echo "--- log server ---"; cat /tmp/aimon-server.log
+            exit 1
+          fi
+          echo "url=$url"
+          curl -fsS "$url/api/version" | head -c 300; echo
+          curl -fsS "$url/static/app.js" -o /dev/null
+          # totals rỗng nghĩa là pricing.json không nằm đúng chỗ claude.py đi tìm
+          curl -fsS "$url/api/snapshot" \
+            | python -c "import json,sys; d=json.load(sys.stdin); assert d.get('totals'), 'snapshot thiếu totals'; print('totals OK')"
+          pkill -f 'aimon.server' || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AIMonitor-vscode
+          path: vscode-extension/*.vsix
+
+      - name: Đính kèm vào Release khi đẩy tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: vscode-extension/*.vsix
+          body: |
+            ## VSCode
+
+            Tải file `.vsix` rồi cài bằng `code --install-extension <file>.vsix`, hoặc
+            trong VSCode: Extensions => nút `...` => **Install from VSIX...**
+
+            Cần có `python3` trên PATH. Extension không kèm Python.
