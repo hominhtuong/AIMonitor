@@ -19,8 +19,5 @@ Thumbs.db
 # Log chạy thử
 *.log
 
-# Git worktrees (isolated dev workspaces)
+# Git worktrees (thư mục làm việc tách biệt)
 .worktrees/
-
-# Subagent-driven-development workspace (scratch)
-.superpowers/
