@@ -118,7 +118,9 @@ powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1
 ### VSCode
 
 If you would rather keep the dashboard next to your code, install the extension from the
-Marketplace: search **AI Monitor** in the Extensions panel, or run
+Marketplace:
+[**AI Monitor**](https://marketplace.visualstudio.com/items?itemName=mituultra.aimonitor).
+Search "AI Monitor" in the Extensions panel, or run
 
 ```bash
 code --install-extension mituultra.aimonitor

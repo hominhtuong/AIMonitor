@@ -112,6 +112,24 @@ Muốn chạy từ source thì clone repo rồi tạo shortcut:
 powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1
 ```
 
+### VSCode
+
+Muốn để dashboard ngay cạnh code thì cài extension từ Marketplace:
+[**AI Monitor**](https://marketplace.visualstudio.com/items?itemName=mituultra.aimonitor).
+Tìm "AI Monitor" trong tab Extensions, hoặc chạy:
+
+```bash
+code --install-extension mituultra.aimonitor
+```
+
+Cài xong, icon AI Monitor xuất hiện ở activity bar (thanh biểu tượng bên trái), bấm vào là
+dashboard mở thành một panel trong editor. Extension tự bật server local khi anh mở panel lần
+đầu nên **cần Python 3.9 trở lên trên PATH** - macOS/Linux có sẵn, Windows thì cài từ
+[python.org](https://www.python.org/downloads/) và nhớ tick **"Add python.exe to PATH"**.
+
+Ai cần cài offline thì tải file `.vsix` ở **Releases**, rồi vào Extensions panel => nút `...`
+=> **Install from VSIX...**
+
 ---
 
 ## 3. Vì sao cần tool này: một phiên, hơn 20 tiến trình

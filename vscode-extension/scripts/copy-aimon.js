@@ -35,9 +35,9 @@ fs.writeFileSync(path.join(mediaDir, 'icon.svg'), ACTIVITY_BAR_ICON);
 console.log(`wrote monochrome activity-bar icon -> ${path.join(mediaDir, 'icon.svg')}`);
 
 // Icon marketplace/Extensions panel (package.json "icon") PHẢI là PNG vuông, giữ nguyên màu.
-// Marketplace đòi tối thiểu 128x128 nhưng phóng to trên trang chi tiết, nên dùng bản 256 cho
-// khỏi vỡ - vẫn là logo dùng chung với app macOS.
-const galleryIconSrc = path.join(repoRoot, 'assets', 'icon_256.png');
+// Marketplace đòi tối thiểu 128x128 nhưng trang chi tiết phóng to và màn hình retina nhân
+// đôi, nên dùng thẳng assets/icon.png (512x512) - cùng logo với app macOS và .exe Windows.
+const galleryIconSrc = path.join(repoRoot, 'assets', 'icon.png');
 const imagesDir = path.join(__dirname, '..', 'images');
 fs.mkdirSync(imagesDir, { recursive: true });
 fs.copyFileSync(galleryIconSrc, path.join(imagesDir, 'icon.png'));
