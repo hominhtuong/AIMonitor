@@ -34,9 +34,10 @@ fs.mkdirSync(mediaDir, { recursive: true });
 fs.writeFileSync(path.join(mediaDir, 'icon.svg'), ACTIVITY_BAR_ICON);
 console.log(`wrote monochrome activity-bar icon -> ${path.join(mediaDir, 'icon.svg')}`);
 
-// Icon marketplace/Extensions panel (package.json "icon") PHẢI là PNG vuông, giữ nguyên màu -
-// dùng lại assets/icon_128.png đã có sẵn ở root repo (cùng logo dùng cho app macOS).
-const galleryIconSrc = path.join(repoRoot, 'assets', 'icon_128.png');
+// Icon marketplace/Extensions panel (package.json "icon") PHẢI là PNG vuông, giữ nguyên màu.
+// Marketplace đòi tối thiểu 128x128 nhưng phóng to trên trang chi tiết, nên dùng bản 256 cho
+// khỏi vỡ - vẫn là logo dùng chung với app macOS.
+const galleryIconSrc = path.join(repoRoot, 'assets', 'icon_256.png');
 const imagesDir = path.join(__dirname, '..', 'images');
 fs.mkdirSync(imagesDir, { recursive: true });
 fs.copyFileSync(galleryIconSrc, path.join(imagesDir, 'icon.png'));
@@ -49,3 +50,10 @@ const pricingSrc = path.join(repoRoot, 'pricing.json');
 const pricingDest = path.join(__dirname, '..', 'pricing.json');
 fs.copyFileSync(pricingSrc, pricingDest);
 console.log(`copied ${pricingSrc} -> ${pricingDest}`);
+
+// Marketplace hiện tab "License" lấy từ file LICENSE trong gói. Không có thì vsce cảnh báo
+// và trang extension ghi "No license" - dùng chung LICENSE (MIT) ở gốc repo.
+const licenseSrc = path.join(repoRoot, 'LICENSE');
+const licenseDest = path.join(__dirname, '..', 'LICENSE');
+fs.copyFileSync(licenseSrc, licenseDest);
+console.log(`copied ${licenseSrc} -> ${licenseDest}`);

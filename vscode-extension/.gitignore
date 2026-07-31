@@ -5,4 +5,5 @@ aimon/
 media/
 images/
 pricing.json
+LICENSE
 *.vsix
