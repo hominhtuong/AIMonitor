@@ -21,3 +21,9 @@ Thumbs.db
 
 # Git worktrees (thư mục làm việc tách biệt)
 .worktrees/
+
+# Ảnh tham khảo nhân vật: để ở máy làm cảm hứng vẽ, KHÔNG đẩy lên.
+# Repo này public, mà trong đó có fan art của IP có chủ (Naruto, One Piece, Shaun the Sheep,
+# Mario...) và bản xem trước của pack có giấy phép riêng. Nhân vật thật sự dùng trong tool
+# đều vẽ bằng code ở aimon/static/sprites.js, không dùng file nào ở đây.
+assets/characters/

@@ -76,6 +76,7 @@ export class DashboardPanel {
         refreshSeconds: this.config.refreshSeconds,
         compact: false,
         aiKinds: this.config.aiKinds,
+        officePack: this.config.officePack,
       });
       this.panel.webview.html = iframePage(url);
     } catch (err) {

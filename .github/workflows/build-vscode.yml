@@ -47,6 +47,32 @@ jobs:
       - name: Unit test
         run: npm test
 
+      - name: Danh sách bộ nhân vật phải khớp ở cả ba nơi
+        working-directory: .
+        run: |
+          # sprites.js là nơi VẼ ra chúng; config_file.py chặn giá trị rác ghi vào config;
+          # package.json dựng dropdown trong Settings. Lệch một nơi thì hoặc người dùng chọn
+          # được một bộ không tồn tại, hoặc bộ mới không hiện ra - cả hai đều lặng lẽ.
+          python - <<'PY'
+          import json, re, sys
+          js = open('aimon/static/sprites.js', encoding='utf-8').read()
+          packs = re.findall(r"\{ id: '(\w+)', chars:", js)
+          sys.path.insert(0, '.')
+          from aimon.config_file import OFFICE_PACKS
+          pkg = json.load(open('vscode-extension/package.json', encoding='utf-8'))
+          enum = pkg['contributes']['configuration']['properties']['aimon.officePack']['enum']
+          assert len(packs) >= 1, 'khong doc duoc bo nao tu sprites.js'
+          assert sorted(packs) == sorted(OFFICE_PACKS), f'sprites.js {sorted(packs)} != config_file.py {sorted(OFFICE_PACKS)}'
+          assert sorted(packs) == sorted(enum), f'sprites.js {sorted(packs)} != package.json {sorted(enum)}'
+          # Mỗi bộ phải có nhãn ở CẢ hai ngôn ngữ, nếu không t() trả về chính tên khoá và
+          # bảng chọn hiện ra chữ "office.pack_pets".
+          i18n = open('aimon/static/i18n.js', encoding='utf-8').read()
+          for p in packs:
+              n = i18n.count("'office.pack_%s':" % p)
+              assert n == 2, f'office.pack_{p} co {n} ban dich, phai co 2 (en + vi)'
+          print(f'{len(packs)} bo, khop ca ba noi va du 2 ban dich')
+          PY
+
       - name: Đóng gói .vsix
         run: npm run package
 
@@ -62,6 +88,7 @@ jobs:
                    extension/aimon/server.py extension/aimon/office.py \
                    extension/aimon/static/app.js \
                    extension/aimon/static/office.js extension/aimon/static/sprites.js \
+                   extension/aimon/static/packimport.js \
                    extension/media/icon.svg extension/images/icon.png \
                    extension/README.md extension/CHANGELOG.md extension/LICENSE.txt; do
             echo "$files" | grep -qx "$f" || { echo "THIẾU $f"; exit 1; }

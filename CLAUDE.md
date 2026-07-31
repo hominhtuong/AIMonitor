@@ -629,14 +629,97 @@ vào cả ba đường đóng gói lẫn bước soát danh sách file trong CI,
 biến mất mà tool vẫn chạy - đúng kiểu hỏng lặng lẽ `pricing.json` đã dính. Sprite pack có sẵn
 ngoài kia gần như luôn kèm giấy phép riêng cho phần asset, khác giấy phép phần code.
 
-Bảng ánh xạ tool -> hoạt cảnh (`ACTION_BY_TOOL`) nằm ở **backend**: cả ba vỏ dùng chung server,
-và đó là dữ liệu chứ không phải chuyện hiển thị. Câu chữ thì vẫn theo luật cũ - backend trả mã,
-`i18n.js` dựng câu. `office.js` có một bản `action_of_js` nhỏ chỉ dùng cho sự kiện phát lại;
-sửa bảng ở `office.py` thì sửa cả hai.
+### Bộ nhân vật (sprites.js)
 
-Phóng to luôn theo **bội số nguyên** và kích thước canvas là `ROOM_W * scale`, không phải bề
-rộng khung chứa. Cho canvas `width:100%` là pixel art nhoè ngay, mà đó là thứ duy nhất khung
-nhìn này có để nhìn.
+**Bốn bộ, mỗi bộ 10 nhân vật**: Văn phòng (người), Thú cưng, Slime, Mascot. Chọn một bộ thì
+CẢ PHÒNG theo bộ đó, và mỗi agent nhận một nhân vật KHÁC nhau trong bộ; quá 10 agent thì quay
+vòng dùng lại. Bấm vào một người trong phòng rồi chọn ở dãy dưới bảng chi tiết thì đổi riêng
+người đó.
+
+`PACKS` khai bộ, `ALL_CHARS` là bảng phẳng mọi nhân vật của mọi bộ theo đúng thứ tự hàng trong
+atlas - `office.js` chỉ giữ một số nguyên `charIndex` trỏ vào đây, không cần biết bộ nào.
+
+**Không dùng file ảnh tải về.** Ảnh tham khảo để ở `assets/characters/` và đã bị `.gitignore`
+chặn: repo này public, mà trong đó có fan art của IP có chủ (Naruto, One Piece, Shaun the
+Sheep, Mario) và bản xem trước của pack có giấy phép riêng. "Tải trên trang free download"
+không cấp quyền cho nhân vật gốc - trang chỉ cấp được quyền cho phần người upload tự vẽ.
+
+**Viền tối 1 pixel làm hậu kỳ, đừng vẽ tay.** `outlineCell()` quét alpha của ô vừa vẽ, chỗ nào
+trong suốt mà chạm vào chỗ đặc thì tô. Nhờ vậy sửa một hình chữ nhật bất kỳ không phải sửa
+viền theo, và mọi bộ đều có cùng một kiểu viền. Đây là thứ tách nhân vật khỏi nền và là khác
+biệt lớn nhất giữa bản đầu (bẹt) với bản có nét như sprite thật.
+
+Ô trong atlas vì thế **rộng hơn nhân vật 1 pixel mỗi bên**. `drawEntity` phải vẽ lệch `-1`,
+nếu không viền của hàng xóm dính sang và thân bị lệch nửa pixel.
+
+**Tỷ lệ chibi là thứ tạo ra cảm giác dễ thương, không phải thêm chi tiết** - 16x20 pixel không
+đủ chỗ cho chi tiết. Đầu chiếm 9/20 chiều cao, mắt 2x2 có chấm sáng trắng, má hồng. Bản đầu vẽ
+theo tỷ lệ người thật, mặt chỉ còn hai chấm 1x1 và phản hồi nhận được là "xấu, không cute".
+
+Bố cục dọc phải giữ nguyên khi thêm nhân vật: `y 0..9` đầu, `y 10..15` thân, `y 16..19` chân.
+Lệch một hàng giữa đầu và thân là hở một vệt sàn ngang cổ - ở bậc phóng 5 nhìn như cái đầu rời
+khỏi thân, và đó là lỗi đã dính khi dựng tư thế ngồi.
+
+Người ngồi **không vẽ chân** (chân khuất sau ghế) nên `drawEntity` cũng không vẽ bóng cho họ:
+bóng nằm ở đáy sprite, mà đáy sprite lúc đó là khoảng trống, thành ra một vệt lơ lửng.
+
+Hai cái bẫy khi vẽ bộ mới:
+
+- **Hình khối phải thót dần về đỉnh.** Slime bản đầu vẽ bằng một hình chữ nhật bo góc nên cả
+  bộ trông như mấy cái TV cũ. `slimeDome()` giờ thu hẹp 3 hàng trên cùng.
+- **Phụ kiện phải BÁM vào thân.** Sừng hươu và râu ong bản đầu vẽ ở `x=3` và `x=13`, ngoài
+  silhouette (thân chỉ rộng `x=4..11`), nên chúng bay lơ lửng giữa không khí.
+
+Danh sách bộ nằm ở **ba chỗ** và phải khớp: `PACKS` trong `sprites.js` (nơi vẽ), `OFFICE_PACKS`
+trong `config_file.py` (chặn giá trị rác), `enum` của `aimon.officePack` trong `package.json`
+(dựng dropdown). Mỗi bộ còn phải có nhãn ở CẢ hai ngôn ngữ, nếu không bảng chọn hiện ra chữ
+`office.pack_pets`. CI kiểm cả bốn điều kiện này.
+
+Chỗ ngồi (`OF.slots`) giữ nguyên khi đổi bộ, nên đổi bộ xong ai vẫn ở đúng vị trí cũ, chỉ đổi
+hình. Nhưng lựa chọn ép riêng thì bị xoá: chúng thuộc về bộ cũ, giữ lại thì đổi bộ xong vẫn
+còn vài người mang hình bộ trước, nhìn như lỗi. Phải dọn `OF.slots` của ai rời phòng, nếu
+không `slotFor()` thấy chỗ nào cũng bận và người mới vào toàn phải quay vòng.
+
+### Nhập bộ nhân vật từ ảnh (packimport.js)
+
+Nút `+` ở bảng chọn cho người dùng đưa một tấm ảnh nhiều nhân vật vào, tool tự tách thành một
+bộ. **Ảnh không rời khỏi máy**: đọc bằng `FileReader`, xử lý bằng canvas, cất PNG đã thu nhỏ ở
+`localStorage`. File này không có một lời gọi mạng nào, và bộ nhập vào không bao giờ đi vào gói
+phát hành - đó mới là điểm mấu chốt, vì ảnh nhân vật tải trên mạng thường có giấy phép riêng
+hoặc là fan art của IP có chủ. Người dùng tự đưa ảnh của mình vào máy mình thì không phát tán
+gì; đóng sẵn chúng vào bản phát hành thì có.
+
+Bốn bước, mỗi bước một cái bẫy đã trả giá:
+
+1. **Tách nền bằng flood fill từ MÉP vào**, không lọc theo màu trên toàn ảnh. Lọc toàn ảnh thì
+   nhân vật áo trắng trên nền trắng bị thủng một lỗ giữa người.
+2. **Cắt theo VÙNG LIÊN THÔNG**, không chiếu xuống hàng/cột. Bảng liên hoàn thật gần như không
+   bao giờ xếp thành lưới đều: ảnh thú trại có hàng 4 con so le, chiếu xuống cột thì không cột
+   nào trống hẳn nên cả 4 con gộp thành MỘT ô.
+3. **Gộp mẩu lẻ theo kích thước NHÂN VẬT, không theo kích thước ảnh.** Bản đầu nới 1.2% cạnh
+   ngắn, với tấm 1200px thành 14 pixel, và hai con đứng cạnh nhau dính làm một - 12 con còn 4.
+   `attachOrphans()` phân loại trước: khung cỡ trung vị trở lên là nhân vật thật và không bao
+   giờ nhập vào nhau; chỉ mẩu tí hon mới đi tìm chủ.
+4. **Lọc rác theo tỷ lệ ngang/dọc và diện tích tương đối**, đo thật rồi mới chọn ngưỡng:
+
+   | Ảnh | Nhân vật thật | Rác |
+   | --- | --- | --- |
+   | Thú trại (12 con) | tỷ lệ 0.99-1.47, nhỏ nhất 41% trung vị | không có |
+   | Mascot (20 con) | tỷ lệ 0.69-0.99 | dấu chìm tỷ lệ **3.72**, hai mẩu 8x7 và 6x6 |
+
+   Lọc theo độ ĐẶC thì không ăn: chữ "ShowHex" đặc 0.91, đặc hơn quá nửa số nhân vật.
+
+Thu nhỏ phải **bật làm mượt** (lấy trung bình vùng) rồi mới cắt ngưỡng alpha. Nearest-neighbour
+từ 180px xuống 20px thì mỗi pixel đích chỉ lấy đúng một pixel nguồn, mất gần hết chi tiết.
+
+Ảnh người dùng gần như luôn chỉ có một tư thế đứng, không đủ 13 khung hình. `drawImportedFrame`
+dựng chuyển động bằng cách xê dịch 1 pixel theo nhịp - đủ để nhìn ra đang đi hay đang gõ, mà
+không đòi người dùng phải có sprite sheet đầy đủ. Bộ nhập vào **không tô viền** (`outline:
+false`): ảnh gốc đã có viền sẵn, tô thêm là viền đôi dày cộp.
+
+Đo trên 10 tấm thật: 6-81ms mỗi tấm. Ảnh nào nền sát màu thân nhân vật (bầy cừu kem trên nền
+kem) thì flood fill ăn lẹm vào thân và tách thiếu - giới hạn đã biết của việc tách nền tự động,
+nên có `note_single` báo cho người dùng thay vì lặng lẽ đưa ra một bộ hỏng.
 
 ## Guard khi kill
 

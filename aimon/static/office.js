@@ -78,7 +78,275 @@ const OF = {
   last: 0,
   clock: 0,
   pal: {},
+  // Bộ nhân vật đang áp cho cả phòng. Mỗi agent nhận một nhân vật KHÁC nhau trong bộ;
+  // hết nhân vật thì quay vòng dùng lại.
+  pack: 'office',
+  slots: new Map(),      // id agent -> chỗ thứ mấy trong bộ
+  overrides: new Map(),  // id agent -> khoá "bộ:nhân-vật" do người dùng tự chọn cho riêng người đó
 };
+
+/* ------------------------------------------------- chọn bộ nhân vật cho phòng */
+
+const PACK_KEY = 'aimon.pack';
+const OVERRIDE_KEY = 'aimon.charOverrides';
+// Ép riêng cho từng agent là lựa chọn nhất thời (id phiên đổi liên tục), nên chỉ giữ vài
+// chục cái gần nhất thay vì để localStorage phình mãi.
+const MAX_OVERRIDES = 40;
+
+/** Chỗ của một agent trong bộ. Ưu tiên chỗ còn trống để hai người cạnh nhau không trùng mặt;
+ *  hết chỗ mới quay vòng. Giữ nguyên khi đổi bộ, nên đổi bộ xong ai vẫn ở đúng vị trí cũ. */
+function slotFor(id) {
+  if (OF.slots.has(id)) return OF.slots.get(id);
+  const n = packById(OF.pack).chars.length;
+  const used = new Set();
+  OF.slots.forEach((v, k) => { if (k !== id && OF.ents.has(k)) used.add(v); });
+  let s = 0;
+  while (s < n && used.has(s)) s++;
+  if (s >= n) s = OF.slots.size % n;
+  OF.slots.set(id, s);
+  return s;
+}
+
+/** Chỉ số nhân vật thật sự dùng cho một agent. */
+function charIndexFor(id) {
+  const key = OF.overrides.get(id);
+  if (key) {
+    const i = charIndexByKey(key);
+    if (i >= 0) return i;
+  }
+  return charAt(OF.pack, slotFor(id));
+}
+
+/** Áp lại nhân vật cho mọi người đang có trong phòng. */
+function reskinAll() {
+  OF.ents.forEach((e) => { e.charIndex = charIndexFor(e.id); });
+}
+
+function saveOverrides() {
+  const obj = {};
+  OF.overrides.forEach((v, k) => { obj[k] = v; });
+  try { localStorage.setItem(OVERRIDE_KEY, JSON.stringify(obj)); } catch (e) { /* riêng tư */ }
+}
+
+/** Đổi bộ cho cả phòng. Bỏ mọi lựa chọn ép riêng: chúng thuộc về bộ cũ, giữ lại thì đổi bộ
+ *  xong vẫn còn vài người mang hình bộ trước, nhìn như lỗi. */
+function setPack(id) {
+  OF.pack = packById(id).id;
+  OF.overrides.clear();
+  saveOverrides();
+  try { localStorage.setItem(PACK_KEY, OF.pack); } catch (e) { /* riêng tư */ }
+  reskinAll();
+  renderPacks();
+  renderDetail();
+}
+
+/** Ép riêng một agent sang nhân vật khác. */
+function setCharFor(id, charIndex) {
+  OF.overrides.set(id, charKey(charIndex));
+  while (OF.overrides.size > MAX_OVERRIDES) {
+    OF.overrides.delete(OF.overrides.keys().next().value);
+  }
+  saveOverrides();
+  const e = OF.ents.get(id);
+  if (e) e.charIndex = charIndex;
+  renderDetail();
+}
+
+function initPack() {
+  let saved = null;
+  try { saved = localStorage.getItem(PACK_KEY); } catch (e) { /* bỏ qua */ }
+  // Cùng thứ tự ưu tiên với bộ lọc loại agent: lựa chọn bấm trên trang thắng tham số của
+  // extension, vì đây là sở thích cá nhân chứ không phải ràng buộc của khung nhìn.
+  const q = new URLSearchParams(location.search).get('pack');
+  const cfg = (window.AIMON_CONFIG || {}).office_pack;
+  const pick = saved != null ? saved : (q != null ? q : (cfg || ''));
+  OF.pack = PACKS.some((p) => p.id === pick) ? pick : 'office';
+
+  try {
+    const raw = JSON.parse(localStorage.getItem(OVERRIDE_KEY) || '{}');
+    Object.keys(raw).forEach((k) => {
+      if (typeof raw[k] === 'string' && charIndexByKey(raw[k]) >= 0) OF.overrides.set(k, raw[k]);
+    });
+  } catch (e) { /* dữ liệu cũ hỏng thì bỏ qua, không làm chết khung nhìn */ }
+}
+
+/* ------------------------------------------- bộ nhân vật nhập từ ảnh của người dùng
+ *
+ * Ảnh KHÔNG rời khỏi máy và bộ nhập vào KHÔNG bao giờ đi vào gói phát hành. Đó là chủ ý:
+ * ảnh nhân vật tải trên mạng thường có giấy phép riêng, hoặc là fan art của nhân vật có
+ * chủ. Người dùng tự đưa ảnh của mình vào máy mình thì không phát tán gì; đóng sẵn chúng
+ * vào bản phát hành thì có.
+ */
+
+const CUSTOM_KEY = 'aimon.customPacks';
+const CUSTOM_MAX = 6;
+
+/** Canvas 16x20 -> chuỗi PNG để cất. Cất PNG chứ không cất ảnh gốc: ảnh gốc vài trăm KB,
+ *  còn 40 nhân vật đã thu nhỏ chỉ tốn vài chục KB, vừa localStorage. */
+function packToStore(pack) {
+  return {
+    id: pack.id,
+    name: pack.name,
+    chars: pack.chars.map((c) => ({ id: c.id, name: c.name, png: c.canvas.toDataURL('image/png') })),
+  };
+}
+
+function readStoredPacks() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch (e) {
+    return [];   // dữ liệu hỏng thì coi như chưa có bộ nào, đừng làm chết khung nhìn
+  }
+}
+
+function writeStoredPacks(list) {
+  try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(list)); }
+  catch (e) { toast(t('import.err_store'), 'err'); }
+}
+
+/** Dựng lại canvas từ PNG đã cất. Bất đồng bộ vì Image.onload, nên khung nhìn khởi động
+ *  bằng bộ dựng sẵn trước rồi mới gắn bộ nhập vào sau - không bắt người dùng chờ. */
+function loadCustomPacks() {
+  const stored = readStoredPacks();
+  if (!stored.length) return Promise.resolve(0);
+  const jobs = stored.map((p) => Promise.all(p.chars.map((c) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const cv = document.createElement('canvas');
+      cv.width = SPRITE_W; cv.height = SPRITE_H;
+      cv.getContext('2d').drawImage(im, 0, 0);
+      res({ id: c.id, name: c.name, canvas: cv });
+    };
+    im.onerror = () => res(null);
+    im.src = c.png;
+  }))).then((chars) => {
+    const ok = chars.filter(Boolean);
+    if (ok.length) addCustomPack(p.id, ok);
+    return ok.length ? 1 : 0;
+  }));
+  return Promise.all(jobs).then((n) => n.reduce((a, b) => a + b, 0));
+}
+
+/** Người dùng vừa chọn một file ảnh. */
+function importPackFile(file) {
+  if (!file) return;
+  readImageFile(file)
+    .then((img) => {
+      const { cells, note, found } = sliceSheet(img, SPRITE_W, SPRITE_H);
+      if (!cells.length) { toast(t('import.err_empty'), 'err'); return; }
+
+      const base = (file.name || 'pack').replace(/\.[^.]+$/, '').slice(0, 24) || 'pack';
+      const id = 'custom:' + base + ':' + cells.length;
+      const chars = cells.map((cv, i) => ({ id: 'c' + i, name: base + ' ' + (i + 1), canvas: cv }));
+      addCustomPack(id, chars);
+
+      const list = readStoredPacks().filter((p) => p.id !== id);
+      list.push(packToStore({ id, name: base, chars }));
+      while (list.length > CUSTOM_MAX) list.shift();
+      writeStoredPacks(list);
+
+      OF.atlas = buildSpriteAtlas();     // atlas có thêm hàng mới, phải dựng lại
+      setPack(id);
+      toast(t(note || 'import.done', { n: cells.length, found: found || cells.length }), note ? '' : 'ok');
+    })
+    .catch(() => toast(t('import.err_read'), 'err'));
+}
+
+function deleteCustomPack(id) {
+  writeStoredPacks(readStoredPacks().filter((p) => p.id !== id));
+  removeCustomPack(id);
+  OF.atlas = buildSpriteAtlas();
+  if (OF.pack === id) setPack('office');
+  else { reskinAll(); renderPacks(); }
+}
+
+/** Bảng chọn bộ: mỗi bộ một ô, xem trước bằng ba nhân vật đầu của bộ đó. */
+function renderPacks() {
+  const host = document.getElementById('office-skins');
+  if (!host) return;
+
+  // Dựng lại khi số bộ đổi (vừa nhập thêm hoặc vừa xoá). +1 cho ô "thêm bộ".
+  if (host.childElementCount !== PACKS.length + 1) {
+    host.textContent = '';
+    PACKS.forEach((p) => {
+      const b = document.createElement('button');
+      b.className = 'skin';
+      b.dataset.pack = p.id;
+      const strip = document.createElement('span');
+      strip.className = 'strip';
+      for (let i = 0; i < 3 && i < p.chars.length; i++) {
+        const cv = document.createElement('canvas');
+        renderCharPreview(cv, charAt(p.id, i), 2);
+        strip.appendChild(cv);
+      }
+      b.appendChild(strip);
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      b.appendChild(nm);
+      if (p.custom) {
+        // Nút xoá là <span role=button>, KHÔNG phải <button>: button lồng trong button là
+        // HTML sai, Firefox tự tháo ra ngoài và cái nút rơi mất khỏi ô.
+        const del = document.createElement('span');
+        del.className = 'del';
+        del.dataset.del = p.id;
+        del.setAttribute('role', 'button');
+        del.textContent = '×';
+        b.appendChild(del);
+      }
+      host.appendChild(b);
+    });
+
+    const add = document.createElement('button');
+    add.className = 'skin add';
+    add.dataset.add = '1';
+    add.innerHTML = '<span class="plus">+</span><span class="nm"></span>';
+    host.appendChild(add);
+  }
+
+  Array.from(host.children).forEach((b) => {
+    const nm = b.querySelector('.nm');
+    if (b.dataset.add) {
+      b.setAttribute('aria-pressed', 'false');
+      b.title = t('import.hint');
+      if (nm) nm.textContent = t('import.add');
+      return;
+    }
+    b.setAttribute('aria-pressed', String(b.dataset.pack === OF.pack));
+    const p = packById(b.dataset.pack);
+    // Bộ nhập vào lấy tên từ tên file, không dịch; bộ dựng sẵn thì tra bảng dịch.
+    if (nm) nm.textContent = p.custom ? p.id.split(':')[1] : t('office.pack_' + b.dataset.pack);
+    const del = b.querySelector('.del');
+    if (del) del.title = t('import.remove');
+  });
+  const box = document.getElementById('office-skinbox');
+  const sum = box && box.querySelector('summary');
+  if (sum) sum.textContent = t('office.pack_pick');
+}
+
+/** Dãy nhân vật của bộ đang chọn, để đổi riêng cho một agent. Dựng HTML thô vì nó nằm trong
+ *  vùng do render()/morph() quản lý; canvas xem trước được vẽ ngay sau đó. */
+function agentSkinRow(agentId, current) {
+  const p = packById(OF.pack);
+  return '<div class="agent-skins" data-key="askin">'
+    + `<span class="lbl">${esc(t('office.change_char'))}</span>`
+    + p.chars.map((c, i) => {
+      const gi = charAt(OF.pack, i);
+      return `<button class="mini pick" data-char="${gi}" aria-pressed="${gi === current}"
+        title="${esc(c.name)}"><canvas data-char-preview="${gi}"></canvas></button>`;
+    }).join('')
+    + '</div>';
+}
+
+/** Vẽ nội dung cho mọi canvas xem trước vừa được morph() dựng ra. */
+function paintCharPreviews() {
+  document.querySelectorAll('canvas[data-char-preview]').forEach((cv) => {
+    const gi = +cv.dataset.charPreview;
+    if (cv.dataset.painted === String(gi)) return;   // morph giữ lại canvas cũ thì khỏi vẽ lại
+    renderCharPreview(cv, gi, 2);
+    cv.dataset.painted = String(gi);
+  });
+}
 
 /* ------------------------------------------------------------- bố cục phòng */
 
@@ -215,7 +483,7 @@ function syncAgents(payload) {
     seen.add(a.id);
     let e = OF.ents.get(a.id);
     if (!e) {
-      e = newEntity(a.id, 'agent', charIndexOf(a.id));
+      e = newEntity(a.id, 'agent', charIndexFor(a.id));
       OF.ents.set(a.id, e);
     }
     e.data = a;
@@ -230,7 +498,7 @@ function syncAgents(payload) {
       seen.add(sub.id);
       let se = OF.ents.get(sub.id);
       if (!se) {
-        se = newEntity(sub.id, 'sub', charIndexOf(sub.id));
+        se = newEntity(sub.id, 'sub', charIndexFor(sub.id));
         OF.ents.set(sub.id, se);
       }
       se.data = { ...sub, state: 'busy', action: 'work', parent: a.id };
@@ -238,6 +506,10 @@ function syncAgents(payload) {
       if (!se.spot && e.desk) sendToSpot(se, e.desk.helpers[i]);
     });
   });
+
+  // Bỏ chỗ đã giữ của những ai không còn trong phòng: giữ lại thì slotFor() thấy chỗ nào
+  // cũng bận và người mới vào toàn phải quay vòng, cả phòng trùng mặt nhau.
+  OF.slots.forEach((_, id) => { if (!seen.has(id)) OF.slots.delete(id); });
 
   // Ai không còn trong danh sách thì đi ra cửa rồi biến mất
   OF.ents.forEach((e, id) => {
@@ -483,20 +755,24 @@ function drawEntity(g, e) {
   const flip = e.dir === 'left' && e.path.length;
   const small = e.kind === 'sub';
 
-  px2(g, e.x + 3, e.y + SPRITE_H - 2, 10, 2, OF.pal.shadow);
+  // Người ngồi không vẽ chân (chân khuất sau ghế), nên cái bóng ở đáy sprite hoá ra một
+  // vệt tách rời lơ lửng dưới thân. Ngồi thì bóng cũng khuất sau ghế - bỏ luôn.
+  if (e.mode !== 'sit') px2(g, e.x + 3, e.y + SPRITE_H - 2, 10, 2, OF.pal.shadow);
   g.save();
+  // Ô trong atlas rộng hơn nhân vật 1 pixel mỗi bên để chứa viền, nên vẽ lệch -1: phần thân
+  // vẫn rơi đúng vào (e.x, e.y), còn viền tràn ra ngoài như nó phải thế.
   if (small) {
     // sub-agent vẽ nhỏ hơn một chút để phân biệt với người gọi nó mà không cần chú thích
     g.translate(e.x + SPRITE_W / 2, e.y + SPRITE_H);
     g.scale(0.8, 0.8);
     g.translate(-SPRITE_W / 2, -SPRITE_H);
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, 0, 0, SPRITE_W, SPRITE_H);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, sw, sh);
   } else if (flip) {
     g.translate(e.x + SPRITE_W, e.y);
     g.scale(-1, 1);
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, 0, 0, SPRITE_W, SPRITE_H);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, sw, sh);
   } else {
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, e.x, e.y, SPRITE_W, SPRITE_H);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, e.x - 1, e.y - 1, sw, sh);
   }
   g.restore();
 }
@@ -507,11 +783,11 @@ function drawCatEntity(g) {
   const [sx, sy, sw, sh] = OF.atlas.catCell(Math.floor(c.anim * 5) % 2);
   g.save();
   if (c.flip) {
-    g.translate(c.x + sw, c.y);
+    g.translate(c.x + sw - 2, c.y);
     g.scale(-1, 1);
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, sw, sh);
   } else {
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, c.x, c.y, sw, sh);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, c.x - 1, c.y - 1, sw, sh);
   }
   g.restore();
 }
@@ -743,9 +1019,12 @@ function renderDetail() {
     <div class="grid">${cells.map((c) =>
       `<div class="cell"><div class="v" data-flash="1">${esc(c.v)}</div><div class="k">${esc(c.k)}</div></div>`).join('')}</div>
     ${doing}${subs}
+    ${agentSkinRow(OF.sel, e.charIndex)}
     <div class="h2row"><h2>${t('office.tree_title', { n: root ? root.children.length : 0 })}</h2></div>
     ${tree}
   </div>`);
+  // morph() vừa dựng lại DOM nên mấy canvas xem trước đang trống, phải tô ngay sau đó.
+  paintCharPreviews();
 }
 
 /* ------------------------------------------------------------- vòng dữ liệu */
@@ -808,8 +1087,39 @@ function officeInit() {
   OF.canvas.addEventListener('mouseleave', () => { OF.hover = null; });
   OF.canvas.addEventListener('click', onClick);
   window.addEventListener('resize', resize);
+
+  initPack();
+  renderPacks();
+  const skins = document.getElementById('office-skins');
+  if (skins) {
+    skins.addEventListener('click', (ev) => {
+      const del = ev.target.closest('[data-del]');
+      if (del) { ev.stopPropagation(); deleteCustomPack(del.dataset.del); return; }
+      if (ev.target.closest('button[data-add]')) { document.getElementById('office-file').click(); return; }
+      const b = ev.target.closest('button[data-pack]');
+      if (b) setPack(b.dataset.pack);
+    });
+    const file = document.getElementById('office-file');
+    if (file) {
+      file.addEventListener('change', () => {
+        importPackFile(file.files && file.files[0]);
+        file.value = '';        // chọn lại đúng file đó lần nữa vẫn phải bắn sự kiện
+      });
+    }
+  }
+
   OF.ready = true;
   resize();
+
+  // Nạp bộ người dùng đã nhập trước đó. Chạy nền: dựng canvas từ PNG là bất đồng bộ, chờ nó
+  // thì phòng đứng hình mất một nhịp mà chẳng được gì.
+  loadCustomPacks().then((n) => {
+    if (!n) return;
+    OF.atlas = buildSpriteAtlas();
+    initPack();          // bộ đã cất giờ mới tồn tại, chọn lại cho đúng
+    reskinAll();
+    renderPacks();
+  });
 }
 
 function officeStart() {
@@ -841,7 +1151,10 @@ function officeSync() {
 
 document.addEventListener('click', (ev) => {
   const b = ev.target.closest('button[data-act="of-close"]');
-  if (b) { OF.sel = null; renderDetail(); }
+  if (b) { OF.sel = null; renderDetail(); return; }
+  // Bấm một nhân vật trong dãy => đổi riêng cho agent đang mở, không đụng ai khác.
+  const pick = ev.target.closest('.agent-skins button[data-char]');
+  if (pick && OF.sel) setCharFor(OF.sel, +pick.dataset.char);
 });
 document.querySelectorAll('.tabs button').forEach((b) =>
   b.addEventListener('click', () => setTimeout(officeSync, 0)));
@@ -861,6 +1174,7 @@ function officeRefresh() {
   renderLegend();
   renderStatus();
   renderDetail();
+  renderPacks();      // tên bộ phải đổi theo ngôn ngữ
   if (OF.on) draw();
 }
 

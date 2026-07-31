@@ -200,6 +200,19 @@ running commands, purple for fetching the web. Leave an agent idle for a minute 
 it gets up and wanders around. Sub-agents show up as smaller helpers standing next to whoever
 called them. Click any computer to open that session in full, process tree included.
 
+There are **four character sets** of ten: Office, Pets, Slimes and Mascots. Open **Character
+set** under the room to see all four with a preview; pick one and the whole room switches to
+it, each agent taking a different character from the set - once it runs out it starts over.
+Click a character in the room and the detail panel grows a row of that set, so you can change
+just that one. Both choices are remembered.
+
+To use your own characters, click the **+** tile next to the four sets and pick any picture
+holding several characters. It lifts the background, finds each one and fits them to the office
+format. **The picture never leaves your machine**: it is read in the page, never uploaded, and
+sets you add are not part of the released app. A flat background with gaps between the
+characters works best - [drawing your own set](docs/tao-bo-nhan-vat.md) (in Vietnamese) spells
+out every rule the slicer follows.
+
 It is a quicker read than the cards when several agents run at once: you see who is busy
 without reading a word. The room holds ten desks; if more agents are running, the count above
 the room says how many are not shown.
@@ -281,7 +294,8 @@ the Windows build read `~/.aimon/config.json`, which you create yourself:
   "claude_dir": "~/work/.claude",
   "pricing_file": "~/my-prices.json",
   "port": 8899,
-  "ai_kinds": ["claude-code", "gemini"]
+  "ai_kinds": ["claude-code", "gemini"],
+  "office_pack": "pets"
 }
 ```
 

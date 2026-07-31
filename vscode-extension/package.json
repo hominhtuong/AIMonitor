@@ -2,7 +2,7 @@
   "name": "aimonitor",
   "displayName": "AI Monitor",
   "description": "See every AI process, token, and account limit on your machine, inside VSCode. Runs fully offline.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "publisher": "mituultra",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -239,6 +239,24 @@
           ],
           "order": 8,
           "markdownDescription": "Which kinds of AI agent the dashboard and the Office view start out showing. Most machines run background processes that get classified as AI without you ever launching them - Copilot helpers, editor-bundled Codex - and showing all of them buries the sessions you actually care about.\n\nThis is a starting point, not a lock: the **Show:** row at the top of the dashboard turns each kind on and off, and what you pick there wins and is remembered."
+        },
+        "aimon.officePack": {
+          "type": "string",
+          "enum": [
+            "office",
+            "pets",
+            "slime",
+            "mascot"
+          ],
+          "enumDescriptions": [
+            "Office - ten people, different hair and outfits",
+            "Pets - cat, dog, rabbit, sheep, cow, pig, chick, duckling, frog",
+            "Slimes - ten coloured blobs",
+            "Mascots - ten round mascots, each with its own hat"
+          ],
+          "default": "office",
+          "order": 12,
+          "markdownDescription": "Character set used in the Office view. Every agent gets a *different* character from the set; once the set runs out it starts over.\n\nThis is a starting point, not a lock: **Character set** under the room shows each set with a preview, and clicking a character in the room changes just that one. What you pick there wins and is remembered."
         }
       }
     }

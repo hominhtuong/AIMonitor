@@ -40,7 +40,12 @@ DEFAULTS = {
     "pricing_file": "",       # rỗng = pricing.json đi kèm
     "port": 0,                # 0 = dùng mặc định của server (8899 rồi lùi dần)
     "ai_kinds": DEFAULT_AI_KINDS,   # loại agent hiện trên dashboard; ["*"] = tất cả
+    "office_pack": "",              # bộ nhân vật cho khung nhìn Văn phòng; "" = bộ mặc định
 }
+
+# Các bộ nhân vật nằm ở static/sprites.js (nơi vẽ ra chúng). Ở đây chỉ cần biết chuỗi nào
+# hợp lệ để không ghi rác vào cấu hình; trang web vẫn tự kiểm lại lần nữa.
+OFFICE_PACKS = ("office", "pets", "slime", "mascot")
 
 _THEMES = ("auto", "dark", "light")
 
@@ -71,6 +76,10 @@ def _clean(raw: dict) -> dict:
     port = raw.get("port")
     if isinstance(port, int) and 0 <= port <= 65535:
         out["port"] = port
+
+    pack = raw.get("office_pack")
+    if isinstance(pack, str) and pack.strip() in OFFICE_PACKS:
+        out["office_pack"] = pack.strip()
 
     kinds = raw.get("ai_kinds")
     if isinstance(kinds, list):
@@ -117,6 +126,7 @@ def frontend() -> dict:
         "theme": cfg["theme"],
         "refresh_seconds": cfg["refresh_seconds"],
         "ai_kinds": cfg["ai_kinds"],
+        "office_pack": cfg["office_pack"],
         # Kèm nhãn luôn để trang web khỏi phải giữ bản sao thứ hai của KIND_LABELS. Tên sản
         # phẩm (Claude Code, Codex...) không dịch, nên gửi thẳng bản tiếng Anh là đủ.
         "known_kinds": {k: KIND_LABELS.get(k, k) for k in sorted(AI_ROOT_KINDS)},
