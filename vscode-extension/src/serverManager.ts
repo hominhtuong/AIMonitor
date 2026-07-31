@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from 'node:child_process';
 import * as http from 'node:http';
 import { readInstanceFile, AimonInstance } from './instanceFile';
+import { findPythons, PythonFound } from './pythonFinder';
 
 /**
  * Tên binary Python thử lần lượt, theo thứ tự ưu tiên của từng hệ điều hành. Mỗi mục có thể
@@ -52,6 +53,15 @@ function spawnOnce(candidate: string, aimonParentDir: string): ChildProcess {
     // stdout không cần đọc -> 'ignore'. stderr PHẢI được đọc: nếu để 'pipe' mà không ai đọc,
     // buffer OS đầy sẽ làm server Python block ghi vĩnh viễn.
     stdio: ['ignore', 'ignore', 'pipe'],
+    env: {
+      ...process.env,
+      // Server in thông báo tiếng Việt. stdout ở đây bị pipe đi nên Python dùng code page của
+      // hệ (cp1252/cp1258 trên Windows) chứ không phải UTF-8, và `print` một chữ 'Đ' là
+      // UnicodeEncodeError -> server chết trước khi phục vụ được request nào. server.py đã tự
+      // ép UTF-8, hai biến này là lớp phòng thứ hai cho ai đang chạy bản aimon/ cũ hơn.
+      PYTHONIOENCODING: 'utf-8',
+      PYTHONUTF8: '1',
+    },
   });
   const info: SpawnInfo = { pythonBin: candidate, stderr: '', enoent: false, exited: false, exitCode: null };
   spawnInfoByProc.set(proc, info);
@@ -208,6 +218,51 @@ export async function waitForServer(
 export interface StartedServer {
   proc: ChildProcess;
   instance: AimonInstance;
+}
+
+/** Máy không có Python nào >= 3.9. Khác hẳn "có Python nhưng server không lên" - UI phải
+ * mời cài đặt chứ không đổ lỗi cho extension. */
+export class PythonNotFoundError extends Error {
+  constructor() {
+    super('no-python');
+    this.name = 'PythonNotFoundError';
+  }
+}
+
+/**
+ * Bật server bằng danh sách interpreter đã được DÒ và KIỂM TRA phiên bản thật, thay vì đoán
+ * tên binary. Xem pythonFinder.ts.
+ */
+export async function startWithDiscoveredPython(
+  aimonParentDir: string,
+  discover: () => Promise<PythonFound[]> = () => findPythons(),
+  timeoutPerCandidateMs = 15000
+): Promise<StartedServer> {
+  const pythons = await discover();
+  if (pythons.length === 0) throw new PythonNotFoundError();
+
+  const problems: string[] = [];
+  for (const py of pythons) {
+    const candidate = [py.command, ...py.args].join(' ');
+    const proc = spawnOnce(candidate, aimonParentDir);
+    const outcome = await waitForSpawnOutcome(proc);
+    if (outcome === 'error') {
+      problems.push(describeFailure(proc));
+      continue;
+    }
+    try {
+      const instance = await waitForServer(300, timeoutPerCandidateMs, readInstanceFile, proc);
+      return { proc, instance };
+    } catch {
+      problems.push(`Python ${py.version.join('.')} (${py.source}): ${describeFailure(proc)}`);
+      if (!getSpawnInfo(proc)?.exited) proc.kill('SIGTERM');
+    }
+  }
+
+  throw new Error(
+    `Found ${pythons.length} Python interpreter(s) but none could run the AI Monitor server.\n` +
+      problems.filter(Boolean).map((p) => `- ${p}`).join('\n')
+  );
 }
 
 /**

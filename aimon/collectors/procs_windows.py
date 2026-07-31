@@ -10,7 +10,9 @@ Lưu ý khác biệt so với macOS/Linux:
 from __future__ import annotations
 
 import json
-import subprocess
+import subprocess  # noqa: F401  (giữ cho type hint)
+
+from .. import proc_util as PU
 
 _PS_SCRIPT = r"""
 $ErrorActionPreference = 'SilentlyContinue'
@@ -44,7 +46,7 @@ _MEM_CACHE: dict = {"total": 0, "free": 0}
 def _powershell(script: str, timeout: int = 25):
     for exe in ("powershell.exe", "pwsh.exe"):
         try:
-            out = subprocess.run(
+            out = PU.run(
                 [exe, "-NoProfile", "-NonInteractive", "-Command", script],
                 capture_output=True,
                 text=True,

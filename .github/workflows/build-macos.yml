@@ -85,12 +85,17 @@ jobs:
       # chạy được từ trong Contents/Resources hay không.
       - name: Server chạy được từ trong bundle
         working-directory: dist/AIMonitor.app/Contents/Resources
+        env:
+          # App mở từ Finder không có console UTF-8. Ép code page cũ để bắt được lỗi
+          # UnicodeEncodeError khi in thông báo tiếng Việt - đúng lớp lỗi đã lọt ra ở 1.2.3.
+          PYTHONIOENCODING: cp1252
         run: |
           /usr/bin/python3 -c "
           import sys; sys.path.insert(0, '.')
           import aimon.server, aimon.snapshot
+          aimon.server._force_utf8_stdio()
           assert aimon.snapshot.build(), 'snapshot rỗng'
-          print('server import + snapshot OK')
+          print('server import + snapshot OK, in được tiếng Việt: đã dùng cổng')
           "
 
       - name: Đóng gói

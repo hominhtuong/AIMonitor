@@ -127,8 +127,10 @@ code --install-extension mituultra.aimonitor
 ```
 
 An AI Monitor icon appears in the activity bar and the dashboard opens as a panel inside the
-editor. It starts the same local server on first open, so it needs Python 3.9+ on your PATH -
-on Windows, install from python.org and tick **"Add python.exe to PATH"**.
+editor. Install and open it - that is the whole setup. The extension finds Python by itself
+(the `py` launcher, `PATH`, and the standard install folders), so it works even when Python
+was installed without being added to `PATH`. If the machine has no Python 3.9+ at all, the
+panel says so and gives you a **Download Python** button and a **Try again** button.
 
 Offline installs can still grab the `.vsix` from **Releases** and use Extensions panel =>
 `...` menu => **Install from VSIX...**

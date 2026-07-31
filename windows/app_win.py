@@ -23,6 +23,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aimon import instance as INST  # noqa: E402
+from aimon import proc_util as PU  # noqa: E402
 from aimon import server  # noqa: E402
 
 PROFILE = os.path.join(tempfile.gettempdir(), "aimon-window")
@@ -49,6 +50,25 @@ def find_browser() -> str | None:
     return None
 
 
+# Cờ bắt buộc khi mở Edge/Chrome bằng một user-data-dir MỚI TINH.
+#
+# Profile mới nghĩa là browser coi đây là lần chạy đầu tiên: Edge bung màn hình chào mừng,
+# hỏi nhập dữ liệu, hỏi đặt làm browser mặc định, và mở trang tab mới - trang đó có nội dung
+# tài trợ. Người dùng thấy "app tự mở browser rồi hiện quảng cáo", dù AI Monitor chỉ trỏ tới
+# 127.0.0.1 và không có bất kỳ mã quảng cáo hay theo dõi nào.
+#
+# Kèm theo đó là chặn luôn phần browser tự gọi mạng nền, để cửa sổ này thật sự chỉ nói
+# chuyện với server local.
+_BROWSER_FLAGS = [
+    "--no-first-run",                 # bỏ toàn bộ luồng chào mừng / onboarding
+    "--no-default-browser-check",     # không hỏi "đặt làm mặc định"
+    "--disable-background-networking",  # không gọi mạng nền
+    "--disable-component-update",
+    "--disable-sync",
+    "--disable-features=msEdgeWelcomePage,EdgeDiscoverFeature,Translate",
+]
+
+
 def open_window(url: str) -> subprocess.Popen | None:
     """Mở cửa sổ app. Không có Edge/Chrome thì đành mở browser mặc định."""
     browser = find_browser()
@@ -59,8 +79,14 @@ def open_window(url: str) -> subprocess.Popen | None:
         return None
     # user-data-dir riêng để cửa sổ này độc lập với phiên duyệt web của người dùng:
     # không dùng chung cookie, và đóng nó không đụng tới các cửa sổ browser đang mở.
-    return subprocess.Popen(
-        [browser, f"--app={url}", f"--user-data-dir={PROFILE}", "--window-size=1440,920"],
+    return PU.popen(
+        [
+            browser,
+            f"--app={url}",
+            f"--user-data-dir={PROFILE}",
+            "--window-size=1440,920",
+            *_BROWSER_FLAGS,
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )

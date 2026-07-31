@@ -123,9 +123,11 @@ code --install-extension mituultra.aimonitor
 ```
 
 Cài xong, icon AI Monitor xuất hiện ở activity bar (thanh biểu tượng bên trái), bấm vào là
-dashboard mở thành một panel trong editor. Extension tự bật server local khi anh mở panel lần
-đầu nên **cần Python 3.9 trở lên trên PATH** - macOS/Linux có sẵn, Windows thì cài từ
-[python.org](https://www.python.org/downloads/) và nhớ tick **"Add python.exe to PATH"**.
+dashboard mở thành một panel trong editor. **Cài rồi mở lên là dùng được, không phải cấu hình
+gì.** Extension tự đi tìm Python trên máy: py launcher, PATH, và các thư mục cài mặc định -
+nên máy cài Python mà quên tick "Add to PATH" vẫn chạy bình thường. Chỉ khi máy thật sự chưa
+có Python 3.9 trở lên thì panel mới báo, kèm nút **Tải Python** và nút **Thử lại**: cài xong
+bấm Thử lại là xong.
 
 Ai cần cài offline thì tải file `.vsix` ở **Releases**, rồi vào Extensions panel => nút `...`
 => **Install from VSIX...**

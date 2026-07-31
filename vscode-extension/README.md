@@ -26,15 +26,26 @@ telemetry.
 
 ![One session and its whole process tree](https://raw.githubusercontent.com/hominhtuong/AIMonitor/main/assets/session-detail.png)
 
-## Requirements
+## Setup
 
-Python 3.9 or newer on your PATH. That is the only requirement.
+Install the extension and open the panel. That is the whole setup.
 
-- **macOS / Linux:** already there, nothing to do.
-- **Windows:** install from [python.org](https://www.python.org/downloads/) and tick
-  **"Add python.exe to PATH"** during setup. The `py` launcher works too.
+The extension finds Python on its own. It scans the `py` launcher, everything on `PATH`, and
+the standard install folders, then runs each one to check the version - so it works even when
+Python is installed but was never added to `PATH`, which is the usual case on Windows.
+
+Only if the machine genuinely has no Python 3.9+ does the panel say so, with a **Download
+Python** button and a **Try again** button next to it. Install, click Try again, done. Nothing
+to configure, no settings to fill in.
 
 The dashboard has no dependencies of its own - the server is pure Python standard library.
+
+## Privacy
+
+Everything is local. The extension starts a server bound to `127.0.0.1`, and the dashboard
+only ever talks to that server - no external requests, no CDN, no fonts, no analytics, no
+telemetry, no ads. It reads your local Claude Code transcripts and process list, and sends
+them nowhere.
 
 ## How it works
 

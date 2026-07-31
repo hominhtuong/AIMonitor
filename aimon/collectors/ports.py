@@ -11,10 +11,11 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import subprocess
+import subprocess  # noqa: F401  (giữ cho type hint)
 import sys
 
 from .. import instance as INST
+from .. import proc_util as PU
 
 IS_WINDOWS = sys.platform.startswith("win")
 TTL = 5.0
@@ -52,7 +53,7 @@ def _listening_posix(me: tuple[int, int] = (0, 0)) -> list[dict]:
     if not shutil.which("lsof"):
         return []
     try:
-        out = subprocess.run(
+        out = PU.run(
             ["lsof", "-nP", "-iTCP", "-sTCP:LISTEN"], capture_output=True, text=True, timeout=15
         ).stdout
     except Exception:
@@ -89,7 +90,7 @@ def _listening_posix(me: tuple[int, int] = (0, 0)) -> list[dict]:
 
 def _tasklist_names() -> dict[int, str]:
     try:
-        out = subprocess.run(
+        out = PU.run(
             ["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True, timeout=15
         ).stdout
     except Exception:
@@ -108,7 +109,7 @@ def _tasklist_names() -> dict[int, str]:
 
 def _listening_windows(me: tuple[int, int] = (0, 0)) -> list[dict]:
     try:
-        out = subprocess.run(
+        out = PU.run(
             ["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, timeout=20
         ).stdout
     except Exception:
@@ -146,7 +147,7 @@ def _docker() -> tuple[list[dict], bool]:
     if not shutil.which("docker"):
         return [], False
     try:
-        res = subprocess.run(
+        res = PU.run(
             ["docker", "ps", "--format", "{{json .}}"], capture_output=True, text=True, timeout=15
         )
     except Exception:

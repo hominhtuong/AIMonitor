@@ -36,6 +36,7 @@ from .collectors import claude as C  # noqa: E402
 from .collectors import ports as PO  # noqa: E402
 from .collectors import procs as P  # noqa: E402
 from . import instance as INST  # noqa: E402
+from . import proc_util as PU  # noqa: E402
 from . import snapshot as SNAP  # noqa: E402
 
 # Bản .exe cho Windows (PyInstaller) giải nén tài nguyên ra thư mục tạm sys._MEIPASS,
@@ -44,7 +45,7 @@ BASE = os.path.join(sys._MEIPASS, "aimon") if getattr(sys, "frozen", False) else
 STATIC_DIR = os.path.join(BASE, "static")
 IS_WINDOWS = sys.platform.startswith("win")
 
-VERSION = "1.2.3"
+VERSION = "1.2.4"
 
 DEFAULT_PORT = 8899
 PORT_SCAN_TRIES = 20  # 8899..8919 rồi mới xin cổng ngẫu nhiên
@@ -67,7 +68,9 @@ def _kill_windows(pid: int, tree: bool = False, force: bool = True) -> None:
         args.append("/T")
     if force:
         args.append("/F")
-    res = subprocess.run(args, capture_output=True, text=True, timeout=20)
+    # PU.run thay cho subprocess.run: taskkill là chương trình console, gọi thẳng từ tiến
+    # trình không có console (bản .exe, hoặc server do extension spawn) sẽ nháy cửa sổ đen.
+    res = PU.run(args, capture_output=True, text=True, timeout=20)
     if res.returncode != 0:
         raise OSError((res.stderr or res.stdout or "taskkill thất bại").strip())
 
@@ -311,7 +314,29 @@ def _running_instance(host: str, preferred: int) -> dict | None:
     return None
 
 
+def _force_utf8_stdio() -> None:
+    """Ép stdout/stderr sang UTF-8 trước khi in bất cứ thứ gì.
+
+    Mọi thông báo của tool đều là tiếng Việt có dấu. Trên Windows, stdout KHÔNG phải console
+    UTF-8 (bị pipe đi, hoặc console đang ở code page cũ như cp1252/cp1258) thì `print` một
+    chữ 'Đ' là `UnicodeEncodeError` và server chết trước khi kịp phục vụ request nào - đúng
+    lỗi extension VSCode gặp, vì nó spawn server với stdout đổ vào chỗ khác.
+
+    Không phải lỗi thiếu Python: Python vẫn chạy, chỉ là không mã hoá nổi chuỗi ra byte.
+    `errors="replace"` để dù có gặp ký tự lạ tới đâu cũng không bao giờ chết vì một dòng log.
+    """
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None:
+            continue  # bản .exe dựng với --noconsole
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError, ValueError):
+            pass  # đối tượng thay thế (vd _Null của app_win) hoặc stream không đổi được
+
+
 def main(argv=None) -> int:
+    _force_utf8_stdio()
     ap = argparse.ArgumentParser(description="AI Monitor - dashboard tiến trình AI local")
     ap.add_argument(
         "--port",

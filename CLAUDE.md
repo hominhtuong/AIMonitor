@@ -11,6 +11,17 @@ họ cần biết tool làm được gì và mở lên thế nào, không cần 
   `from __future__ import annotations` nên annotation kiểu `int | None` thì an toàn.
 - Server bind `127.0.0.1`, không gửi dữ liệu ra ngoài, không gọi API Anthropic.
 - Frontend không dùng thư viện ngoài, không build step.
+- **Mọi lệnh ngoài phải đi qua `aimon/proc_util.py`, đừng gọi thẳng `subprocess`.** Trên
+  Windows, gọi một chương trình console (powershell, netstat, taskkill) từ tiến trình KHÔNG có
+  console - bản `.exe` dựng `--noconsole`, hoặc server do extension spawn - sẽ khiến hệ điều
+  hành bật một cửa sổ console mới. Collector chạy theo nhịp `/api/snapshot` tức mỗi 3 giây,
+  nên người dùng thấy cửa sổ đen nháy liên tục không dứt. `proc_util` thêm `CREATE_NO_WINDOW`
+  (getattr, vì hằng số này không tồn tại trên POSIX).
+- **Đừng tin stdout là UTF-8.** Thông báo của tool đều là tiếng Việt có dấu, mà stdout bị pipe
+  đi (extension spawn) hoặc console đang ở code page cũ thì Python mã hoá bằng cp1252/cp1258
+  và `print` một chữ 'Đ' là `UnicodeEncodeError` - server chết trước khi phục vụ request nào.
+  `server.main()` gọi `_force_utf8_stdio()` ngay dòng đầu. Tái hiện lỗi bằng
+  `PYTHONIOENCODING=cp1252 python3 -m aimon.server --new --port 0`.
 
 ## Bố cục
 
@@ -19,6 +30,7 @@ aimon/
   server.py             HTTP server, routing, thao tác kill/pause, chọn cổng
   instance.py           state file ~/.aimon/instance.json (host/port/pid instance đang chạy)
   snapshot.py           gộp mọi collector thành 1 JSON cho /api/snapshot
+  proc_util.py          gọi lệnh ngoài không nháy cửa sổ console trên Windows
   collectors/
     procs.py            phân loại AI, dựng cây cha-con, %CPU theo delta, rollup RAM
     procs_posix.py      ps / vm_stat
@@ -33,6 +45,7 @@ vscode-extension/       vỏ extension VSCode (TypeScript)
   src/extension.ts      activate/deactivate, đăng ký webview view
   src/dashboardViewProvider.ts  bật server rồi nhúng dashboard vào iframe
   src/serverManager.ts  spawn python, probe /api/version, chờ instance.json, SIGTERM
+  src/pythonFinder.ts   dò Python thật trên máy rồi kiểm tra phiên bản bằng cách chạy thử
   src/instanceFile.ts   đọc + kiểm tra ~/.aimon/instance.json
   scripts/copy-aimon.js copy aimon/ + pricing.json + icon vào gói lúc build
 scripts/
@@ -190,6 +203,12 @@ chứ đừng chạy từ cây source, vì lỗi đóng gói chỉ lộ ra ở �
 
 Thiếu `pricing.json` / `static/` hay lọt `__pycache__`, `.ts` là fail ngay ở `build`.
 
+Cả ba job chạy thử server đều đặt `PYTHONIOENCODING=cp1252` và **chuyển hướng stdout đi chỗ
+khác**. Không có hai thứ đó thì runner chạy sẵn console UTF-8, và CI bỏ lọt nguyên một lớp
+lỗi - bản 1.2.3 lên tới Marketplace với server chết ngay ở `print` tiếng Việt đầu tiên trong
+khi cả năm job đều xanh. Job chạy thử phải mô phỏng **đúng điều kiện extension tạo ra**, không
+phải điều kiện dễ chịu của runner.
+
 `macos-check` **không** dùng `setup-python`: bản Python quan trọng với repo này là
 `/usr/bin/python3` (3.9.6), thứ duy nhất chắc chắn có trên máy người dùng macOS.
 `setup-python` sẽ cài một Python khác rồi kiểm tra nhầm sang nó. Cũng vì thế không đặt được
@@ -305,15 +324,26 @@ nên extension phải chạy bên đó mới thấy đúng. `asExternalUri` lo p
 
 ### Windows - hai chỗ phải làm riêng
 
+**Đừng đoán tên binary Python - đi dò.** `pythonFinder.ts` quét `py -0p` (launcher liệt kê
+mọi bản đã đăng ký, kèm đường dẫn thật), `where`/`which -a`, rồi các thư mục cài mặc định
+(`%LOCALAPPDATA%\Programs\Python\Python3*`, `/opt/homebrew`, pyenv shims...). Máy Windows cài
+Python từ python.org mà quên tick "Add to PATH" là chuyện rất thường - chỉ tra PATH là hỏng.
+
+Mỗi ứng viên phải **tự khai phiên bản bằng cách chạy thật** (`-c "import sys;print(...)"`),
+không suy đoán từ tên file. Dưới 3.9 thì loại. Nhờ vậy alias Store cũng tự rụng mà không cần
+luật riêng.
+
 **`python` trên Windows thường không phải Python.** Windows 10/11 cài sẵn App Execution Alias
 `python.exe` trỏ về Microsoft Store. Máy chưa cài Python thật thì alias đó vẫn nằm trên PATH,
 nên `spawn` **không** báo ENOENT: nó chạy được, mở trang Store rồi thoát ngay với mã 9009.
-Chỉ dựa vào ENOENT để đổi candidate là extension treo đủ 15 giây rồi báo timeout vô nghĩa.
+Đáng nói hơn: **chạy nó sẽ mở trang Store**, nên khi dò phải loại từ trước chứ không phải chạy
+rồi mới biết. Dấu hiệu: file 0 byte nằm trong `\WindowsApps\` (bản Python cài thật từ Store
+cũng ở đó nhưng có kích thước thật, và dùng được - đừng loại theo đường dẫn).
 
-Vì vậy `pythonCandidates()` trả thứ tự khác nhau theo hệ điều hành, Windows là
-`['py -3', 'python', 'python3']` - `py.exe` là launcher chính thức, không bao giờ trỏ về alias
-Store. Kèm theo đó `waitForServer()` bỏ chờ ngay khi tiến trình con thoát, và
-`startAimonServer()` chuyển sang candidate kế tiếp thay vì bỏ cuộc.
+`waitForServer()` bỏ chờ ngay khi tiến trình con thoát, và `startWithDiscoveredPython()`
+chuyển sang interpreter kế tiếp thay vì bỏ cuộc. Không tìm thấy Python nào thì ném
+`PythonNotFoundError` - panel hiện nút "Tải Python" + "Thử lại", chứ không đổ ra một traceback
+mà người dùng không hiểu.
 
 **Không SIGTERM để tắt server.** Node trên Windows dịch SIGTERM thành `TerminateProcess`:
 Python chết ngay, khối `finally` trong `server.py` không chạy, `~/.aimon/instance.json` ở lại

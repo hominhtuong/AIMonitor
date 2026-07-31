@@ -76,6 +76,12 @@ jobs:
       # Chạy thật server đã bundle: đây mới là chỗ lộ ra nếu copy-aimon.js thiếu
       # pricing.json hay static/, chứ /api/version thì thiếu gì cũng vẫn trả 200.
       - name: Chạy thử server trong gói
+        env:
+          # Mô phỏng đúng môi trường extension tạo ra: stdout KHÔNG phải console UTF-8.
+          # Không có biến này thì runner chạy sẵn UTF-8 và CI bỏ lọt cả một lớp lỗi - đúng
+          # cách bản 1.2.3 lọt ra tới người dùng: server chết ngay ở `print` tiếng Việt đầu
+          # tiên với UnicodeEncodeError, mà CI vẫn xanh.
+          PYTHONIOENCODING: cp1252
         run: |
           vsix=$(ls *.vsix)
           rm -rf /tmp/vsix-check && mkdir -p /tmp/vsix-check
@@ -161,12 +167,19 @@ jobs:
 
       - name: Chạy thử server trong gói trên Windows
         shell: pwsh
+        env:
+          # Đây mới là điều kiện thật của extension: stdout bị chuyển hướng đi chỗ khác nên
+          # Python dùng code page của hệ chứ không phải UTF-8. Bản 1.2.3 chết đúng ở đây
+          # (UnicodeEncodeError khi in tiếng Việt) mà CI vẫn xanh vì runner để sẵn UTF-8 và
+          # bước này không chuyển hướng stdout.
+          PYTHONIOENCODING: cp1252
         run: |
           $vsix = (Get-ChildItem vsix/*.vsix)[0].FullName
           Expand-Archive -Path $vsix -DestinationPath vsix-extracted -Force
           Push-Location vsix-extracted/extension
           $p = Start-Process -FilePath python -ArgumentList '-m','aimon.server','--port','0','--new' `
-                             -PassThru -RedirectStandardError "$env:TEMP\aimon-err.log"
+                             -PassThru -RedirectStandardOutput "$env:TEMP\aimon-out.log" `
+                             -RedirectStandardError "$env:TEMP\aimon-err.log"
           $state = "$env:USERPROFILE\.aimon\instance.json"
           $url = $null
           foreach ($i in 1..30) {
@@ -179,6 +192,8 @@ jobs:
           if (-not $url) {
             Write-Host "--- stderr server ---"
             if (Test-Path "$env:TEMP\aimon-err.log") { Get-Content "$env:TEMP\aimon-err.log" }
+            Write-Host "--- stdout server ---"
+            if (Test-Path "$env:TEMP\aimon-out.log") { Get-Content "$env:TEMP\aimon-out.log" }
             Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
             throw "Server trong gói không khởi động được trên Windows"
           }
@@ -210,6 +225,8 @@ jobs:
           path: vsix
 
       - name: Chạy thử server trong gói bằng /usr/bin/python3
+        env:
+          PYTHONIOENCODING: cp1252  # xem giải thích ở job build
         run: |
           /usr/bin/python3 --version
           vsix=$(ls vsix/*.vsix)
