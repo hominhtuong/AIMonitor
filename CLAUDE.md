@@ -335,7 +335,9 @@ publish đầu, sau đó thì không** - muốn đổi là phải đăng extensi
   `vsce publish --packagePath`. Đừng đổi thành `vsce publish` không tham số: nó build lại và
   phát hành thứ chưa ai chạy thử.
 - Số phiên bản lấy từ `vscode-extension/package.json`, **không** lấy từ tag git. Quên bump nó
-  là Marketplace từ chối vì version đã tồn tại. Đây là chỗ dễ quên nhất khi đẩy tag.
+  là Marketplace từ chối vì version đã tồn tại. Để khỏi quên, ba số được giữ **bằng nhau**:
+  `aimon/server.py` -> `VERSION`, `vscode-extension/package.json` -> `version`, và tag `v*`.
+  Phát hành thì sửa cả hai file rồi mới tag.
 - Thiếu secret `VSCE_PAT` thì workflow không fail, chỉ ghi cảnh báo vào job summary và
   Release vẫn có `.vsix`.
 - `OVSX_PAT` là tuỳ chọn, để đăng thêm lên Open VSX (store của VSCodium, Cursor, Windsurf).

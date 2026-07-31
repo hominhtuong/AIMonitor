@@ -1,8 +1,9 @@
 # Changelog
 
-## 1.0.0
+## 1.2.3
 
-First release on the VSCode Marketplace.
+First release on the VSCode Marketplace. The version number follows the AI Monitor project
+so the extension, the macOS app and the Windows build in a release all carry the same number.
 
 - AI Monitor dashboard in a panel: AI process tree with CPU and RAM per session, token and
   cost totals, Session (5h) and Weekly (7d) account limits, open ports.
