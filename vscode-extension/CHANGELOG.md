@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.5.0
+
+- **Four character sets, and every agent gets a different one.** The office crew was redrawn
+  from scratch in a chibi style - head nearly half the height, big eyes with a highlight,
+  blushed cheeks, and a dark outline around the silhouette - after the honest feedback that the
+  old ones were not cute. There are four sets of ten now:
+
+  - **Office** - ten people: bob, afro, top bun with an apron, ponytail, cap, hoodie, beanie
+    with a scarf, cat ears, spiky hair with overalls, long hair
+  - **Pets** - cat, rabbit, dog, black cat, sheep, cow, pig, chick, duckling, frog
+  - **Slimes** - ten coloured blobs, some with a leaf, a crown or a cherry on top
+  - **Mascots** - ten round mascots, each under a different hat
+
+  Pick a set under the room and the whole room switches to it, each agent taking a *different*
+  character from it; once the set runs out it starts over. Click any character in the room and
+  a row of the set appears in the detail panel - pick one to change just that agent. Both
+  choices are remembered, and the starting set is the new `Office Pack` setting plus an
+  `office_pack` key in `~/.aimon/config.json`.
+
+  Still no image files: every character is drawn in code, so nothing extra ships in the package
+  and there is no third-party asset licence involved.
+
+- **Bring your own characters.** A **+** tile next to the four sets turns any picture on your
+  machine into a character set: it lifts the background, finds each character, and fits them to
+  the office format. Tested on ten real sheets - 12 farm animals out of one, 20 mascots out of
+  another, in well under a tenth of a second each - and the author's watermark is dropped
+  rather than turned into a "character".
+
+  The picture never leaves your machine: it is read in the page, processed on a canvas, and the
+  finished sprites are kept in browser storage. Nothing is uploaded, and imported sets are never
+  part of a release - which is the point, since character art found online usually carries its
+  own licence.
+
+- Fixed a one-pixel gap at the neck of seated characters that showed the floor through it, and
+  removed the shadow that floated under them - a seated character draws no legs, so the shadow
+  had nothing to sit under.
+
 ## 1.4.0
 
 - **Only the agent kinds you use.** The dashboard and the Office view now start out showing

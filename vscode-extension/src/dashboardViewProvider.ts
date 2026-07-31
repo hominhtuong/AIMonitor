@@ -65,6 +65,7 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         refreshSeconds: this.config.refreshSeconds,
         compact: true,
         aiKinds: this.config.aiKinds,
+        officePack: this.config.officePack,
       });
       view.webview.html = iframePage(url);
     } catch (err) {

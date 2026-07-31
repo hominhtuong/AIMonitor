@@ -196,6 +196,18 @@ lấy dữ liệu web. Rảnh quá một phút rưỡi thì nhân vật đứng 
 thành người nhỏ hơn đứng cạnh bàn của người gọi nó. Bấm vào máy tính nào thì mở đầy đủ phiên
 đó, kèm cả cây tiến trình.
 
+Có **bốn bộ nhân vật**, mỗi bộ mười người: Văn phòng, Thú cưng, Slime, Mascot. Mở mục **Bộ
+nhân vật** ngay dưới căn phòng là thấy cả bốn kèm hình xem trước; chọn một bộ thì cả phòng đổi
+theo, mỗi agent một nhân vật khác nhau, đông quá thì quay vòng dùng lại. Bấm vào một nhân vật
+trong phòng thì bảng chi tiết hiện thêm dãy nhân vật của bộ đó - bấm một cái là đổi riêng cho
+người đó thôi. Cả hai lựa chọn đều được nhớ lại.
+
+Muốn dùng nhân vật của riêng mình thì bấm nút **+** cạnh bốn bộ và chọn một tấm ảnh bất kỳ có
+nhiều nhân vật. Tool tự tách nền, tự cắt từng nhân vật và đưa về đúng khuôn. **Ảnh không rời
+khỏi máy bạn**: đọc ngay trong trang, không gửi đi đâu, và bộ bạn thêm không nằm trong bản phát
+hành. Ảnh nền phẳng và các nhân vật cách nhau thì tách chuẩn nhất - xem
+[hướng dẫn tự tạo bộ nhân vật](docs/tao-bo-nhan-vat.md) để biết tool tách theo quy tắc nào.
+
 Nhiều agent chạy cùng lúc thì nhìn cái này nhanh hơn đọc thẻ: biết ngay ai đang bận mà không
 phải đọc chữ nào. Phòng có mười bàn; đông hơn thì dòng đếm phía trên nói rõ còn bao nhiêu
 người chưa hiện.
@@ -276,7 +288,8 @@ Extension VSCode có bảng settings riêng (Extensions => AI Monitor). App macO
   "claude_dir": "~/work/.claude",
   "pricing_file": "~/bang-gia-rieng.json",
   "port": 8899,
-  "ai_kinds": ["claude-code", "gemini"]
+  "ai_kinds": ["claude-code", "gemini"],
+  "office_pack": "pets"
 }
 ```
 

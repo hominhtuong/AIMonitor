@@ -23,6 +23,7 @@ export interface AimonConfig {
   claudeDataDir: string;
   pricingFile: string;
   aiKinds: string[];
+  officePack: string;
 }
 
 export function readConfig(): AimonConfig {
@@ -40,6 +41,7 @@ export function readConfig(): AimonConfig {
     claudeDataDir: (c.get<string>('claudeDataDir') ?? '').trim(),
     pricingFile: (c.get<string>('pricingFile') ?? '').trim(),
     aiKinds: c.get<string[]>('aiKinds') ?? ['claude-code'],
+    officePack: (c.get<string>('officePack') ?? '').trim(),
   };
 }
 

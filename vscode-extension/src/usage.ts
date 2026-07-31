@@ -86,6 +86,8 @@ export function dashboardUrl(
     compact: boolean;
     /** Loại agent hiện lúc mở lần đầu. Bỏ trống = để trang tự quyết. */
     aiKinds?: string[];
+    /** Bộ nhân vật cho khung nhìn Văn phòng. Bỏ trống = để trang tự quyết. */
+    officePack?: string;
   }
 ): string {
   const u = new URL(base);
@@ -96,5 +98,6 @@ export function dashboardUrl(
   // lại và thắng tham số này ở lần mở sau - bấm tắt một loại xong tải lại mà nó hiện lại
   // thì cái nút coi như hỏng. `theme` phải thắng vì dashboard buộc bám màu của editor.
   if (opts.aiKinds && opts.aiKinds.length) u.searchParams.set('kinds', opts.aiKinds.join(','));
+  if (opts.officePack) u.searchParams.set('pack', opts.officePack);
   return u.toString();
 }
