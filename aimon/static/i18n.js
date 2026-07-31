@@ -118,6 +118,11 @@ const DICT = {
 
     /* --- khung nhìn Văn phòng --- */
     'office.pack_pick': 'Character set',
+    'office.room_pick': 'Room',
+    'office.room_classic': 'Classic',
+    'office.room_library': 'Library',
+    'office.room_loft': 'Loft',
+    'office.room_garden': 'Garden',
     'import.add': 'Add a set',
     'import.hint': 'Turn one of your own images into a character set',
     'import.remove': 'Remove this set',
@@ -132,6 +137,9 @@ const DICT = {
     'office.pack_pets': 'Pets',
     'office.pack_slime': 'Slimes',
     'office.pack_mascot': 'Mascots',
+    'office.pack_voyage': 'Voyage',
+    'office.pack_ninja': 'Ninja',
+    'office.pack_crew': 'The Crew',
     'office.change_char': 'Character:',
     'office.title': 'The office',
     'office.hint': 'Each running agent is a character. Click a desk to see its process tree.',
@@ -414,6 +422,11 @@ const DICT = {
 
     /* --- khung nhìn Văn phòng --- */
     'office.pack_pick': 'Bộ nhân vật',
+    'office.room_pick': 'Phòng',
+    'office.room_classic': 'Cổ điển',
+    'office.room_library': 'Thư viện',
+    'office.room_loft': 'Gác xép',
+    'office.room_garden': 'Sân vườn',
     'import.add': 'Thêm bộ',
     'import.hint': 'Biến một tấm ảnh của bạn thành một bộ nhân vật',
     'import.remove': 'Xoá bộ này',
@@ -428,6 +441,9 @@ const DICT = {
     'office.pack_pets': 'Thú cưng',
     'office.pack_slime': 'Slime',
     'office.pack_mascot': 'Mascot',
+    'office.pack_voyage': 'Hải trình',
+    'office.pack_ninja': 'Nhẫn giả',
+    'office.pack_crew': 'Năm anh em',
     'office.change_char': 'Nhân vật:',
     'office.title': 'Văn phòng',
     'office.hint': 'Mỗi agent đang chạy là một nhân vật. Bấm vào bàn để xem cây tiến trình.',

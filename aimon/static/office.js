@@ -75,12 +75,14 @@ const OF = {
   sel: null,
   hover: null,
   cat: null,
+  confetti: [],          // bông giấy của màn ăn mừng lúc một phiên xong việc
   last: 0,
   clock: 0,
   pal: {},
   // Bộ nhân vật đang áp cho cả phòng. Mỗi agent nhận một nhân vật KHÁC nhau trong bộ;
   // hết nhân vật thì quay vòng dùng lại.
-  pack: 'office',
+  pack: 'voyage',
+  room: 'classic',       // kiểu phòng đang dùng; hình học không đổi, chỉ đổi sàn/tường/trang trí
   slots: new Map(),      // id agent -> chỗ thứ mấy trong bộ
   overrides: new Map(),  // id agent -> khoá "bộ:nhân-vật" do người dùng tự chọn cho riêng người đó
 };
@@ -88,6 +90,7 @@ const OF = {
 /* ------------------------------------------------- chọn bộ nhân vật cho phòng */
 
 const PACK_KEY = 'aimon.pack';
+const ROOM_KEY = 'aimon.room';
 const OVERRIDE_KEY = 'aimon.charOverrides';
 // Ép riêng cho từng agent là lựa chọn nhất thời (id phiên đổi liên tục), nên chỉ giữ vài
 // chục cái gần nhất thay vì để localStorage phình mãi.
@@ -160,7 +163,9 @@ function initPack() {
   const q = new URLSearchParams(location.search).get('pack');
   const cfg = (window.AIMON_CONFIG || {}).office_pack;
   const pick = saved != null ? saved : (q != null ? q : (cfg || ''));
-  OF.pack = PACKS.some((p) => p.id === pick) ? pick : 'office';
+  // Rơi về bộ ĐẦU TIÊN trong danh sách chứ không viết cứng tên: đổi thứ tự ở sprites.js
+  // là mặc định đổi theo, khỏi phải nhớ sửa hai chỗ.
+  OF.pack = PACKS.some((p) => p.id === pick) ? pick : PACKS[0].id;
 
   try {
     const raw = JSON.parse(localStorage.getItem(OVERRIDE_KEY) || '{}');
@@ -168,6 +173,68 @@ function initPack() {
       if (typeof raw[k] === 'string' && charIndexByKey(raw[k]) >= 0) OF.overrides.set(k, raw[k]);
     });
   } catch (e) { /* dữ liệu cũ hỏng thì bỏ qua, không làm chết khung nhìn */ }
+}
+
+function setRoom(id) {
+  OF.room = roomById(id).id;
+  try { localStorage.setItem(ROOM_KEY, OF.room); } catch (e) { /* riêng tư */ }
+  renderRooms();
+  if (OF.on) draw();
+}
+
+function initRoom() {
+  let saved = null;
+  try { saved = localStorage.getItem(ROOM_KEY); } catch (e) { /* bỏ qua */ }
+  OF.room = ROOMS.some((r) => r.id === saved) ? saved : ROOMS[0].id;
+}
+
+/** Bảng chọn kiểu phòng. Mỗi ô là một canvas vẽ THU NHỎ chính căn phòng đó - xem trước phải
+ *  là thứ sẽ nhận, không phải một ô màu tượng trưng. */
+function renderRooms() {
+  const host = document.getElementById('office-rooms');
+  if (!host) return;
+  if (host.childElementCount !== ROOMS.length) {
+    host.textContent = '';
+    ROOMS.forEach((r) => {
+      const b = document.createElement('button');
+      b.className = 'skin room';
+      b.dataset.room = r.id;
+      b.appendChild(document.createElement('canvas'));
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      b.appendChild(nm);
+      host.appendChild(b);
+    });
+  }
+  Array.from(host.children).forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.room === OF.room));
+    const nm = b.querySelector('.nm');
+    if (nm) nm.textContent = t('office.room_' + b.dataset.room);
+    paintRoomPreview(b.querySelector('canvas'), b.dataset.room);
+  });
+  const sum = document.querySelector('#office-roombox summary');
+  if (sum) sum.textContent = t('office.room_pick');
+}
+
+/** Vẽ cả căn phòng vào một canvas nhỏ. Dùng chính `ROOMS[].draw` nên xem trước không bao giờ
+ *  lệch khỏi phòng thật, kể cả sau này sửa hình. */
+function paintRoomPreview(cv, id) {
+  if (!cv || cv.dataset.painted === id + ':' + (OF.pal.floor || '')) return;
+  const sc = 0.32;
+  cv.width = Math.round(ROOM_W * sc);
+  cv.height = Math.round(ROOM_H * sc);
+  const g = cv.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.setTransform(sc, 0, 0, sc, 0, 0);
+  g.clearRect(0, 0, ROOM_W, ROOM_H);
+  roomById(id).draw(g, OF.pal);
+  // vài cái bàn cho ra dáng văn phòng chứ không phải một mảng màu trống
+  OF.desks.forEach((d) => {
+    px2(g, d.x + 7, d.y + DESK_H + 2, 20, 9, OF.pal.chair);
+    px2(g, d.x, d.y, DESK_W, DESK_H, OF.pal.desk);
+    px2(g, d.monX, d.monY, MON_W, MON_H, OF.pal.metal);
+  });
+  cv.dataset.painted = id + ':' + (OF.pal.floor || '');
 }
 
 /* ------------------------------------------- bộ nhân vật nhập từ ảnh của người dùng
@@ -257,7 +324,7 @@ function deleteCustomPack(id) {
   writeStoredPacks(readStoredPacks().filter((p) => p.id !== id));
   removeCustomPack(id);
   OF.atlas = buildSpriteAtlas();
-  if (OF.pack === id) setPack('office');
+  if (OF.pack === id) setPack(PACKS[0].id);
   else { reskinAll(); renderPacks(); }
 }
 
@@ -387,6 +454,8 @@ function readPalette() {
     screenOn: g('--of-screen-on', '#1c3352'),
     metal: g('--of-metal', '#4a5769'),
     rug: g('--of-rug', '#334a63'),
+    chair: g('--of-chair', '#4a5570'),
+    chairDark: g('--of-chair2', '#333c52'),
     plant: g('--of-plant', '#2f8f5b'),
     shadow: g('--of-shadow', 'rgba(0,0,0,.22)'),
     bubble: g('--of-bubble', '#0f172a'),
@@ -418,16 +487,37 @@ function newEntity(id, kind, charIndex) {
     queue: [],
     data: null,
     leaving: false,
+    cheer: 0,                    // giây còn lại của màn ăn mừng lúc xong việc
   };
 }
 
-/** Đường đi từ vị trí hiện tại tới đích, luôn men theo lối đi thay vì xuyên qua bàn. */
-function routeTo(e, tx, ty) {
+/** Khe trống cạnh bàn, tính theo mép TRÁI của sprite.
+ *
+ * Ghế choán từ `desk.x + 5` tới `desk.x + 29`, mà chỗ ngồi lại nằm phía trên ghế. Đi thẳng
+ * từ lối đi lên chỗ ngồi là chui XUYÊN qua ghế từ dưới lên - nhìn như người mọc ra từ gầm
+ * ghế. Phải vòng ra khe giữa hai bàn rồi mới bước NGANG vào ghế, và lúc rời bàn thì làm
+ * ngược lại. Chọn khe gần chỗ đang đứng hơn để không phải đi vòng cả cái bàn.
+ */
+function deskSideX(desk, fromX) {
+  const left = desk.x - 12;
+  const right = desk.x + DESK_W - 4;
+  return Math.abs(fromX - left) <= Math.abs(fromX - right) ? left : right;
+}
+
+/** Đường đi từ vị trí hiện tại tới đích, luôn men theo lối đi thay vì xuyên qua bàn.
+ *  `seat` khác null nghĩa là đích là chỗ ngồi của cái bàn đó - phải tiếp cận từ bên hông. */
+function routeTo(e, tx, ty, seat) {
   const path = [];
   const curAisle = e.y < ROW_Y[1] ? AISLE_Y[0] : AISLE_Y[1];
   const dstAisle = ty < ROW_Y[1] ? AISLE_Y[0] : AISLE_Y[1];
 
-  if (e.mode === 'sit') path.push({ x: e.x, y: curAisle });   // lùi ghế ra lối đi trước
+  if (e.mode === 'sit' && e.desk) {
+    const sx = deskSideX(e.desk, e.x);
+    path.push({ x: sx, y: e.y });          // bước ngang khỏi ghế trước
+    path.push({ x: sx, y: curAisle });     // rồi mới xuống lối đi
+  } else if (e.mode === 'sit') {
+    path.push({ x: e.x, y: curAisle });    // sub-agent đứng cạnh bàn, không có ghế để tránh
+  }
   if (curAisle !== dstAisle) {
     // Đổi dãy thì phải vòng qua lối dọc sát tường, đi thẳng là xuyên qua dãy bàn ở giữa
     const cx = Math.abs(e.x - CORRIDOR_X[0]) < Math.abs(e.x - CORRIDOR_X[1])
@@ -435,8 +525,16 @@ function routeTo(e, tx, ty) {
     path.push({ x: cx, y: curAisle });
     path.push({ x: cx, y: dstAisle });
   }
-  path.push({ x: tx, y: dstAisle });
-  path.push({ x: tx, y: ty });
+  if (seat) {
+    const from = path.length ? path[path.length - 1].x : e.x;
+    const sx = deskSideX(seat, from);
+    path.push({ x: sx, y: dstAisle });     // tới ngang khe
+    path.push({ x: sx, y: ty });           // lên ngang tầm ghế, đi trong khe nên không đụng ghế
+    path.push({ x: tx, y: ty });           // bước ngang vào ngồi
+  } else {
+    path.push({ x: tx, y: dstAisle });
+    path.push({ x: tx, y: ty });
+  }
   e.path = path;
 }
 
@@ -444,7 +542,7 @@ function sendToDesk(e, desk) {
   e.desk = desk;
   e.goal = 'desk';
   e.mode = 'walk';
-  routeTo(e, desk.seatX, desk.seatY);
+  routeTo(e, desk.seatX, desk.seatY, desk);
 }
 
 function sendToSpot(e, spot) {
@@ -477,7 +575,11 @@ function syncAgents(payload) {
 
   // Giữ nguyên bàn cũ trước, rồi mới chia bàn trống cho người mới: đảo bàn mỗi lần làm
   // mới thì cả phòng đứng dậy đổi chỗ liên tục, không ai theo dõi nổi.
-  OF.ents.forEach((e) => { if (e.desk && !e.leaving) used.add(e.desk); });
+  //
+  // Tính CẢ người đang ăn mừng (`leaving` nhưng còn giữ `desk`). Bỏ họ ra thì bàn đó được
+  // coi là trống ngay, người mới vào ngồi đè lên người đang nhún nhảy ở đó - hai nhân vật
+  // chồng lên nhau trên cùng một cái ghế. Họ nhả bàn khi ăn mừng xong, chỉ 2 giây.
+  OF.ents.forEach((e) => { if (e.desk) used.add(e.desk); });
 
   payload.agents.forEach((a) => {
     seen.add(a.id);
@@ -511,16 +613,76 @@ function syncAgents(payload) {
   // cũng bận và người mới vào toàn phải quay vòng, cả phòng trùng mặt nhau.
   OF.slots.forEach((_, id) => { if (!seen.has(id)) OF.slots.delete(id); });
 
-  // Ai không còn trong danh sách thì đi ra cửa rồi biến mất
+  // Ai không còn trong danh sách thì xong việc: đứng dậy, ăn mừng một nhịp rồi mới ra cửa.
   OF.ents.forEach((e, id) => {
     if (seen.has(id) || e.leaving) return;
     e.leaving = true;
-    e.desk = null;
     e.spot = null;
-    e.goal = 'exit';
-    e.mode = 'walk';
-    routeTo(e, -22, AISLE_Y[1]);
+    if (e.kind !== 'agent') {
+      e.desk = null;
+      e.goal = 'exit';
+      e.mode = 'walk';
+      routeTo(e, -22, AISLE_Y[1]);
+    } else if (e.desk && e.mode !== 'sit') {
+      // Xong việc lúc đang đi vòng vòng hoặc đang trên đường về bàn: ĐI VỀ GHẾ CỦA MÌNH đã
+      // rồi mới ăn mừng. Ăn mừng ngay tại chỗ đang đứng thì nhân vật nhún nhảy giữa lối đi
+      // hoặc ngay trước ghế của người khác, nhìn như nhảy nhầm vào bàn thiên hạ.
+      e.goal = 'cheer';
+      e.mode = 'walk';
+      routeTo(e, e.desk.seatX, e.desk.seatY, e.desk);
+    } else {
+      // Đang ngồi sẵn ở ghế mình: ăn mừng tại chỗ. `e.desk` phải giữ lại tới lúc ăn mừng
+      // xong - nó là thứ cho biết bước ngang về phía nào để khỏi trèo qua ghế lúc đi ra.
+      startCheer(e);
+    }
   });
+}
+
+/* Ăn mừng xong việc. Cả hoạt cảnh này chỉ tồn tại vì lúc một phiên kết thúc, nhân vật cứ
+ * thế biến mất ở cửa - không có gì đánh dấu "xong rồi". Một nhịp nhảy tại chỗ kèm confetti
+ * là đủ để liếc qua cũng biết vừa có việc hoàn thành. */
+const CHEER_SEC = 2;
+const CONFETTI = ['#f2c14e', '#e8607a', '#5ec2d9', '#7bd88f', '#b28ce0', '#f0913a'];
+
+/** Đang ngồi thì ăn mừng NGUYÊN TRÊN GHẾ - giữ `mode = 'sit'` để còn nhún trên ghế, và để
+ *  lúc xong `routeTo` biết mà bước ngang khỏi ghế trước khi đi xuống. Chỉ ai đang đứng sẵn
+ *  (đi vòng vòng) mới nhảy giữa sàn. */
+function startCheer(e) {
+  e.goal = 'cheer';
+  if (e.mode !== 'sit') e.mode = 'cheer';
+  e.path = [];
+  e.cheer = CHEER_SEC;
+  spawnConfetti(e.x + SPRITE_W / 2, e.y + 2);
+}
+
+/* Toả NGANG mạnh hơn bắn lên: bản đầu `vx` chỉ ±15 nên cả nắm bông bay thẳng đứng, chụm
+ * lại ngay trên đỉnh đầu và trông như cặp sừng chứ không như pháo giấy. */
+function spawnConfetti(x, y) {
+  for (let i = 0; i < 22; i++) {
+    OF.confetti.push({
+      x: x + (Math.random() - 0.5) * 6,
+      y,
+      vx: (Math.random() - 0.5) * 54,
+      vy: -13 - Math.random() * 20,
+      c: CONFETTI[(Math.random() * CONFETTI.length) | 0],
+      life: 1.2 + Math.random() * 0.8,
+    });
+  }
+}
+
+function stepConfetti(dt) {
+  for (let i = OF.confetti.length - 1; i >= 0; i--) {
+    const c = OF.confetti[i];
+    c.life -= dt;
+    if (c.life <= 0) { OF.confetti.splice(i, 1); continue; }
+    c.vy += 40 * dt;                 // trọng lực, để bông rơi xuống chứ không bay thẳng
+    c.x += c.vx * dt;
+    c.y += c.vy * dt;
+  }
+}
+
+function drawConfetti(g) {
+  OF.confetti.forEach((c) => px2(g, Math.round(c.x), Math.round(c.y), 1, 2, c.c));
 }
 
 /** Sự kiện đã trôi qua giữa hai lần đọc: xếp hàng để diễn lại, không bỏ sót tool ngắn. */
@@ -567,6 +729,20 @@ function step(e, dt) {
   }
   if (!e.burst && e.queue.length) e.burst = { action: e.queue.shift(), left: BURST_SEC };
 
+  // Ăn mừng cho hết nhịp rồi mới đứng dậy đi ra. `routeTo` chạy lúc mode vẫn còn là 'sit'
+  // nên nó tự chèn cú bước ngang khỏi ghế; đổi mode trước khi gọi là mất bước đó và nhân
+  // vật lại chui thẳng xuống qua ghế.
+  if (e.cheer > 0) {
+    e.cheer -= dt;
+    if (e.cheer > 0) return;
+    e.cheer = 0;
+    e.goal = 'exit';
+    routeTo(e, -22, AISLE_Y[1]);
+    e.mode = 'walk';
+    e.desk = null;
+    return;
+  }
+
   if (e.path.length) {
     const wp = e.path[0];
     const dx = wp.x - e.x, dy = wp.y - e.y;
@@ -576,7 +752,10 @@ function step(e, dt) {
       e.x = wp.x; e.y = wp.y;
       e.path.shift();
       if (!e.path.length) {
-        if (e.leaving) { OF.ents.delete(e.id); return; }
+        if (e.goal === 'exit') { OF.ents.delete(e.id); return; }
+        // Vừa về tới ghế của mình để ăn mừng: phải đặt `sit` TRƯỚC startCheer, nếu không nó
+        // tưởng đang đứng và cho nhún kiểu đứng ngay trên mặt ghế.
+        if (e.goal === 'cheer') { e.mode = 'sit'; startCheer(e); return; }
         // Theo ĐÍCH vừa tới, không theo việc có sở hữu bàn hay không. Lấy `e.desk` làm căn
         // cứ thì người vừa đi vòng vòng xong sẽ chuyển sang tư thế ngồi ngay giữa lối đi,
         // và kẹt luôn ở đó vì nhánh "quay về bàn" chỉ chạy khi chưa ngồi.
@@ -592,6 +771,9 @@ function step(e, dt) {
 
   const d = e.data || {};
   if (e.kind !== 'agent') return;
+  // Đang được hover thì đứng lại chờ lệnh. Chỉ giữ khi họ đang rảnh - có việc trở lại thì
+  // phải cho về bàn ngay, công việc quan trọng hơn phép lịch sự.
+  if (e.greet && d.state === 'wander') return;
 
   if (d.state === 'wander') {
     // Rảnh lâu thì rời bàn đi vòng vòng, nhưng VẪN GIỮ CHỖ để lát nữa quay lại đúng bàn cũ
@@ -617,11 +799,20 @@ function tick(now) {
 
   Array.from(OF.ents.values()).forEach((e) => step(e, dt));
   stepCat(dt);
+  stepConfetti(dt);
   draw();
   OF.raf = requestAnimationFrame(tick);
 }
 
-/* ------------------------------------------------------------- con mèo */
+/* ------------------------------------------------------------- con mèo
+ *
+ * Con mèo được vẽ SAU tất cả mọi người nên nó luôn nằm trên cùng. Vì vậy nó phải bị nhốt
+ * trong dải sát mép dưới phòng: dải cũ (`AISLE_Y[1] + 4`) trùng đúng lối đi của người, và nó
+ * đi ngang qua che mất mặt người đang đi - nhìn như con mèo lơ lửng trước mặt ai đó. Ở dải
+ * này nó chỉ còn cắt qua bàn chân, đúng chỗ một con mèo nên ở.
+ */
+
+const CAT_LANE = ROOM_H - 12;
 
 function stepCat(dt) {
   const c = OF.cat;
@@ -633,7 +824,7 @@ function stepCat(dt) {
   const dist = Math.hypot(dx, dy);
   if (dist < 2) {
     c.tx = 16 + Math.random() * (ROOM_W - 48);
-    c.ty = AISLE_Y[1] + 4 + Math.random() * 10;
+    c.ty = CAT_LANE + Math.random() * 3;
     c.wait = 1 + Math.random() * 4;
     return;
   }
@@ -650,45 +841,148 @@ function px2(g, x, y, w, h, color) {
   g.fillRect(x, y, w, h);
 }
 
-function drawRoom(g) {
-  const p = OF.pal;
-  // sàn lát ô
+/* ------------------------------------------------------------- các kiểu phòng
+ *
+ * Mỗi kiểu chỉ đổi SÀN, TƯỜNG và ĐỒ TRANG TRÍ. Hình học của phòng - vị trí bàn, ghế, lối đi,
+ * lối dọc, cửa - dùng chung hằng số ở đầu file và KHÔNG kiểu nào được đụng vào. Nhờ vậy đổi
+ * kiểu phòng thì không có gì lệch được: nhân vật vẫn ngồi đúng chỗ cũ, bàn vẫn đúng chỗ cũ.
+ *
+ * Màu cũng lấy từ đúng bảng màu chung (`readPalette`), chỉ dùng lại theo vai trò khác - ví
+ * dụ tường gạch mượn màu bàn. Nhờ vậy không phải thêm biến CSS cho từng kiểu, và kiểu nào
+ * cũng tự đúng ở cả nền sáng lẫn nền tối.
+ */
+
+/** Sàn lát ô cờ - kiểu chung của mọi phòng, chỉ khác kích thước ô. */
+function floorTiles(g, p, size) {
   px2(g, 0, WALL_H, ROOM_W, ROOM_H - WALL_H, p.floor);
-  for (let y = WALL_H; y < ROOM_H; y += 8) {
-    for (let x = ((y / 8) % 2) * 8; x < ROOM_W; x += 16) {
-      px2(g, x, y, 8, 8, p.floor2);
+  for (let y = WALL_H; y < ROOM_H; y += size) {
+    for (let x = (((y - WALL_H) / size) % 2) * size; x < ROOM_W; x += size * 2) {
+      px2(g, x, y, size, size, p.floor2);
     }
   }
-  // thảm ở khu đi lại: nền đặc + một đường viền lượn bên trong cho đỡ phẳng
+}
+
+/** Sàn gỗ: các thanh dọc dài, khe hở sẫm màu. */
+function floorPlanks(g, p) {
+  px2(g, 0, WALL_H, ROOM_W, ROOM_H - WALL_H, p.floor);
+  for (let x = 0; x < ROOM_W; x += 13) {
+    px2(g, x, WALL_H, 1, ROOM_H - WALL_H, p.floor2);
+  }
+  for (let y = WALL_H + 18; y < ROOM_H; y += 37) {
+    for (let x = (y % 2) * 13; x < ROOM_W; x += 26) px2(g, x, y, 13, 1, p.floor2);
+  }
+}
+
+function clockOnWall(g, p, x) {
+  px2(g, x, 6, 12, 12, p.outline);
+  px2(g, x + 1, 7, 10, 10, '#f4f6fb');
+  const hand = OF.clock * 0.6;
+  px2(g, x + 6 + Math.round(Math.cos(hand) * 3), 12 + Math.round(Math.sin(hand) * 3), 1, 1, p.outline);
+}
+
+function windowOnWall(g, p, x, w) {
+  px2(g, x, 5, w, 15, p.outline);
+  px2(g, x + 1, 6, w - 2, 13, p.sky);
+  px2(g, x + (w >> 1) - 1, 6, 1, 13, p.outline);
+  px2(g, x + 1, 12, w - 2, 1, p.outline);
+}
+
+function potPlant(g, p, x, y) {
+  px2(g, x, y + 8, 8, 6, p.deskDark);
+  px2(g, x + 1, y, 6, 9, p.plant);
+  px2(g, x + 3, y - 3, 2, 4, p.plant);
+}
+
+const ROOMS = [
+  {
+    id: 'classic',
+    draw(g, p) {
+      floorTiles(g, p, 8);
+      px2(g, 0, 0, ROOM_W, WALL_H, p.wall);
+      px2(g, 0, WALL_H - 3, ROOM_W, 3, p.wallDark);
+      windowOnWall(g, p, 40, 46);
+      windowOnWall(g, p, 150, 46);
+      clockOnWall(g, p, 118);
+      potPlant(g, p, 244, 32);
+      potPlant(g, p, 8, 32);
+    },
+  },
+  {
+    id: 'library',
+    draw(g, p) {
+      floorPlanks(g, p);
+      px2(g, 0, 0, ROOM_W, WALL_H, p.wallDark);
+      px2(g, 0, WALL_H - 3, ROOM_W, 3, p.deskDark);
+      // Hai kệ sách: mỗi kệ hai tầng, gáy sách cao thấp so le cho khỏi phẳng
+      [12, 150].forEach((sx) => {
+        px2(g, sx, 3, 98, 19, p.desk);
+        [4, 13].forEach((sy) => {
+          px2(g, sx + 1, sy, 96, 8, p.deskDark);
+          for (let i = 0; i < 24; i++) {
+            const bx = sx + 2 + i * 4;
+            if (bx > sx + 94) break;
+            const hh = 4 + ((i * 7 + sy) % 4);
+            const col = [p.plant, p.sky, p.rug, p.chair][(i + sy) % 4];
+            px2(g, bx, sy + 8 - hh, 3, hh, col);
+          }
+        });
+      });
+      clockOnWall(g, p, 118);
+    },
+  },
+  {
+    id: 'loft',
+    draw(g, p) {
+      floorTiles(g, p, 13);
+      // Tường gạch: mượn màu bàn, hàng lệch nhau nửa viên
+      px2(g, 0, 0, ROOM_W, WALL_H, p.deskDark);
+      for (let y = 0; y < WALL_H - 3; y += 5) {
+        px2(g, 0, y, ROOM_W, 4, p.desk);
+        for (let x = ((y / 5) % 2) * 9; x < ROOM_W; x += 18) px2(g, x, y, 1, 4, p.deskDark);
+      }
+      px2(g, 0, WALL_H - 3, ROOM_W, 3, p.deskDark);
+      windowOnWall(g, p, 78, 104);   // một cửa sổ lớn giữa tường
+      potPlant(g, p, 244, 32);
+    },
+  },
+  {
+    id: 'garden',
+    draw(g, p) {
+      floorTiles(g, p, 8);
+      px2(g, 0, 0, ROOM_W, WALL_H, p.wall);
+      px2(g, 0, WALL_H - 3, ROOM_W, 3, p.wallDark);
+      windowOnWall(g, p, 96, 68);
+      // Giàn cây leo rủ từ trần xuống, độ dài so le
+      for (let x = 2; x < ROOM_W; x += 7) {
+        const len = 4 + ((x * 3) % 9);
+        px2(g, x, 0, 3, len, p.plant);
+        px2(g, x + 1, len, 1, 2, p.plant);
+      }
+      potPlant(g, p, 244, 32);
+      potPlant(g, p, 8, 32);
+      potPlant(g, p, 26, 34);
+    },
+  },
+];
+
+function roomById(id) {
+  return ROOMS.find((r) => r.id === id) || ROOMS[0];
+}
+
+function drawRoom(g) {
+  const p = OF.pal;
+  roomById(OF.room).draw(g, p);
+
+  // Phần dùng chung cho MỌI kiểu phòng - đây là chỗ giữ cho không kiểu nào lệch khỏi kiểu
+  // nào: thảm ở khu đi lại và cửa ra vào luôn ở đúng một chỗ.
   const rw = ROOM_W - 130;
   px2(g, 60, AISLE_Y[1] + 8, rw, 12, p.rug);
   px2(g, 63, AISLE_Y[1] + 11, rw - 6, 1, p.floor2);
   px2(g, 63, AISLE_Y[1] + 16, rw - 6, 1, p.floor2);
 
-  // tường + cửa sổ + đồng hồ
-  px2(g, 0, 0, ROOM_W, WALL_H, p.wall);
-  px2(g, 0, WALL_H - 3, ROOM_W, 3, p.wallDark);
-  [40, 150].forEach((wx) => {
-    px2(g, wx, 5, 46, 15, p.outline);
-    px2(g, wx + 1, 6, 44, 13, p.sky);
-    px2(g, wx + 22, 6, 1, 13, p.outline);
-    px2(g, wx + 1, 12, 44, 1, p.outline);
-  });
-  px2(g, 118, 6, 12, 12, p.outline);
-  px2(g, 119, 7, 10, 10, '#f4f6fb');
-  const hand = OF.clock * 0.6;
-  px2(g, 124 + Math.round(Math.cos(hand) * 3), 12 + Math.round(Math.sin(hand) * 3), 1, 1, p.outline);
-
-  // cửa ra vào ở mép trái
   px2(g, 0, AISLE_Y[1] - 12, 6, 30, p.deskDark);
   px2(g, 1, AISLE_Y[1] - 10, 4, 26, p.desk);
 
-  // cây cảnh hai góc
-  [{ x: 244, y: 32 }, { x: 8, y: 32 }].forEach((c) => {
-    px2(g, c.x, c.y + 8, 8, 6, p.deskDark);
-    px2(g, c.x + 1, c.y, 6, 9, p.plant);
-    px2(g, c.x + 3, c.y - 3, 2, 4, p.plant);
-  });
 }
 
 /** Một bàn: mặt bàn, chân bàn, màn hình. Màn hình sáng theo việc đang làm. */
@@ -723,6 +1017,8 @@ function drawDesk(g, desk, ent) {
   }
   px2(g, desk.monX + MON_W / 2 - 1, desk.monY + MON_H - 2, 2, 2, p.metal);
 
+  drawChairBase(g, desk);
+
   // mặt bàn
   px2(g, desk.x, desk.y, DESK_W, DESK_H, p.desk);
   px2(g, desk.x, desk.y, DESK_W, 2, p.deskDark);
@@ -732,8 +1028,57 @@ function drawDesk(g, desk, ent) {
   px2(g, desk.x + 10, desk.y + 4, 14, 4, p.metal);
 }
 
+/* Ghế chia làm HAI phần vẽ ở hai thời điểm khác nhau, và đó là toàn bộ mấu chốt:
+ *
+ * - `drawChairBase` vẽ TRƯỚC nhân vật - cột và chân đế nằm hẳn dưới, không đè ai.
+ * - `drawChairBack` vẽ SAU nhân vật - tựa lưng che phần hông, nên người trông như lọt vào
+ *   lòng ghế.
+ *
+ * Bản đầu vẽ cả cái ghế trước nhân vật bằng một hình chữ nhật 20x9 đặc. Kết quả: tựa lưng
+ * nằm dưới thân người và thò ra thành một tấm ván to phía sau, nhìn hệt như người đang đứng
+ * úp mặt vào cái ghế chứ không phải ngồi lên nó - đúng phản hồi nhận được.
+ *
+ * Tựa lưng chỉ cao tới ngang hông chứ không kín lưng như ghế văn phòng thật: cả app này xoay
+ * quanh việc nhận ra ai là ai qua màu áo, che hết áo thì mọi bộ nhân vật thành một màu.
+ */
+
+const CHAIR_X = 7;              // lệch so với desk.x; nhân vật ngồi ở desk.x + 9
+const CHAIR_W = 20;
+
+function drawChairBase(g, desk) {
+  const p = OF.pal;
+  const cx = desk.x + CHAIR_X;
+  const top = desk.y + DESK_H + 12;                       // ngay dưới đáy tựa lưng
+  px2(g, cx + 8, top, 4, 2, p.chairDark);                 // cột giữa
+  px2(g, cx + 3, top + 2, 14, 2, p.chairDark);            // đế nằm ngang
+  px2(g, cx + 2, top + 3, 2, 1, p.chair);                 // hai bánh xe
+  px2(g, cx + 16, top + 3, 2, 1, p.chair);
+}
+
+/* Tựa lưng đè lên ĐÚNG ba hàng cuối của thân (hàng 13-15 của sprite), chừa lại ba hàng vai
+ * và áo phía trên. Đè sâu hơn thì mọi bộ nhân vật thành một màu ghế; đè nông hơn thì hở một
+ * vệt thân dưới đáy ghế, nhìn như người bị cắt đôi. */
+function drawChairBack(g, desk) {
+  const p = OF.pal;
+  const cx = desk.x + CHAIR_X;
+  const cy = desk.y + DESK_H + 7;
+  // Bo hai góc trên bằng cách chừa 1 pixel mỗi bên ở hàng đầu, đủ để không ra hình hộp diêm.
+  px2(g, cx + 1, cy, CHAIR_W - 2, 1, p.chairDark);
+  px2(g, cx, cy + 1, CHAIR_W, 3, p.chair);
+  px2(g, cx, cy + 4, CHAIR_W, 1, p.chairDark);            // mép dưới, tách khỏi cột
+  // Tay vịn: hai mẩu nhô ra hai bên, thứ làm nó đọc ra "ghế" chứ không phải một khối màu.
+  px2(g, cx - 2, cy, 2, 4, p.chairDark);
+  px2(g, cx + CHAIR_W, cy, 2, 4, p.chairDark);
+}
+
 function frameFor(e) {
   const d = e.data || {};
+  // Nhảy ăn mừng bằng cách đảo qua lại hai khung có sẵn thật nhanh, không phải vẽ thêm
+  // khung nào. Ngồi thì đảo hai tư thế ngồi (nhún trên ghế), đứng thì đảo hai bước chân.
+  if (e.cheer > 0) {
+    const beat = Math.floor(e.anim * 9) % 2;
+    return e.mode === 'sit' ? (beat ? 'k1' : 'k0') : (beat ? 'd1' : 'd2');
+  }
   const walking = e.path.length > 0;
   if (walking) {
     const s = Math.floor(e.anim * 6) % 4;
@@ -755,6 +1100,11 @@ function drawEntity(g, e) {
   const flip = e.dir === 'left' && e.path.length;
   const small = e.kind === 'sub';
 
+  // Nhún nhảy lúc ăn mừng: cả người nhấc lên 1 pixel theo nhịp, nhưng CÁI BÓNG đứng yên -
+  // bóng nhảy theo thì mất luôn cảm giác nhấc chân khỏi sàn.
+  const hop = e.cheer > 0 && Math.floor(e.anim * 9) % 2 ? -1 : 0;
+  const ey = e.y + hop;
+
   // Người ngồi không vẽ chân (chân khuất sau ghế), nên cái bóng ở đáy sprite hoá ra một
   // vệt tách rời lơ lửng dưới thân. Ngồi thì bóng cũng khuất sau ghế - bỏ luôn.
   if (e.mode !== 'sit') px2(g, e.x + 3, e.y + SPRITE_H - 2, 10, 2, OF.pal.shadow);
@@ -763,16 +1113,16 @@ function drawEntity(g, e) {
   // vẫn rơi đúng vào (e.x, e.y), còn viền tràn ra ngoài như nó phải thế.
   if (small) {
     // sub-agent vẽ nhỏ hơn một chút để phân biệt với người gọi nó mà không cần chú thích
-    g.translate(e.x + SPRITE_W / 2, e.y + SPRITE_H);
+    g.translate(e.x + SPRITE_W / 2, ey + SPRITE_H);
     g.scale(0.8, 0.8);
     g.translate(-SPRITE_W / 2, -SPRITE_H);
     g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, sw, sh);
   } else if (flip) {
-    g.translate(e.x + SPRITE_W, e.y);
+    g.translate(e.x + SPRITE_W, ey);
     g.scale(-1, 1);
     g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, -1, -1, sw, sh);
   } else {
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, e.x - 1, e.y - 1, sw, sh);
+    g.drawImage(OF.atlas.canvas, sx, sy, sw, sh, e.x - 1, ey - 1, sw, sh);
   }
   g.restore();
 }
@@ -883,17 +1233,20 @@ function draw() {
   drawRoom(g);
 
   const byDesk = new Map();
-  OF.ents.forEach((e) => { if (e.desk && e.kind === 'agent') byDesk.set(e.desk, e); });
+  OF.ents.forEach((e) => { if (e.desk && e.kind === 'agent' && !e.leaving) byDesk.set(e.desk, e); });
   const ents = Array.from(OF.ents.values()).sort((a, b) => a.y - b.y);
 
   [0, 1].forEach((row) => {
-    OF.desks.filter((d) => d.row === row).forEach((d) => drawDesk(g, d, byDesk.get(d)));
+    const desks = OF.desks.filter((d) => d.row === row);
+    desks.forEach((d) => drawDesk(g, d, byDesk.get(d)));
     const lo = row === 0 ? -Infinity : ROW_Y[1];
     const hi = row === 0 ? ROW_Y[1] : Infinity;
     ents.filter((e) => e.y >= lo && e.y < hi).forEach((e) => drawEntity(g, e));
+    desks.forEach((d) => drawChairBack(g, d));    // tựa lưng đè lên hông người ngồi
   });
 
   drawCatEntity(g);
+  drawConfetti(g);          // trên cùng: bông bay trước mặt mọi người, không nấp sau bàn
 
   if (OF.hover && OF.hover !== OF.sel) {
     const e = OF.ents.get(OF.hover);
@@ -928,6 +1281,23 @@ function resize() {
 
 /* ------------------------------------------------------------- tương tác */
 
+/** Toạ độ phòng (pixel gốc) từ toạ độ chuột. */
+function roomPos(clientX, clientY) {
+  const r = OF.canvas.getBoundingClientRect();
+  return { x: (clientX - r.left) / OF.scale, y: (clientY - r.top) / OF.scale };
+}
+
+/** Bắt theo THÂN nhân vật ở vị trí hiện tại - khác deskAt (bắt theo cụm bàn). Người đi vòng
+ *  vòng vẫn giữ bàn, nên nếu chỉ có deskAt thì hover vào chính họ giữa phòng không ăn gì. */
+function entAt(clientX, clientY) {
+  const { x, y } = roomPos(clientX, clientY);
+  for (const [id, e] of OF.ents) {
+    if (e.kind !== 'agent') continue;
+    if (x >= e.x - 1 && x <= e.x + SPRITE_W + 1 && y >= e.y - 1 && y <= e.y + SPRITE_H + 1) return id;
+  }
+  return null;
+}
+
 function deskAt(clientX, clientY) {
   const r = OF.canvas.getBoundingClientRect();
   const x = (clientX - r.left) / OF.scale;
@@ -943,18 +1313,60 @@ function deskAt(clientX, clientY) {
   return null;
 }
 
-function onMove(ev) {
-  const id = deskAt(ev.clientX, ev.clientY);
-  if (id !== OF.hover) {
-    OF.hover = id;
-    OF.canvas.style.cursor = id ? 'pointer' : 'default';
+/** Đặt người đang được rê chuột. Người cũ thôi chào, người mới bắt đầu chào - `greet` do
+ *  step() đọc: đang chào thì đứng yên quay mặt ra, không tự đi tiếp.
+ *
+ * Hai chỗ bắt buộc phải qua hàm này chứ đừng sờ thẳng vào `OF.hover`:
+ *
+ * 1. **Rê chuột RA KHỎI canvas cũng phải gỡ `greet`.** Trước đây `mouseleave` chỉ xoá
+ *    `OF.hover`, người được chào giữ `greet = true` vĩnh viễn và đứng chôn chân giữa phòng -
+ *    đúng lỗi "bỏ chuột ra rồi mà nó không đi tiếp nữa".
+ * 2. **Gỡ `greet` phải kèm gỡ `e.goal`.** Lúc bắt đầu chào ta xoá `e.path` để họ dừng ngay
+ *    giữa đường; nếu vẫn để `goal = 'desk'` thì nhánh "có việc thì về bàn" trong step() không
+ *    bao giờ chạy lại (nó chỉ chạy khi `goal !== 'desk'`) và người đó kẹt luôn.
+ */
+function setHover(id) {
+  if (id === OF.hover) return;
+  const prev = OF.ents.get(OF.hover);
+  if (prev) prev.greet = false;
+  const now = OF.ents.get(id);
+  if (now && now.kind === 'agent') {
+    now.greet = true;
+    now.path = [];          // dừng ngay giữa đường, không đi nốt tới đích
+    now.goal = null;        // để step() cấp đích mới khi thôi chào
+    now.dir = 'down';       // quay mặt về phía người xem
+    if (now.mode !== 'sit') now.mode = 'idle';
   }
+  OF.hover = id || null;
 }
 
+function onMove(ev) {
+  const id = entAt(ev.clientX, ev.clientY) || deskAt(ev.clientX, ev.clientY);
+  setHover(id);
+  OF.canvas.style.cursor = id ? 'pointer' : 'default';
+}
+
+/** Bấm vào ai thì mở chi tiết người đó VÀ cuộn tới đúng phần họ cần. Không cuộn thì bảng
+ *  chi tiết mở tận dưới màn hình, bấm xong không thấy gì đổi và tưởng nút hỏng. */
 function onClick(ev) {
-  const id = deskAt(ev.clientX, ev.clientY);
-  OF.sel = id === OF.sel ? null : id;   // bấm lại đúng bàn đang mở thì đóng chi tiết
+  const id = entAt(ev.clientX, ev.clientY) || deskAt(ev.clientX, ev.clientY);
+  if (!id) return;
+  if (id === OF.sel) { OF.sel = null; renderDetail(); return; }   // bấm lại thì đóng
+
+  OF.sel = id;
   renderDetail();
+  const e = OF.ents.get(id);
+  // Bấm xong là thôi chào: chi tiết đã mở ra rồi, giữ họ đứng chờ nữa thì cả phòng đứng hình
+  // trong khi người dùng đang đọc bảng bên dưới.
+  if (e) { e.greet = false; e.goal = null; }
+  const busy = e && (e.data || {}).state === 'busy';
+  // Đang làm việc thì thứ người ta muốn xem là cây tiến trình; đang rảnh thì gần như chắc
+  // chắn là muốn đổi nhân vật.
+  requestAnimationFrame(() => {
+    const sel = busy ? '#office-detail .kids, #office-detail .empty' : '#office-detail .agent-skins';
+    (document.querySelector(sel) || document.getElementById('office-detail'))
+      .scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
 }
 
 /* ------------------------------------------------------------- bảng chi tiết */
@@ -1082,14 +1494,23 @@ function officeInit() {
   OF.atlas = buildSpriteAtlas();
   OF.desks = buildDesks();
   OF.pal = readPalette();
-  OF.cat = { x: 120, y: AISLE_Y[1] + 8, tx: 120, ty: AISLE_Y[1] + 8, wait: 2, anim: 0, flip: false };
+  OF.cat = { x: 120, y: CAT_LANE, tx: 120, ty: CAT_LANE, wait: 2, anim: 0, flip: false };
   OF.canvas.addEventListener('mousemove', onMove);
-  OF.canvas.addEventListener('mouseleave', () => { OF.hover = null; });
+  OF.canvas.addEventListener('mouseleave', () => setHover(null));
   OF.canvas.addEventListener('click', onClick);
   window.addEventListener('resize', resize);
 
   initPack();
+  initRoom();
   renderPacks();
+  renderRooms();
+  const rooms = document.getElementById('office-rooms');
+  if (rooms) {
+    rooms.addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-room]');
+      if (b) setRoom(b.dataset.room);
+    });
+  }
   const skins = document.getElementById('office-skins');
   if (skins) {
     skins.addEventListener('click', (ev) => {
@@ -1138,6 +1559,7 @@ function officeStart() {
 
 function officeStop() {
   OF.on = false;
+  OF.confetti.length = 0;   // không giữ bông của lần trước, mở lại tab là thấy nó treo lơ lửng
   if (OF.timer) { clearInterval(OF.timer); OF.timer = null; }
   if (OF.raf) { cancelAnimationFrame(OF.raf); OF.raf = null; }
 }
@@ -1175,6 +1597,7 @@ function officeRefresh() {
   renderStatus();
   renderDetail();
   renderPacks();      // tên bộ phải đổi theo ngôn ngữ
+  renderRooms();      // và xem trước phòng phải đổi theo bảng màu của theme
   if (OF.on) draw();
 }
 

@@ -15,6 +15,10 @@ See what your AI coding tools are really doing to your machine.
 [![Dependencies](https://img.shields.io/badge/dependencies-none-64748b)](https://github.com/hominhtuong/AIMonitor/blob/main/CLAUDE.md)
 [![Downloads](https://img.shields.io/github/downloads/hominhtuong/AIMonitor/total?color=f59e0b)](https://github.com/hominhtuong/AIMonitor/releases)
 
+<img src="assets/board.png" width="820" alt="The Office view: every running AI agent is a character at a desk">
+
+*Every AI agent running on your machine, sitting at its own desk.*
+
 </div>
 
 ---
@@ -200,13 +204,14 @@ running commands, purple for fetching the web. Leave an agent idle for a minute 
 it gets up and wanders around. Sub-agents show up as smaller helpers standing next to whoever
 called them. Click any computer to open that session in full, process tree included.
 
-There are **four character sets** of ten: Office, Pets, Slimes and Mascots. Open **Character
-set** under the room to see all four with a preview; pick one and the whole room switches to
+There are **seven character sets**: Office, Pets, Slimes and Mascots with ten each, The Crew
+with five, plus Voyage and Ninja with thirty-six each. Open **Character set** under the room to
+see them all with a preview; pick one and the whole room switches to
 it, each agent taking a different character from the set - once it runs out it starts over.
 Click a character in the room and the detail panel grows a row of that set, so you can change
 just that one. Both choices are remembered.
 
-To use your own characters, click the **+** tile next to the four sets and pick any picture
+To use your own characters, click the **+** tile next to the built-in sets and pick any picture
 holding several characters. It lifts the background, finds each one and fits them to the office
 format. **The picture never leaves your machine**: it is read in the page, never uploaded, and
 sets you add are not part of the released app. A flat background with gaps between the

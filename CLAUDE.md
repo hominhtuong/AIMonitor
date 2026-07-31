@@ -577,6 +577,16 @@ cuộn, không mất trạng thái mở/đóng cây.
 Xác nhận thao tác dùng hộp thoại trong trang, **không dùng `confirm()`** - Chrome chặn dialog
 gốc sau vài lần và làm nút kill trông như hỏng.
 
+**Đừng bao giờ dùng `data-*` làm cờ "đã gắn listener rồi".** `patch()` xoá mọi thuộc tính
+không có trong HTML mới, mà HTML mới thì không bao giờ mang cái cờ đó - nên cứ mỗi lần vẽ lại
+cờ bay mất trong khi phần tử vẫn là ĐÚNG phần tử cũ (morph giữ nó lại theo `data-key`).
+Listener cộng dồn theo nhịp làm mới, và `disabled = true` trong handler không cứu được vì mọi
+listener của cùng một sự kiện vẫn chạy hết. Đã trả giá đúng chỗ này: nút Gửi của ô giao việc
+cũ gắn thêm một listener mỗi giây, mở bảng 3 phút rồi bấm là mở ~180 cửa sổ Terminal, treo
+máy. Listener của vùng động phải **uỷ quyền trên `document`, đăng ký một lần** - như nút đóng
+và dãy đổi nhân vật ở cuối `office.js`. Cần nhớ trạng thái thì để trong đối tượng state của
+JS, đừng để trên DOM.
+
 ## Khung nhìn Văn phòng (office.py + static/office.js + static/sprites.js)
 
 Mỗi agent đang chạy là một nhân vật pixel trong một căn phòng: có việc thì ngồi vào bàn và
@@ -631,10 +641,11 @@ ngoài kia gần như luôn kèm giấy phép riêng cho phần asset, khác gi�
 
 ### Bộ nhân vật (sprites.js)
 
-**Bốn bộ, mỗi bộ 10 nhân vật**: Văn phòng (người), Thú cưng, Slime, Mascot. Chọn một bộ thì
-CẢ PHÒNG theo bộ đó, và mỗi agent nhận một nhân vật KHÁC nhau trong bộ; quá 10 agent thì quay
-vòng dùng lại. Bấm vào một người trong phòng rồi chọn ở dãy dưới bảng chi tiết thì đổi riêng
-người đó.
+**Bảy bộ**: Hải trình và Nhẫn giả mỗi bộ 36 nhân vật, Văn phòng (người), Thú cưng, Slime,
+Mascot mỗi bộ 10, Năm anh em 5. Bộ ĐẦU TIÊN trong `BUILTIN_PACKS` là mặc định - `initPack()` rơi về
+`PACKS[0].id` chứ không viết cứng tên, nên đổi thứ tự là đổi luôn mặc định. Chọn một bộ thì CẢ PHÒNG theo bộ đó, và mỗi agent nhận một nhân vật KHÁC nhau trong
+bộ; hết nhân vật thì quay vòng dùng lại. Bấm vào một người trong phòng rồi chọn ở dãy dưới
+bảng chi tiết thì đổi riêng người đó.
 
 `PACKS` khai bộ, `ALL_CHARS` là bảng phẳng mọi nhân vật của mọi bộ theo đúng thứ tự hàng trong
 atlas - `office.js` chỉ giữ một số nguyên `charIndex` trỏ vào đây, không cần biết bộ nào.
@@ -643,6 +654,23 @@ atlas - `office.js` chỉ giữ một số nguyên `charIndex` trỏ vào đây,
 chặn: repo này public, mà trong đó có fan art của IP có chủ (Naruto, One Piece, Shaun the
 Sheep, Mario) và bản xem trước của pack có giấy phép riêng. "Tải trên trang free download"
 không cấp quyền cho nhân vật gốc - trang chỉ cấp được quyền cho phần người upload tự vẽ.
+
+Bộ **Năm anh em** dựng từ một tấm ảnh chụp chung của người dùng, và đó là bộ duy nhất mô tả
+người thật - nhưng vẫn **không có file ảnh nào đi vào repo**, vẫn vẽ bằng code như sáu bộ kia.
+Ở 16x20 pixel thì chép khuôn mặt là vô nghĩa (8 pixel ngang cho cả khuôn mặt, hai con mắt đã
+chiếm 4), nên mỗi người được khoá bằng ĐÚNG BA dấu hiệu tách bạch: tóc, thân, chân. Ba chứ
+không phải một, vì mỗi tư thế giấu đi một thứ khác nhau - ngồi thì mất giày và mất luôn ngực
+(quay lưng), đi ngang thì mất kính. Bảng chi tiết nằm ở đầu `CREW_CHARS`.
+
+Hai cái bẫy riêng của bộ này, cùng một gốc là **cả năm người đều tóc đen còn mắt cũng vẽ bằng
+mực đen**:
+
+- Mặt trước của tóc phải dừng ở hàng 3, **chừa hàng 4 làm trán**. Để mái tóc chạm thẳng vào
+  hàng mắt thì hai thứ dính làm một, khuôn mặt mất hẳn đôi mắt, chỉ còn một vệt đen với hai
+  chấm sáng. Hàng trán đó cũng đúng là chỗ đặt thanh ngang của gọng kính.
+- Gọng kính đen phải là kiểu **browline** (một thanh ngang trên, gọng chỉ khép ở mép ngoài và
+  đáy) kèm một chấm loá trong tròng. Bản đầu vẽ khung vuông KÍN bốn cạnh cho hai mắt: cộng
+  với tóc đen phía trên, cả cái đầu thành một khối đen đặc, không còn mặt mũi gì.
 
 **Viền tối 1 pixel làm hậu kỳ, đừng vẽ tay.** `outlineCell()` quét alpha của ô vừa vẽ, chỗ nào
 trong suốt mà chạm vào chỗ đặc thì tô. Nhờ vậy sửa một hình chữ nhật bất kỳ không phải sửa
@@ -679,6 +707,123 @@ Chỗ ngồi (`OF.slots`) giữ nguyên khi đổi bộ, nên đổi bộ xong a
 hình. Nhưng lựa chọn ép riêng thì bị xoá: chúng thuộc về bộ cũ, giữ lại thì đổi bộ xong vẫn
 còn vài người mang hình bộ trước, nhìn như lỗi. Phải dọn `OF.slots` của ai rời phòng, nếu
 không `slotFor()` thấy chỗ nào cũng bận và người mới vào toàn phải quay vòng.
+
+### Kiểu phòng và ghế
+
+Bốn kiểu: Cổ điển, Thư viện, Gác xép, Sân vườn. Mỗi kiểu CHỈ đổi sàn, tường và đồ trang trí -
+hình học của phòng (vị trí bàn, ghế, lối đi, lối dọc, cửa) nằm ở hằng số đầu file và không
+kiểu nào được đụng vào. Nhờ vậy đổi kiểu phòng thì **không có gì lệch được**, và ô xem trước
+gọi thẳng `ROOMS[].draw` nên cũng không bao giờ lệch khỏi phòng thật.
+
+Màu lấy từ đúng bảng màu chung, chỉ dùng lại theo vai trò khác (tường gạch mượn màu bàn). Nhờ
+vậy không phải thêm biến CSS cho từng kiểu, và kiểu nào cũng tự đúng ở cả hai theme.
+
+Con mèo bị nhốt trong dải sát mép dưới phòng (`CAT_LANE`) vì nó được vẽ SAU tất cả mọi người
+nên luôn nằm trên cùng. Dải cũ trùng đúng lối đi của người, và nó đi ngang qua che mất mặt ai
+đang đi bộ - nhìn như con mèo lơ lửng trước mặt người ta. Ở dải này nó chỉ còn cắt qua bàn
+chân, đúng chỗ một con mèo nên ở.
+
+**Ghế vẽ làm HAI phần ở hai thời điểm khác nhau.** `drawChairBase` (cột + đế) vẽ trong
+`drawDesk`, tức trước nhân vật; `drawChairBack` (tựa lưng + tay vịn) vẽ SAU nhân vật của dãy
+đó, nên tựa lưng che phần hông và người trông như lọt vào lòng ghế.
+
+Bản đầu vẽ cả cái ghế trước nhân vật bằng một hình chữ nhật 20x9 đặc: tựa lưng nằm dưới thân
+người rồi thò ra thành một tấm ván to phía sau, nhìn hệt như người đang **úp mặt vào ghế**
+chứ không phải ngồi lên nó. Tựa lưng chỉ đè ba hàng cuối của thân chứ không kín lưng như ghế
+văn phòng thật - cả app xoay quanh việc nhận ra ai là ai qua màu áo, che hết áo thì mọi bộ
+nhân vật thành một màu ghế.
+
+**Vào và ra khỏi chỗ ngồi đều phải đi VÒNG QUA KHE cạnh bàn** (`deskSideX`). Chỗ ngồi nằm
+phía trên ghế, nên đi thẳng từ lối đi lên là chui xuyên qua ghế từ dưới - nhìn như người mọc
+ra từ gầm ghế. `routeTo(e, x, y, seat)` chèn thêm hai chặng: lên trong khe giữa hai bàn, rồi
+bước ngang vào ghế; lúc rời bàn thì chèn cú bước ngang ra khe trước khi đi xuống. Đừng đổi
+`e.mode` khỏi `'sit'` TRƯỚC khi gọi `routeTo` - chính cờ đó bật nhánh bước ngang.
+
+### Bấm và rê chuột trong phòng
+
+`deskAt()` bắt theo cụm bàn, `entAt()` bắt theo THÂN nhân vật ở vị trí hiện tại. Phải có cả
+hai: người đi vòng vòng vẫn giữ bàn, nên nếu chỉ có `deskAt` thì rê chuột vào chính họ giữa
+phòng không ăn gì.
+
+**Bấm xong phải cuộn tới.** Không cuộn thì bảng chi tiết mở tận dưới màn hình, người dùng bấm
+xong không thấy gì đổi và tưởng nút hỏng - đúng phản hồi nhận được. Đang làm việc thì cuộn tới
+cây tiến trình, đang rảnh thì cuộn tới dãy đổi nhân vật.
+
+Rê chuột vào ai thì `e.greet = true`: `step()` cho họ đứng yên quay mặt ra chờ lệnh. Chỉ giữ
+khi `d.state === 'wander'` - có việc trở lại thì phải cho về bàn ngay.
+
+**Gỡ `greet` phải đi qua `setHover()`, và luôn kèm gỡ `e.goal`.** Hai lỗi đã dính:
+
+1. `mouseleave` chỉ xoá `OF.hover` mà không gỡ `greet` của người đang được chào - họ đứng
+   chôn chân giữa phòng vĩnh viễn, bỏ chuột ra rồi vẫn không đi tiếp.
+2. Lúc bắt đầu chào ta xoá `e.path` cho họ dừng ngay giữa đường. Nếu vẫn để `goal = 'desk'`
+   thì nhánh "có việc thì về bàn" trong `step()` không bao giờ chạy lại - nó chỉ chạy khi
+   `goal !== 'desk'` - và người đó kẹt luôn kể cả khi đã thôi chào.
+
+Bấm chọn một người cũng gỡ `greet`: bảng chi tiết đã mở rồi, giữ họ đứng chờ nữa thì cả phòng
+đứng hình trong khi người dùng đang đọc bảng bên dưới.
+
+### Ăn mừng lúc xong việc
+
+Phiên kết thúc thì nhân vật **ăn mừng 2 giây (`CHEER_SEC`) ngay trên ghế CỦA CHÍNH MÌNH** -
+bắn confetti, nhún theo nhịp bằng cách đảo hai khung ngồi có sẵn - rồi mới đứng dậy đi ra.
+Trước đó họ chỉ lặng lẽ biến mất ở cửa, không có gì đánh dấu "xong rồi".
+
+Ba chỗ dễ sai, đã sửa đúng theo phản hồi:
+
+- **Phải ở ghế của chính mình.** Xong việc lúc đang đi vòng vòng thì cho đi về bàn mình đã
+  (`goal = 'cheer'`), tới nơi mới ăn mừng. Ăn mừng tại chỗ đang đứng thì nhân vật nhún nhảy
+  giữa lối đi hoặc ngay trước ghế người khác, nhìn như nhảy nhầm bàn thiên hạ.
+- **Ngồi thì giữ nguyên `mode = 'sit'`.** Cờ này vừa quyết định dùng khung nhún kiểu ngồi,
+  vừa bật nhánh bước ngang khỏi ghế trong `routeTo` lúc đi ra. Đổi `mode` trước khi gọi
+  `routeTo` là mất cú bước ngang, nhân vật lại chui thẳng xuống xuyên qua ghế.
+- **Người đang ăn mừng vẫn phải GIỮ CHỖ.** `used` trong `syncAgents` tính cả người `leaving`
+  còn `desk`, nếu không bàn đó bị coi là trống ngay và người mới vào ngồi đè lên người đang
+  nhún nhảy - hai nhân vật chồng nhau trên một cái ghế. Chỗ được nhả khi ăn mừng xong.
+
+Confetti là hạt 1x2 pixel trong `OF.confetti`, vẽ SAU tất cả mọi thứ nên bông bay trước mặt
+chứ không nấp sau bàn. `vx` phải toả ngang mạnh hơn lực bắn lên, nếu không cả nắm bông bay
+thẳng đứng chụm trên đỉnh đầu và trông như cặp sừng.
+
+### Giao việc - đã gỡ, đừng làm lại
+
+Từng có ô nhập prompt + `POST /api/spawn` mở một phiên Claude MỚI trong cửa sổ Terminal. Đã
+gỡ sạch (endpoint, `office.spawn_session`, `find_claude`, khoá i18n, CSS). Người dùng muốn
+prompt đi vào phiên ĐANG chạy và hiện ngay trong CLI / plugin của họ, chứ không muốn một cửa
+sổ terminal lạ bật ra bên ngoài - mà cái họ muốn thì không làm được, còn cái làm được thì họ
+không muốn. Kết quả khảo sát trên bản Claude Code 2.1.220:
+
+| Phiên chạy ở đâu | Bơm prompt vào phiên đang chạy | Bằng cách nào |
+| --- | --- | --- |
+| Plugin Claude Code trong VSCode | **Không** | không có đường nào, xem dưới |
+| Terminal.app (macOS) | Được | AppleScript, ghép `tty` của tab với `ps -o tty=` |
+| iTerm2 | Được | `write text`, session cũng có thuộc tính `tty` |
+| tmux / screen | Được | `tmux send-keys` |
+| Terminal tích hợp VSCode | Chỉ từ extension AIMonitor | `terminal.sendText`, cùng cửa sổ |
+| Windows | Không | không có API bơm input vào tab |
+
+Ca **plugin VSCode** bịt cả ba đường, và đó là ca phổ biến nhất:
+
+1. Tiến trình không có TTY (`ps` cho `??`), stdin là pipe thuộc extension host. `TIOCSTI` -
+   ioctl duy nhất nhét được ký tự vào input tiến trình khác - macOS gỡ từ 10.15, Linux tắt
+   mặc định.
+2. Extension Claude Code **có** deep link `vscode://anthropic.claude-code/open?session=<id>&prompt=<text>`,
+   nhưng `createPanel` trong `extension.js` chủ động chặn: panel của phiên đó đang mở thì nó
+   chỉ `reveal()` rồi báo *"Session is already open. Your prompt was not applied - enter it
+   manually."* Prompt chỉ áp được khi mở LẠI một phiên đã đóng - mà phiên đã đóng thì không
+   có tiến trình, không có mặt trong phòng.
+3. Binary claude có sẵn hạ tầng nhắn tin giữa các phiên (`messagingSocketPath` trong
+   `~/.claude/sessions/<pid>.json`, client uds gửi `{type:"user", priority:"next"}`), nhưng
+   phiên interactive **không công bố socket**: trường đó luôn rỗng ở 2.1.220. Chỉ background
+   agent mới có. Không có lệnh CLI công khai nào gửi được (`claude --help` không có `send`).
+
+Đã kiểm chứng thực tế đường Terminal.app: `do script "..." in tab N of window id X` bơm đúng
+ký tự vào tiến trình foreground đang ở raw mode, tiếng Việt nguyên vẹn, kèm `\r` cuối. Nên
+nếu sau này có làm lại thì làm theo đường TTY chứ **đừng quay lại kiểu mở cửa sổ terminal
+mới** - đó là thứ người dùng đã bác.
+
+Phát hiện phụ còn dùng được: `claude agents --json` trả PID + `sessionId` + tên của mọi phiên
+đang sống, không cần TTY. Đó là nguồn chính xác hơn hẳn việc đoán tên phiên từ transcript.
 
 ### Nhập bộ nhân vật từ ảnh (packimport.js)
 

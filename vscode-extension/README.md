@@ -3,10 +3,16 @@
 See every AI process running on your machine, how many tokens they burned, and how much of
 your account limit is left - in a panel next to your code.
 
-![AI Monitor dashboard](https://raw.githubusercontent.com/hominhtuong/AIMonitor/main/assets/screenshot.png)
+![Every running AI agent as a character at its own desk](https://raw.githubusercontent.com/hominhtuong/AIMonitor/main/assets/board.png)
+
+*The Office view: every agent running on your machine is a character at a desk. Its screen
+shows what kind of work it is doing right now - blue for editing files, green for reading,
+amber for running commands. Click a computer to open that session in full.*
 
 Everything runs on `127.0.0.1`. No data leaves your machine, no account, no API key, no
 telemetry.
+
+![AI Monitor dashboard](https://raw.githubusercontent.com/hominhtuong/AIMonitor/main/assets/screenshot.png)
 
 ## What it shows
 
@@ -23,6 +29,10 @@ telemetry.
 - **Open ports.** Which local ports your dev processes and Docker containers are holding.
 - **Kill or suspend a process** straight from the panel, with AI Monitor and its own parent
   processes protected from being killed by accident.
+- **The Office view.** The same information as a small pixel office - one desk per agent, the
+  screen colour telling you what kind of work it is doing, sub-agents standing next to whoever
+  called them. Seven character sets to pick from, or drop in a picture of your own and it will
+  cut the characters out for you, entirely on your machine.
 
 ![One session and its whole process tree](https://raw.githubusercontent.com/hominhtuong/AIMonitor/main/assets/session-detail.png)
 

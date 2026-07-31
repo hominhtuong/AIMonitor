@@ -2,7 +2,7 @@
   "name": "aimonitor",
   "displayName": "AI Monitor",
   "description": "See every AI process, token, and account limit on your machine, inside VSCode. Runs fully offline.",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "publisher": "mituultra",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -243,18 +243,24 @@
         "aimon.officePack": {
           "type": "string",
           "enum": [
+            "voyage",
+            "ninja",
             "office",
             "pets",
             "slime",
-            "mascot"
+            "mascot",
+            "crew"
           ],
           "enumDescriptions": [
+            "Voyage - thirty-six sailors, hats, goggles and beards",
+            "Ninja - thirty-six shinobi, headbands, masks and cloaks",
             "Office - ten people, different hair and outfits",
             "Pets - cat, dog, rabbit, sheep, cow, pig, chick, duckling, frog",
             "Slimes - ten coloured blobs",
-            "Mascots - ten round mascots, each with its own hat"
+            "Mascots - ten round mascots, each with its own hat",
+            "The Crew - five friends, told apart by hair, glasses and outfit"
           ],
-          "default": "office",
+          "default": "voyage",
           "order": 12,
           "markdownDescription": "Character set used in the Office view. Every agent gets a *different* character from the set; once the set runs out it starts over.\n\nThis is a starting point, not a lock: **Character set** under the room shows each set with a preview, and clicking a character in the room changes just that one. What you pick there wins and is remembered."
         }
