@@ -20,6 +20,10 @@
   - Refresh interval, colour theme, where the status bar opens the dashboard.
   - Where your Claude data lives and which price table to use.
 - New commands: **Open Dashboard in a Tab**, **Select Python Interpreter**, **Restart Server**.
+- The standalone macOS and Windows builds get their own settings too, in
+  `~/.aimon/config.json` - theme, refresh interval, Claude data folder, price table, port. The
+  extension's own settings still win inside VSCode, so changing one window does not reconfigure
+  an app running alongside it.
 
 ## 1.2.4
 

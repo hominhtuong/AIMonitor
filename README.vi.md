@@ -247,6 +247,26 @@ AI Monitor chỉ đọc file trên máy, không bao giờ tự gọi API Anthrop
 
 ---
 
+## 7b. Cấu hình
+
+Extension VSCode có bảng settings riêng (Extensions => AI Monitor). App macOS và bản `.exe`
+đọc file `~/.aimon/config.json`, bạn tự tạo:
+
+```json
+{
+  "theme": "light",
+  "refresh_seconds": 5,
+  "claude_dir": "~/work/.claude",
+  "pricing_file": "~/bang-gia-rieng.json",
+  "port": 8899
+}
+```
+
+Khoá nào cũng không bắt buộc. File hỏng hoặc không có thì dùng mặc định, không bao giờ làm
+dashboard không mở được. Nút sáng/tối ở đầu trang đè lên `theme` cho riêng máy đó.
+
+---
+
 ## 8. Hỏi đáp nhanh
 
 **Tắt Copilot rồi nó lại chạy?** Đó là VS Code tự bật lại, không phải lỗi tool. Muốn dứt điểm

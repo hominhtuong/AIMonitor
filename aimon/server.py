@@ -36,6 +36,7 @@ from .collectors import claude as C  # noqa: E402
 from .collectors import ports as PO  # noqa: E402
 from .collectors import procs as P  # noqa: E402
 from . import instance as INST  # noqa: E402
+from . import config_file as CFG  # noqa: E402
 from . import proc_util as PU  # noqa: E402
 from . import snapshot as SNAP  # noqa: E402
 
@@ -226,6 +227,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(PO.collect(force=True))
         if route == "/api/version":
             return self._json({"version": VERSION, **RUNTIME, **P.capabilities()})
+        if route == "/api/config":
+            return self._json(CFG.frontend())
+        if route == "/api/config.js":
+            # Trả JS chứ không phải JSON, và index.html nạp nó TRƯỚC app.js: nhờ vậy trang
+            # biết theme ngay từ lúc dựng, không vẽ nền tối rồi mới nháy sang nền sáng.
+            body = ("window.AIMON_CONFIG=" + json.dumps(CFG.frontend()) + ";").encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return self.wfile.write(body)
         return self._json({"error": "not found"}, 404)
 
     def do_POST(self):
@@ -341,7 +354,7 @@ def main(argv=None) -> int:
     ap.add_argument(
         "--port",
         type=int,
-        default=int(os.environ.get("AIMON_PORT", DEFAULT_PORT)),
+        default=int(os.environ.get("AIMON_PORT") or CFG.load()["port"] or DEFAULT_PORT),
         help=f"cổng mong muốn (mặc định {DEFAULT_PORT}); bận thì tự tìm cổng trống khác",
     )
     ap.add_argument("--host", default=os.environ.get("AIMON_HOST", "127.0.0.1"))

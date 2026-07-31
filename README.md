@@ -251,6 +251,27 @@ AI Monitor only reads local files. It never calls the Anthropic API with your cr
 
 ---
 
+## 7b. Settings
+
+The VSCode extension has its own settings panel (Extensions => AI Monitor). The macOS app and
+the Windows build read `~/.aimon/config.json`, which you create yourself:
+
+```json
+{
+  "theme": "light",
+  "refresh_seconds": 5,
+  "claude_dir": "~/work/.claude",
+  "pricing_file": "~/my-prices.json",
+  "port": 8899
+}
+```
+
+Every key is optional. A broken or missing file just means defaults - it never stops the
+dashboard from starting. The light/dark button in the header overrides `theme` for that
+machine.
+
+---
+
 ## 8. FAQ
 
 **I killed Copilot and it came back.** VS Code restarted it, that is not a bug in this tool.

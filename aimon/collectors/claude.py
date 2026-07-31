@@ -28,11 +28,14 @@ import threading
 import time
 from datetime import datetime
 
+from .. import config_file as CFG
+
 HOME = os.path.expanduser("~")
-# AIMON_CLAUDE_DIR cho ai để dữ liệu Claude Code ở chỗ khác. Dùng biến môi trường chứ không
-# thêm tham số dòng lệnh: cả ba vỏ (app macOS, .exe, extension VSCode) đều spawn server nên
-# đặt env là xong, không phải kéo tham số qua từng lớp.
-CLAUDE_DIR = os.environ.get("AIMON_CLAUDE_DIR") or os.path.join(HOME, ".claude")
+_CFG = CFG.load()
+# Thứ tự: biến môi trường (extension VSCode truyền vào) > ~/.aimon/config.json (dùng chung
+# cho cả ba vỏ) > mặc định. Dùng env chứ không thêm tham số dòng lệnh vì cả ba vỏ đều spawn
+# server nên đặt env là xong, không phải kéo tham số qua từng lớp.
+CLAUDE_DIR = os.environ.get("AIMON_CLAUDE_DIR") or _CFG["claude_dir"] or os.path.join(HOME, ".claude")
 PROJECTS_DIR = os.path.join(CLAUDE_DIR, "projects")
 SESSIONS_DIR = os.path.join(CLAUDE_DIR, "sessions")
 
@@ -43,7 +46,7 @@ BASE = (
     else os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 # AIMON_PRICING trỏ thẳng tới file giá riêng, để ai sửa giá không phải đụng vào gói cài.
-PRICING_FILE = os.environ.get("AIMON_PRICING") or os.path.join(BASE, "pricing.json")
+PRICING_FILE = os.environ.get("AIMON_PRICING") or _CFG["pricing_file"] or os.path.join(BASE, "pricing.json")
 
 MAX_EVENTS = 60
 AGENT_TOOLS = {"Agent", "Task"}

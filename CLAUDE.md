@@ -31,6 +31,7 @@ aimon/
   instance.py           state file ~/.aimon/instance.json (host/port/pid instance đang chạy)
   snapshot.py           gộp mọi collector thành 1 JSON cho /api/snapshot
   proc_util.py          gọi lệnh ngoài không nháy cửa sổ console trên Windows
+  config_file.py        đọc ~/.aimon/config.json - cấu hình dùng chung cho cả ba vỏ
   collectors/
     procs.py            phân loại AI, dựng cây cha-con, %CPU theo delta, rollup RAM
     procs_posix.py      ps / vm_stat
@@ -411,6 +412,31 @@ nên đừng để logic vào đấy.
 
 Đường dẫn dữ liệu truyền qua biến môi trường `AIMON_CLAUDE_DIR` / `AIMON_PRICING` chứ không
 qua tham số dòng lệnh: cả ba vỏ đều spawn server nên đặt env là xong.
+
+## Cấu hình dùng chung (~/.aimon/config.json)
+
+Settings của VSCode chỉ tồn tại trong VSCode. Người dùng app macOS và bản `.exe` không có chỗ
+nào đổi nhịp làm mới hay trỏ dữ liệu Claude sang thư mục khác - file này là chỗ đó, server đọc
+nên cả ba vỏ đều hưởng. Khoá: `theme`, `refresh_seconds`, `claude_dir`, `pricing_file`, `port`.
+
+Thứ tự ưu tiên, mạnh trước:
+
+```text
+tham số dòng lệnh  >  biến môi trường  >  config.json  >  mặc định trong code
+```
+
+Riêng theme và nhịp làm mới có thêm một tầng ở phía trang web: `?theme=` do extension VSCode
+truyền vào **đè lên tất cả** (mỗi khung nhìn trong editor tự quyết), rồi tới lựa chọn người
+dùng bấm trên trang (localStorage), rồi mới tới file này. File này cho *mặc định*, không phải
+*ép buộc* - đó là lý do settings VSCode không ghi vào đây, tránh đổi cấu hình của một cửa sổ
+lại làm đổi luôn app macOS đang chạy chung server.
+
+**File hỏng không được làm server chết.** JSON sai cú pháp, thiếu khoá, hay giá trị ngoài
+khoảng đều bị bỏ qua và chạy bằng mặc định. Đã kiểm tra cả ba ca.
+
+Trang web nhận cấu hình qua `/api/config.js` - server sinh ra `window.AIMON_CONFIG = {...}`,
+`index.html` nạp nó **trước** `app.js`. Dùng JS chứ không dùng `fetch('/api/config')` để trang
+biết theme ngay lúc dựng, không vẽ nền tối rồi mới nháy sang nền sáng.
 
 ## Đa ngôn ngữ (static/i18n.js)
 

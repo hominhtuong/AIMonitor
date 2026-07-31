@@ -822,10 +822,12 @@ function applyEmbedOptions() {
   } else {
     let saved = null;
     try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* bỏ qua */ }
-    setTheme(saved === 'light' || saved === 'dark' ? saved : systemTheme(), false);
+    const cfg = (window.AIMON_CONFIG || {}).theme;
+    const fromCfg = cfg === 'light' || cfg === 'dark' ? cfg : null;
+    setTheme(saved === 'light' || saved === 'dark' ? saved : (fromCfg || systemTheme()), false);
   }
 
-  const refresh = Number(q.get('refresh'));
+  const refresh = Number(q.get('refresh') || (window.AIMON_CONFIG || {}).refresh_seconds || 0);
   if (Number.isFinite(refresh) && refresh > 0) {
     S.interval = Math.round(refresh * 1000);
     const sel = $('#interval');
