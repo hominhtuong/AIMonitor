@@ -32,6 +32,10 @@ export function escapeHtml(text: string): string {
  * `'*'` làm targetOrigin chấp nhận được, nội dung chỉ là một cờ bật tắt.
  *
  * `fill` khác nhau giữa hai khung nhìn: panel hẹp dùng 100% chiều ngang, tab dùng 100vw.
+ *
+ * Chiều ngược lại đi cùng đường: cửa sổ nổi (`?view=office`) không có chỗ bày cây tiến trình
+ * nên bấm vào một nhân vật thì trang gửi `aimon.openPanel` lên, trang này chuyển tiếp cho
+ * extension host mở dashboard đầy đủ ra.
  */
 export function dashboardFramePage(url: string, wide: boolean): string {
   const size = wide ? 'width:100vw;height:100vh' : 'width:100%;height:100vh';
@@ -40,10 +44,14 @@ export function dashboardFramePage(url: string, wide: boolean): string {
     `<iframe id="f" src="${url}" style="border:0;${size}"></iframe>` +
     `<script>
       const f = document.getElementById('f');
+      // acquireVsCodeApi chỉ được gọi ĐÚNG một lần trong đời một webview, gọi lần hai là ném.
+      const api = acquireVsCodeApi();
       let last = null;
       window.addEventListener('message', (e) => {
         const m = e.data;
-        if (!m || m.command !== 'aimon.visibility') return;
+        if (!m) return;
+        if (m.command === 'aimon.openPanel') { api.postMessage(m); return; }
+        if (m.command !== 'aimon.visibility') return;
         last = m;
         if (f.contentWindow) f.contentWindow.postMessage(m, '*');
       });

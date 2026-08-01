@@ -112,6 +112,13 @@
     <!-- Bảng chọn nhân vật. Mỗi ô là một canvas nhỏ vẽ thẳng từ sprites.js, không phải ảnh -
          xem mẫu phải là chính hình sẽ dùng, không phải một bản mô phỏng dễ lệch. Nằm ngoài
          vùng morph() giống canvas chính, vì mỗi ô giữ context riêng. -->
+    <!-- Bối cảnh đứng TRƯỚC kiểu nền: nền là lựa chọn bên trong một bối cảnh, đổi bối cảnh
+         là danh sách nền đổi theo. Xếp ngược lại thì người dùng chọn nền xong mới thấy nó
+         biến mất vì vừa đổi bối cảnh. -->
+    <details class="skinbox" id="office-scenebox">
+      <summary data-i18n="office.scene_pick"></summary>
+      <div class="skins" id="office-scenes"></div>
+    </details>
     <details class="skinbox" id="office-roombox">
       <summary data-i18n="office.room_pick"></summary>
       <div class="skins" id="office-rooms"></div>
@@ -216,6 +223,9 @@
 <!-- Nạp SAU app.js: office.js dùng lại t(), render(), esc(), kidRow() và S.snap của nó. -->
 <script src="/static/sprites.js"></script>
 <script src="/static/packimport.js"></script>
+<!-- scene-farm.js và scene-delivery.js KHÔNG khai ở đây: office.js tự kéo chúng về khi cần
+     (bối cảnh đã chọn lúc dựng trang, hoặc lúc người dùng mở bảng chọn bối cảnh). Ai chỉ dùng
+     bối cảnh Văn phòng thì không tải một byte nào của hai file đó. -->
 <script src="/static/office.js"></script>
 </body>
 </html>

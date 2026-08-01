@@ -24,6 +24,7 @@ export interface AimonConfig {
   pricingFile: string;
   aiKinds: string[];
   officePack: string;
+  officeScene: string;
 }
 
 export function readConfig(): AimonConfig {
@@ -42,7 +43,21 @@ export function readConfig(): AimonConfig {
     pricingFile: (c.get<string>('pricingFile') ?? '').trim(),
     aiKinds: c.get<string[]>('aiKinds') ?? ['claude-code'],
     officePack: (c.get<string>('officePack') ?? '').trim(),
+    officeScene: (c.get<string>('officeScene') ?? '').trim(),
   };
+}
+
+/* Phiên bản của chính extension, `activate()` nạp vào từ `context.extension.packageJSON`.
+ * Giữ ở đây chứ không đọc `getExtension('mituultra.aimonitor')` ở từng chỗ cần: viết cứng
+ * định danh extension vào code là thêm một nguồn sự thật thứ hai bên cạnh package.json. */
+let extVersion = '';
+
+export function setExtensionVersion(v: string): void {
+  extVersion = v;
+}
+
+export function extensionVersion(): string {
+  return extVersion;
 }
 
 export function updateConfig<T>(key: string, value: T): Thenable<void> {

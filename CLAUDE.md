@@ -41,7 +41,9 @@ aimon/
     usage.py            hạn mức Session 5h / Weekly 7d, hiệu chỉnh % ước lượng
     ports.py            lsof / netstat + docker ps
   static/               index.html, style.css, app.js, i18n.js, favicon.svg
-                        office.js (khung nhìn Văn phòng), sprites.js (nhân vật pixel)
+                        office.js     lõi khung nhìn Văn phòng + bối cảnh Văn phòng
+                        scene-farm.js, scene-delivery.js   hai bối cảnh còn lại
+                        sprites.js    nhân vật pixel
 mac/AIMonitor.swift     vỏ app macOS (WKWebView)
 windows/app_win.py      điểm vào bản .exe Windows
 vscode-extension/       vỏ extension VSCode (TypeScript)
@@ -393,18 +395,19 @@ Settings khai ở `contributes.configuration`, VSCode tự vẽ bảng - không 
 `config.ts` là chỗ DUY NHẤT đọc settings; rải `getConfiguration` khắp nơi thì giá trị mặc định
 thành hai nguồn sự thật với `package.json`.
 
-Ba nơi cùng cần server nên có `AimonServerSession` **đếm người giữ**: panel, tab và thanh
-trạng thái đều `acquire`/`release`, server chỉ tắt khi không còn ai. Trước đây provider của
-sidebar tự giữ tiến trình, thêm tab vào là ai đóng trước cũng giết nó.
+Bốn nơi cùng cần server nên có `AimonServerSession` **đếm người giữ**: panel, tab, cửa sổ nổi
+và thanh trạng thái đều `acquire`/`release`, server chỉ tắt khi không còn ai. Trước đây
+provider của sidebar tự giữ tiến trình, thêm tab vào là ai đóng trước cũng giết nó.
 
 **Thanh trạng thái không bao giờ tự bật server.** Nó gọi `peek()` - chỉ đọc instance.json rồi
 probe - nên mở VSCode lên không phát sinh tiến trình Python nào. Có server sẵn (app macOS,
 .exe, hay cửa sổ VSCode khác) thì hiện số, chưa có thì nằm im; bấm vào mới bật.
 
-Hai khung nhìn khác nhau ở đúng một tham số: panel hẹp chạy `?compact=1`, tab rộng thì không.
-Đừng nhân đôi frontend - `body.compact` trong `style.css` lo phần bố cục hẹp.
+Ba khung nhìn khác nhau ở đúng một tham số: panel hẹp chạy `?compact=1`, tab rộng thì không,
+cửa sổ nổi chạy `?view=office`. Đừng nhân đôi frontend - `body.compact` và `body.pip` trong
+`style.css` lo phần bố cục.
 
-Cấu hình truyền cho trang web qua **query param** (`?theme=&refresh=&compact=`), không qua
+Cấu hình truyền cho trang web qua **query param** (`?theme=&refresh=&compact=&view=`), không qua
 file. Lý do: hai khung nhìn trong cùng một cửa sổ phải khác nhau được, và settings của VSCode
 không được đè lên cấu hình của app macOS / .exe đang dùng chung server.
 
@@ -414,6 +417,65 @@ nên đừng để logic vào đấy.
 
 Đường dẫn dữ liệu truyền qua biến môi trường `AIMON_CLAUDE_DIR` / `AIMON_PRICING` chứ không
 qua tham số dòng lệnh: cả ba vỏ đều spawn server nên đặt env là xong.
+
+### Cửa sổ nổi cho khung nhìn Văn phòng (pipWindow.ts)
+
+Khung nhìn thứ ba: căn phòng tách ra một cửa sổ riêng, **nổi trên mọi ứng dụng khác** chứ
+không chỉ trên VSCode. Bấm vào một nhân vật trong đó thì dashboard đầy đủ mở lại và cửa sổ nổi
+đóng.
+
+**Chỉ mở khi người dùng gọi lệnh** `AI Monitor: Open the Office in a Floating Window`. Bản 2.1.0
+từng tự bật cửa sổ này mỗi khi dashboard khuất mắt (thu gọn panel, đổi container, chuyển tab) -
+đã gỡ, người dùng bác: cửa sổ tự nhảy ra giữa lúc đang làm việc khác gây khó chịu hơn là tiện.
+Đừng làm lại kiểu tự động đó. Cùng với nó gỡ luôn `aimon.pip.autoOpen`, cờ `dismissed`,
+`programmatic` và mọi móc nối vào `onDidChangeVisibility` / `onDidChangeViewState` dựng riêng
+cho nó.
+
+VSCode **không** có API tạo cửa sổ nổi cho extension. Ba lệnh nội bộ của workbench ghép lại
+thì ra đúng thứ đó, gọi liền nhau ngay sau khi tạo panel:
+
+| Lệnh | Làm gì |
+| --- | --- |
+| `workbench.action.moveEditorToNewWindow` | đẩy tab đang active sang cửa sổ phụ (cửa sổ OS thật) |
+| `workbench.action.enableCompactAuxiliaryWindow` | bỏ title bar + thanh tab, còn mỗi nội dung |
+| `workbench.action.enableWindowAlwaysOnTop` | ghim nổi trên cả Chrome, Finder, Terminal |
+
+Đã đo trên 1.131: chuyển cửa sổ **không** làm webview bị dispose, `visible`/`active` vẫn true,
+`postMessage` hai chiều vẫn chạy, canvas vẫn giữ 60 fps (301 khung sau 5 giây, 541 sau 9 giây).
+
+Một điều rút ra từ lần làm tự động, vẫn đúng cho bất cứ ai định móc vào chuyện panel đóng hay
+mở: **"đóng panel" là KHUẤT MẮT, không phải bị dispose.** `retainContextWhenHidden` giữ webview
+view sống, nên thu gọn panel hay bấm sang container khác ở activity bar đều không dispose gì
+cả - chỉ `visible` đổi. Móc vào `onDidDispose` thì chạy lệnh tay vẫn tốt còn dùng thật thì im
+lặng không xảy ra gì, đúng kiểu lỗi chỉ lộ ra trên máy người dùng.
+
+Năm chỗ phải nhớ:
+
+1. **Cả ba lệnh tác động lên cửa sổ đang FOCUS**, và hai lệnh sau chỉ chạy cho cửa sổ **phụ**
+   (workbench kiểm `vscodeWindowId` khác cửa sổ chính). Đừng chèn thao tác nào vào giữa.
+2. `moveEditorToNewWindow` bốc tab **đang active** chứ không nhận tham số, nên panel phải tạo
+   với `preserveFocus: false` và phải move NGAY, đừng chờ nạp xong - chờ là có cửa sổ người
+   dùng kịp bấm sang tab khác rồi lệnh bốc nhầm tab của họ.
+3. Hai lệnh compact và always-on-top mới có ở bản VSCode gần đây mà `engines` để `^1.85`, nên
+   **mỗi lệnh một try/catch riêng**: bản cũ vẫn được cửa sổ nổi, chỉ thiếu phần ghim.
+4. **Không có API đặt kích thước / vị trí.** `auxiliary: {compact, bounds}` là tuỳ chọn nội bộ
+   của VSCode (chat dùng), không lộ ra cho extension. Cửa sổ mở theo cỡ nhóm editor nguồn.
+5. **Cửa sổ nổi KHÔNG nhận cờ visibility.** Bị cửa sổ khác che thì vẫn phải chạy tiếp - khác
+   hẳn panel bị thu gọn, lúc đó không ai nhìn thật. Đừng "tối ưu" chỗ này.
+
+Trang web chạy `?view=office` (`body.pip` trong `style.css`): giấu header, tab, bảng chọn,
+bảng chi tiết; canvas vẫn nằm y nguyên chỗ cũ trong DOM - dời nó ra là rơi vào vùng `morph()`
+quản lý và cứ 3 giây bị thay canvas mới. Chế độ này **tắt hẳn vòng `/api/snapshot`**
+(`S.interval = 0`, kể cả lần nạp đầu): căn phòng sống bằng `/api/pulse` 2 KB mỗi giây, còn
+snapshot là 197 KB mỗi 3 giây cho những bảng biểu đang bị CSS giấu hết.
+
+`resize()` phải kẹp bậc phóng theo **cả chiều cao** khi `S.pip` - trang không cuộn được, kéo
+cửa sổ bè ra là mất nửa căn phòng dưới mép dưới mà không có cách nào nhìn thấy.
+
+Bấm nhân vật thì tin đi **ba chặng**: `office.js` => `parent.postMessage` => trang bọc
+(`dashboardFramePage`) => `vscodeApi.postMessage` => extension. Chặng giữa có unit test chạy
+đoạn `<script>` thật trong `vm` (`test/webviewPages.test.ts`) - HTML sinh lúc chạy thì
+TypeScript không kiểm được gì bên trong, hỏng là hỏng trên máy người dùng.
 
 ### Tự dò và tự điền ba ô đường dẫn (autoConfig.ts + settingsPlan.ts)
 
@@ -446,6 +508,18 @@ dò, sờ ổ đĩa, ghi settings, hiện QuickPick nằm ở `autoConfig.ts`.
 Trong bảng Settings, mỗi ô có một dòng `[$(search) Detect again](command:aimon.selectXxx)` ở
 `markdownDescription` - VSCode render `command:` link thành nút bấm được ngay tại chỗ, không
 phải mở Command Palette.
+
+## Số phiên bản ở chân trang
+
+Footer bày **hai** số và đó là chủ ý: `version` trong `/api/config.js` là của SERVER đang phục
+vụ trang, `?ext=` là của vỏ đang nhúng nó. Extension mặc định **dùng lại server đang chạy sẵn**
+(`aimon.reuseRunningInstance`), nên cài extension bản mới mà app macOS / cửa sổ VSCode khác còn
+giữ một server cũ thì trang hiện ra vẫn là trang cũ - tính năng mới "không chạy" mà chẳng có lỗi
+nào. Lệch nhau thì footer ghi thêm `extension v...`; giống nhau thì chỉ một số. Chữa bằng lệnh
+`AI Monitor: Restart server`.
+
+Số này vẽ ngay lúc dựng trang chứ không chờ `/api/snapshot`: server hỏng thì đó đúng là lúc
+người ta cần đọc nó nhất.
 
 ## Cấu hình dùng chung (~/.aimon/config.json)
 
@@ -586,6 +660,90 @@ cũ gắn thêm một listener mỗi giây, mở bảng 3 phút rồi bấm là 
 máy. Listener của vùng động phải **uỷ quyền trên `document`, đăng ký một lần** - như nút đóng
 và dãy đổi nhân vật ở cuối `office.js`. Cần nhớ trạng thái thì để trong đối tượng state của
 JS, đừng để trên DOM.
+
+## Ba bối cảnh (lớp SCENE)
+
+Tab Văn phòng có ba bối cảnh: **Văn phòng** (bàn ghế máy tính), **Nông trại** (thửa ruộng,
+trâu cày, tiều phu bổ củi), **Giao hàng** (địa chỉ nhà, xe máy, kho). Chúng khác nhau ở HÌNH
+HỌC, LUẬT ĐI, HÀNH VI và ĐẠO CỤ - tức đúng những thứ mà "kiểu nền" bị cấm đụng vào. Kiểu nền
+nằm BÊN TRONG một bối cảnh (mỗi bối cảnh có 4 nền riêng), nên đổi bối cảnh là danh sách nền
+đổi theo.
+
+Tab này tên là **Sân khấu** (`tab.office`, `office.title`), không còn là "Văn phòng" - Văn
+phòng nay chỉ là một trong ba bối cảnh diễn trên đó. Mã khoá i18n và id lệnh của extension
+(`aimon.openOfficeWindow`) giữ nguyên: đổi id lệnh là phá keybinding người dùng đã đặt.
+
+Lõi ở `office.js` (thực thể, atlas, vòng vẽ, hover, bảng chi tiết, bảng chọn) - chừng 60% file
+và không biết gì về bối cảnh nào. Bối cảnh Văn phòng nằm cuối chính file đó vì nó là mặc định
+và phải có mặt ngay; hai bối cảnh kia ở `scene-*.js` và **nạp theo yêu cầu**.
+
+**Nạp lười:** `SCENE_LAZY` khai id cùng đường dẫn file, `SCENE_ORDER` khai thứ tự bày trong
+bảng chọn (khai riêng vì thứ tự ĐĂNG KÝ phụ thuộc người dùng chọn gì trước, để nguyên thì bảng
+chọn đảo chỗ mỗi lần mở máy). Ba đường kéo file về:
+
+1. Ngay lúc trang dựng, nếu bối cảnh đã lưu không phải Văn phòng - chờ tới lúc mở tab thì
+   người dùng thấy Văn phòng nháy lên một nhịp rồi mới đổi.
+2. Lúc mở bảng chọn bối cảnh - đó là lúc duy nhất cần hình của bối cảnh chưa dùng tới.
+3. Lúc `setScene()` nhận một id chưa nạp.
+
+Tải hỏng thì **ở lại bối cảnh cũ**, và xoá khỏi `SCENE_LOADS` để lần bấm sau thử lại được.
+Chuyển sang một bối cảnh không tồn tại thì `CS()` rơi về Văn phòng trong khi bảng chọn vẫn tô
+sáng ô kia - hỏng lặng lẽ.
+
+`officeSync()` chạy ở `DOMContentLoaded` chứ không gọi thẳng: thẻ `<script>` nằm trong `<body>`
+nên phần DOM phía sau nó chưa dựng xong.
+
+**Sáu bất biến mọi bối cảnh phải giữ** - mỗi dòng là một lỗi đã trả giá ở bản Văn phòng:
+
+1. `ROOM_W` / `ROOM_H` dùng chung, không bối cảnh nào được đổi. Đó là thứ cho phép nướng nền
+   tĩnh ở pixel gốc và giữ nguyên `resize()`, hit test, ô xem trước.
+2. `stations()` trả >= `MIN_STATIONS` (10) chỗ, và `MIN_STATIONS` phải bằng `MAX_AGENTS` ở
+   `office.py`. Thiếu chỗ thì agent thứ N đứng mãi ngoài cửa mà không có gì báo. CI kiểm con
+   số KHAI (`stationCount`), `buildScene()` kiểm con số THẬT - phải có cả hai.
+3. Mỗi agent sở hữu đúng MỘT chỗ, ổn định suốt phiên.
+4. Chỗ chỉ nhả khi agent đã ra khỏi khung hình (người đang ăn mừng vẫn giữ chỗ).
+5. `behave()` không được đụng vào `path`/`goal`/`mode` của người đang `leaving`.
+6. Trạng thái riêng ảnh hưởng tới hình phải khai vào `sceneSig()`, nếu không màn hình đứng hình.
+
+**Lối đi không được cắt qua thứ gì vẽ SAU nhân vật.** Ở Văn phòng, tựa ghế vẽ sau nhân vật nên
+lối lên chỗ ngồi phải luồn qua khe cạnh bàn. Nông trại không có lớp vẽ sau nên đi thẳng được;
+Shipper thì cái chặn là NHÀ nằm trong nền đã nướng - làn xe phải nằm trọn trong mặt đường, kể
+cả bóng đổ dưới gầm xe (bầu dục tâm `y+19.4`, bán trục 1.8), nếu không bánh xe của người chạy
+đường trên đè lên mái hàng nhà dưới.
+
+**Vai diễn tách khỏi hoạt cảnh tức thời.** `e.role` là nghề đang làm, đổi chậm (`ROLE_HOLD`
+= 2.5 giây) và quyết định đứng ở đâu, cầm cái gì. `currentAction(e)` là việc tức thời, đổi
+theo từng tool và quyết định màu màn hình, bong bóng, nhịp tay. Gộp hai thứ này là cả cánh
+đồng co giật mấy lần mỗi giây. `updateRole()` phải gọi TRƯỚC nhánh đi đường trong `step()` -
+nhánh đó `return` sớm, để dưới thì người đang đi bộ không tích được thời gian giữ vai.
+
+Bốn điểm nữa dễ sai, đã trả giá đúng trong đợt này:
+
+- **Đạo cụ vẽ bằng `fillRect` mà nhân vật vẽ bằng `drawImage`**, nên toạ độ lẻ làm hai thứ
+  lệch nhau tới một pixel và cái rìu rung quanh bàn tay. Bối cảnh có đạo cụ phải khai
+  `snap: true`; cả hai lấy chung `info.x` đã làm tròn, và chung `info.ey` (đã cộng cả cú nhảy
+  ăn mừng lẫn nhịp xóc của xe).
+- **Đạo cụ nằm ngoài phép lật của `drawImage`**, phải tự soi gương bằng tay (`dfx()` ở
+  `scene-delivery.js`), nếu không xe chạy sang trái mà ghi đông vẫn chìa sang phải.
+- **Chặng rẽ chéo phải ngả NGANG nhiều hơn ngả dọc.** `dir` suy từ thành phần lớn hơn của
+  véc-tơ, nên đi thẳng lên xuống là khung hình chuyển sang tư thế nhìn từ sau lưng - một chiếc
+  xe máy quay lưng lại.
+- **Bong bóng thoại neo vào ĐẦU người**, không vào nóc nhà hay mép luống. Ở Văn phòng nó neo
+  vào mép trên màn hình máy tính nên tuy cách đầu 18 pixel vẫn đọc ra là của cái bàn đó; chỗ
+  nào không có vật thể ở khoảng giữa thì bong bóng trôi lơ lửng không biết của ai.
+- **Chữ viết thẳng lên nền phải tương phản với NỀN CỦA BỐI CẢNH.** `--of-label` tính cho sàn
+  văn phòng; cỏ Nông trại tối ở cả hai theme nên phải có `labelColor()` riêng. Cùng lý do,
+  Nông trại tự suy sáng/tối từ độ sáng của `--of-floor` - `--of-plant` và `--of-desk` gần như
+  không đổi giữa hai theme, để nguyên là bấm sang nền sáng mà cánh đồng vẫn tối om.
+- **`setScene()` phải vẽ lại chú giải.** Chú giải dùng từ vựng riêng của từng bối cảnh
+  (`legendSuffix` => khoá `office.act_<mã>_<bối cảnh>`, thiếu thì rơi về khoá chung), quên gọi
+  là đang xem Nông trại mà chân trang vẫn ghi "đóng gói", "chạy giao hàng".
+
+Danh sách bối cảnh nằm ở **sáu chỗ** và phải khớp: `registerScene()` trong `office.js` /
+`scene-*.js`, `SCENE_ORDER` và `SCENE_LAZY` trong `office.js`, `OFFICE_SCENES` trong
+`config_file.py`, `enum` của `aimon.officeScene` trong `package.json`, và nhãn i18n ở CẢ hai
+ngôn ngữ. CI kiểm hết, cộng `stationCount >= MIN_STATIONS`, `MIN_STATIONS == MAX_AGENTS`, và
+mỗi đường dẫn trong `SCENE_LAZY` phải trỏ tới một file có thật.
 
 ## Khung nhìn Văn phòng (office.py + static/office.js + static/sprites.js)
 
@@ -1012,7 +1170,7 @@ false`): ảnh gốc đã có viền sẵn, tô thêm là viền đôi dày cộ
 kem) thì flood fill ăn lẹm vào thân và tách thiếu - giới hạn đã biết của việc tách nền tự động,
 nên có `note_single` báo cho người dùng thay vì lặng lẽ đưa ra một bộ hỏng.
 
-## Hiệu năng - năm cơ chế đừng gỡ
+## Hiệu năng - tám cơ chế đừng gỡ
 
 Số đo đầy đủ và cách đo lại: **`docs/hieu-nang.md`**. Ở đây chỉ ghi những chỗ dễ vô tình phá.
 
@@ -1050,6 +1208,35 @@ số thật là 86 ms. Dùng `resource.getrusage(RUSAGE_CHILDREN)`.
    payload: thiếu khoá thì frontend phải kiểm `undefined` ở mọi chỗ đọc tới, sót một chỗ là tab
    Cổng vỡ. Bấm sang tab Cổng thì `loadSnapshot()` chạy lại ngay, không chờ hết nhịp.
 
+6. **Nền tĩnh nướng một lần vào canvas rời** (`bakeBackground`). Trước đây mỗi khung vẽ lại
+   toàn bộ sàn, tường, cửa sổ, kệ sách - đếm từ code là ~350 lệnh `fillRect` cho kiểu Cổ điển,
+   mà Nông trại còn nhiều hơn hẳn. Nay còn đúng một `drawImage`. Nướng ở **pixel gốc**
+   (260x176 = 183 KB) chứ không ở bậc phóng hiện tại, và điều đó KHÔNG mất một chút nét nào:
+   bậc phóng và `dpr` đều là số nguyên, nền thì toàn `fillRect` căn theo toạ độ nguyên, nên
+   phóng gần nhất cho ra đúng từng pixel. Nướng ở bậc phóng thì ở bậc 5 với dpr 2 tốn 18.3 MB
+   và phải nướng lại mỗi lần kéo cửa sổ. Chữ ký gồm bối cảnh + kiểu nền + bảng màu nên nó tự
+   nướng lại đúng lúc; phần nhúc nhích (kim đồng hồ, đèn giao thông) nằm ở `drawAnimated`.
+
+7. **Rời tab thì trả lại vùng nhớ ảnh** (`freeAtlas`, hẹn `ATLAS_IDLE_MS` = 60 giây). Trước
+   đây `officeStop()` không thả gì cả: mở tab Văn phòng một lần rồi thôi là 7 MB nằm đó tới
+   lúc đóng cửa sổ, mà trong VSCode có `retainContextWhenHidden` nên webview sống rất lâu.
+   Phải đặt `canvas.width = 0` TRƯỚC khi bỏ tham chiếu - đó là cách duy nhất bắt renderer nhả
+   vùng nhớ ngay. Hẹn giờ chứ không thả ngay: bấm nhầm sang tab khác rồi bấm lại là chuyện
+   thường, mà nướng lại tốn 60 ms đứng hình.
+
+8. **Ô xem trước hoãn tới lúc bảng chọn thật sự mở.** `renderPacks()` từng vẽ ngay 24 ô lúc
+   khởi tạo (8 bộ x 3 ô), mỗi ô một `getImageData` cộng một lượt hậu kỳ, cho những ô nằm trong
+   một `<details>` đang đóng mà người dùng không nhìn thấy cái nào. Nay chúng mang
+   `data-char-preview` và `paintCharPreviews()` bỏ qua ô nào có `offsetParent` null.
+
+**Sinh vật nền: nhịp chân chỉ chạy khi ĐANG ĐI, và chữ ký lấy toạ độ ĐÃ LÀM TRÒN.** Con mèo
+từng cộng `anim` vô điều kiện nên nằm chờ vẫn đảo hai khung đi bộ 5 lần mỗi giây, kéo cả căn
+phòng đứng yên phải vẽ lại theo. Với Nông trại có 4 con gà cộng một con chó thì sai lầm đó đưa
+tab về thẳng 60 fps. Chúng vẽ bằng `px2` nên nét nằm trên lưới pixel gốc: hai vị trí cùng làm
+tròn về một pixel cho ra ĐÚNG cùng một hình, nên chữ ký chỉ cần `Math.round` - và phải vẽ ở
+đúng toạ độ đã làm tròn ấy, nếu không khung được vẽ ra rơi vào một lệch pha sub-pixel ngẫu
+nhiên và con vật đi giật cục.
+
 Gzip bật theo `Accept-Encoding`, mức 3 cho JSON (gọi mỗi 3 giây) và mức 6 cho file tĩnh (chỉ
 nạp khi webview dựng lại); dưới 1 KB thì không nén.
 
@@ -1079,7 +1266,7 @@ API trả lỗi rõ ràng thay vì im lặng. Giữ nguyên guard này khi thêm
 ```bash
 python3 -m compileall -q aimon        # cú pháp
 /usr/bin/python3 -c "import sys; sys.path.insert(0,'.'); import aimon.server"   # 3.9 compat
-for f in aimon/static/*.js; do node --check "$f"; done   # cú pháp JS, TẤT CẢ file
+find aimon/static -name "*.js" -exec node --check {} \;   # cú pháp JS, TẤT CẢ file
 ./scripts/install_macos.sh            # tự kiểm tra app macOS đầu-cuối
 
 cd vscode-extension && npm ci && npx tsc --noEmit && npm test && npm run package

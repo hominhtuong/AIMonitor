@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AimonServerSession } from './serverSession';
-import { AimonConfig, resolveTheme, editorIsLight } from './config';
+import { AimonConfig, resolveTheme, editorIsLight, extensionVersion } from './config';
 import { dashboardUrl } from './usage';
 import { PythonNotFoundError } from './serverManager';
 import {
@@ -80,6 +80,8 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         compact: true,
         aiKinds: this.config.aiKinds,
         officePack: this.config.officePack,
+        officeScene: this.config.officeScene,
+        extVersion: extensionVersion(),
       });
       view.webview.html = dashboardFramePage(url, false);
       this.pushVisibility();
