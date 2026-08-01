@@ -263,7 +263,7 @@ const propDraw = { hoe: propHoe, plant: propPlant, harvest: propHarvest, axe: pr
 
 /* Vẽ một khung hình nông dân. `buildAtlas_farm` đã translate vào góc ô + chừa viền 1 pixel
  * gốc, nên hàm này vẽ thẳng ở toạ độ gốc 0..15. Key mới có dạng `<tool>A|B` (đạo cụ 2 nhịp),
- * `blink` (mắt nhắm), hoặc d*/u*/s* (đi lại). */
+ * `blink` (mắt nhắm), hoặc d*, u*, s* (đi lại). */
 function drawFarmerFarm(g, c, key) {
   const tool = FARM_FRAME_TOOL[key];
   const pose = /[AB]$/.test(key) ? key[key.length - 1] : 'A';
