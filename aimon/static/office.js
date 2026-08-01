@@ -81,6 +81,7 @@ const OF = {
   hover: null,
   cat: null,
   confetti: [],          // bông giấy của màn ăn mừng lúc một phiên xong việc
+  sig: null,             // chữ ký khung vừa vẽ; trùng thì bỏ qua khung này (xem frameSig)
   last: 0,
   clock: 0,
   pal: {},
@@ -128,6 +129,32 @@ function charIndexFor(id) {
 /** Áp lại nhân vật cho mọi người đang có trong phòng. */
 function reskinAll() {
   OF.ents.forEach((e) => { e.charIndex = charIndexFor(e.id); });
+  ensureAtlas();
+}
+
+/** Nướng atlas cho vừa đủ những nhân vật sắp phải vẽ, và chỉ nướng lại khi thiếu.
+ *
+ *  Nướng cả tám bộ tốn 35.4 MB vùng nhớ ảnh và 175 ms đứng hình - mà 175 ms đó rơi đúng vào
+ *  lúc người dùng vừa bấm sang tab Văn phòng, chỗ dễ nhận ra nhất. Trong khi phòng chỉ có
+ *  `MAX_AGENTS` chỗ và mỗi lúc chỉ hiện một bộ.
+ *
+ *  Nướng CẢ BỘ đang chọn chứ không chỉ mấy người đang có mặt: agent vào ra liên tục, mà mỗi
+ *  người mới lại là một nhân vật khác trong bộ - lấy đúng người đang có thì cứ ai vào phòng
+ *  là nướng lại một lần. Cả bộ thì chỉ nướng lại khi đổi bộ hoặc khi có lựa chọn ép riêng
+ *  trỏ sang bộ khác. */
+function neededChars() {
+  const p = packById(OF.pack);
+  const want = [];
+  for (let i = 0; i < p.chars.length; i++) want.push(p.start + i);
+  OF.ents.forEach((e) => { if (want.indexOf(e.charIndex) < 0) want.push(e.charIndex); });
+  return want;
+}
+
+function ensureAtlas(force) {
+  const want = neededChars();
+  if (!force && OF.atlas && OF.atlas.covers(want)) return;
+  OF.atlas = buildSpriteAtlas(want);
+  invalidate();
 }
 
 function saveOverrides() {
@@ -157,6 +184,8 @@ function setCharFor(id, charIndex) {
   saveOverrides();
   const e = OF.ents.get(id);
   if (e) e.charIndex = charIndex;
+  // Lựa chọn ép riêng trỏ được sang bộ KHÁC bộ đang chọn, mà atlas chỉ nướng bộ đang chọn.
+  ensureAtlas();
   renderDetail();
 }
 
@@ -324,8 +353,7 @@ function importPackFile(file) {
       while (list.length > CUSTOM_MAX) list.shift();
       writeStoredPacks(list);
 
-      OF.atlas = buildSpriteAtlas();     // atlas có thêm hàng mới, phải dựng lại
-      setPack(id);
+      setPack(id);   // setPack => reskinAll => ensureAtlas, bộ mới được nướng ở đó
       toast(t(note || 'import.done', { n: cells.length, found: found || cells.length }), note ? '' : 'ok');
     })
     .catch(() => toast(t('import.err_read'), 'err'));
@@ -334,7 +362,6 @@ function importPackFile(file) {
 function deleteCustomPack(id) {
   writeStoredPacks(readStoredPacks().filter((p) => p.id !== id));
   removeCustomPack(id);
-  OF.atlas = buildSpriteAtlas();
   if (OF.pack === id) setPack(PACKS[0].id);
   else { reskinAll(); renderPacks(); }
 }
@@ -654,6 +681,10 @@ function syncAgents(payload) {
       startCheer(e);
     }
   });
+
+  // Người mới vào có thể mang lựa chọn ép riêng trỏ sang bộ khác. Đây chỉ là phép kiểm tập
+  // con trên chừng 10-36 số mỗi giây, không nướng lại gì nếu đã đủ.
+  ensureAtlas();
 }
 
 /* Ăn mừng xong việc. Cả hoạt cảnh này chỉ tồn tại vì lúc một phiên kết thúc, nhân vật cứ
@@ -835,6 +866,43 @@ function step(e, dt) {
   }
 }
 
+/** Chữ ký của MỌI thứ quyết định ra khung hình đang thấy.
+ *
+ *  Vòng `tick()` chạy 60 lần mỗi giây, nhưng phần lớn thời gian trong phòng không có gì
+ *  chuyển động: mọi người ngồi yên cùng một khung, con mèo đang nằm chờ. Vẽ lại y hệt khung
+ *  cũ 60 lần một giây là phần đắt nhất của tab Văn phòng - không phải vì JS (đo được 0.11 ms
+ *  một khung) mà vì trình duyệt phải hợp thành và đẩy lên màn hình một canvas mới mỗi lần.
+ *
+ *  So bằng CHỮ KÝ chứ không bằng cờ "bẩn" do từng hàm `step*` tự khai: cờ bẩn đòi mọi nhánh
+ *  đổi trạng thái đều phải nhớ bật cờ, sót một nhánh là màn hình đứng hình mà không ai biết
+ *  vì sao. Chữ ký suy thẳng từ những gì `draw()` đọc, nên sót là sót cả hai phía và lộ ra
+ *  ngay - còn thêm trạng thái mới thì chỉ việc thêm vào đây.
+ *
+ *  Vị trí quy về **pixel thiết bị** (`OF.scale * OF.dpr`) rồi làm tròn nửa pixel: dịch chuyển
+ *  nhỏ hơn thế thì màn hình không thể hiện ra khác được, mà nhân vật đi bộ thì mỗi khung
+ *  nhích vài pixel thiết bị nên vẫn vẽ đủ 60 fps lúc có người di chuyển. */
+function frameSig() {
+  const k = OF.scale * OF.dpr * 2;
+  const q = (v) => Math.round(v * k);
+  let s = OF.scale + '/' + OF.dpr + '/' + OF.room + '/' + (OF.hover || '') + '/' + (OF.sel || '');
+  const c = OF.cat;
+  if (c) s += '|c' + q(c.x) + ',' + q(c.y) + ',' + (c.flip ? 1 : 0) + ',' + (Math.floor(c.anim * 5) % 2);
+  OF.ents.forEach((e) => {
+    const d = e.data || {};
+    s += '|' + e.charIndex + ',' + q(e.x) + ',' + q(e.y) + ',' + (e.dir === 'left' && e.path.length ? 1 : 0)
+      + ',' + frameFor(e) + ',' + e.mode + ',' + e.kind + ',' + (e.cheer > 0 ? 1 : 0)
+      + ',' + (e.desk ? e.desk.x + '.' + e.desk.row : '-') + ',' + currentAction(e)
+      + ',' + (e.kind === 'sub' ? (d.type || '') : (d.tool || ''));
+  });
+  return s;
+}
+
+/** Buộc vẽ lại khung tới. Gọi khi thứ KHÔNG nằm trong chữ ký đổi: bảng màu theo theme, kiểu
+ *  phòng, atlas vừa nướng lại, kích thước canvas. */
+function invalidate() {
+  OF.sig = null;
+}
+
 function tick(now) {
   OF.raf = null;
   if (!OF.on) return;
@@ -845,7 +913,12 @@ function tick(now) {
   Array.from(OF.ents.values()).forEach((e) => step(e, dt));
   stepCat(dt);
   stepConfetti(dt);
-  draw();
+  // Confetti đổi vị trí từng khung nên không đưa vào chữ ký, cứ có hạt là vẽ.
+  const sig = frameSig();
+  if (OF.confetti.length || sig !== OF.sig) {
+    draw();
+    OF.sig = sig;
+  }
   OF.raf = requestAnimationFrame(tick);
 }
 
@@ -862,9 +935,12 @@ const CAT_LANE = ROOM_H - 12;
 function stepCat(dt) {
   const c = OF.cat;
   if (!c) return;
-  c.anim += dt;
   c.wait -= dt;
+  // Chỉ chạy nhịp chân KHI ĐANG ĐI. Trước đây `anim` cộng vô điều kiện nên con mèo nằm chờ
+  // vẫn đảo qua lại hai khung đi bộ - nhìn như nó giậm chân tại chỗ. Và vì nó đảo 5 lần mỗi
+  // giây nên cả căn phòng đứng yên vẫn phải vẽ lại 5 lần mỗi giây chỉ vì con mèo.
   if (c.wait > 0) return;
+  c.anim += dt;
   const dx = c.tx - c.x, dy = c.ty - c.y;
   const dist = Math.hypot(dx, dy);
   if (dist < 2) {
@@ -1356,6 +1432,7 @@ function resize() {
   // Đồ đạc trong phòng vẫn vẽ ở pixel gốc và vẫn tắt nội suy, chỉ nhân vật đi đường này.
   OF.spriteSmooth = (OF.scale * OF.dpr) % SPRITE_SS !== 0;
   if (OF.ctx) OF.ctx.imageSmoothingEnabled = false;
+  invalidate();
   if (OF.on) draw();
 }
 
@@ -1596,7 +1673,6 @@ function officeInit() {
   OF.canvas = document.getElementById('office-canvas');
   if (!OF.canvas) return;
   OF.ctx = OF.canvas.getContext('2d');
-  OF.atlas = buildSpriteAtlas();
   OF.desks = buildDesks();
   OF.pal = readPalette();
   OF.cat = { x: 120, y: CAT_LANE, tx: 120, ty: CAT_LANE, wait: 2, anim: 0, flip: false };
@@ -1606,6 +1682,7 @@ function officeInit() {
   window.addEventListener('resize', resize);
 
   initPack();
+  ensureAtlas();     // sau initPack: phải biết bộ nào đang chọn thì mới biết nướng gì
   initRoom();
   renderPacks();
   renderRooms();
@@ -1641,7 +1718,6 @@ function officeInit() {
   // thì phòng đứng hình mất một nhịp mà chẳng được gì.
   loadCustomPacks().then((n) => {
     if (!n) return;
-    OF.atlas = buildSpriteAtlas();
     initPack();          // bộ đã cất giờ mới tồn tại, chọn lại cho đúng
     reskinAll();
     renderPacks();
@@ -1654,6 +1730,7 @@ function officeStart() {
   OF.on = true;
   OF.pal = readPalette();       // theme có thể đã đổi từ lần mở trước
   OF.last = 0;
+  invalidate();                 // canvas vừa bị dọn lúc đóng tab, phải vẽ lại từ đầu
   resize();
   loadPulse();
   OF.timer = setInterval(loadPulse, PULSE_MS);
@@ -1672,7 +1749,10 @@ function officeStop() {
 /** Tab đang mở là Văn phòng thì chạy, không thì dừng hẳn - kể cả vòng gọi /api/pulse. */
 function officeSync() {
   const pane = document.getElementById('pane-office');
-  const visible = !!pane && pane.classList.contains('on') && !document.hidden;
+  // pageVisible() ở app.js: nó tính cả trường hợp vỏ nhúng giấu webview - thứ mà
+  // document.hidden không bắt được. Vòng vẽ 60 fps chạy trong panel đã thu gọn là phần
+  // tốn CPU nhất của cả tool mà không ai nhìn thấy.
+  const visible = !!pane && pane.classList.contains('on') && pageVisible();
   if (visible) officeStart(); else officeStop();
 }
 
@@ -1698,6 +1778,7 @@ function officeKindsChanged() {
 function officeRefresh() {
   if (!OF.ready) return;
   OF.pal = readPalette();
+  invalidate();
   renderLegend();
   renderStatus();
   renderDetail();

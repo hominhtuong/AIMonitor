@@ -172,6 +172,22 @@ def _docker() -> tuple[list[dict], bool]:
     return items, True
 
 
+def cached() -> dict:
+    """Trả nguyên cache, KHÔNG bao giờ chạy `lsof`/`docker ps`.
+
+    Dùng khi trang đang xem tab không đụng tới dữ liệu cổng. Giữ nguyên hình dạng payload
+    thay vì bỏ hẳn ba khoá này ra: thiếu khoá thì frontend phải đi kiểm `undefined` ở mọi
+    chỗ đọc tới, mà chỉ cần sót một chỗ là tab Cổng vỡ. Số hơi cũ vài giây thì không ai
+    thấy, vì cái tab đang xem có hiện nó ra đâu - và lúc bấm sang tab Cổng thì trang xin
+    lại bản mới ngay.
+    """
+    return {
+        "ports": _cache["ports"],
+        "docker": _cache["docker"],
+        "docker_available": _cache["docker_available"],
+    }
+
+
 def collect(force: bool = False) -> dict:
     import time
 

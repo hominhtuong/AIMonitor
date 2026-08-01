@@ -15,6 +15,8 @@ const S = {
   events: {},
   busy: false,
   modalOpen: false,
+  // Vỏ nhúng (extension VSCode) báo xuống là panel đang bị giấu. Xem pageVisible().
+  embedHidden: false,
   caps: { pause: true, os: 'macos' },
   // Số vừa đổi thì chữ sáng lên rồi mờ dần về màu cũ trong 1.1s. Chỉ đổi màu chữ,
   // không đụng nền và không đổi kích thước nên không gây giật. Không còn công tắc.
@@ -269,7 +271,11 @@ async function loadSnapshot() {
   if (S.busy || S.modalOpen) return;
   S.busy = true;
   try {
-    const r = await fetch('/api/snapshot', { cache: 'no-store' });
+    // Chỉ xin dữ liệu cổng khi đang thật sự xem tab Cổng & Docker: `lsof` chiếm 28 ms
+    // trong 63 ms của một lần build, mà bốn tab kia không đọc tới nó. Vừa bấm sang tab đó
+    // thì handler bên dưới gọi loadSnapshot() ngay, nên không phải chờ hết một nhịp.
+    const q = S.tab === 'net' ? '' : '?ports=0';
+    const r = await fetch('/api/snapshot' + q, { cache: 'no-store' });
     const data = await r.json();
     if (data.error) { toast(t('err.snapshot', { msg: data.error }), 'err'); return; }
     S.snap = data;
@@ -848,6 +854,9 @@ document.querySelectorAll('.tabs button').forEach((b) => {
     document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'pane-' + S.tab));
     syncKindBar();
     if (S.tab === 'hist') loadHistory();
+    // Tab Cổng dùng dữ liệu mà bốn tab kia không xin, nên vừa sang là phải nạp lại ngay -
+    // không thì người dùng nhìn số cũ tới hết một nhịp làm mới.
+    if (S.tab === 'net') loadSnapshot();
   });
 });
 
@@ -873,12 +882,45 @@ $('#quit').addEventListener('click', async () => {
   setStatus(t('hdr.stopped'));
 });
 $('#interval').addEventListener('change', () => { S.interval = +$('#interval').value; schedule(); });
-document.addEventListener('visibilitychange', schedule);
+document.addEventListener('visibilitychange', onVisibility);
+
+/* Trang có đang được nhìn không.
+ *
+ * `document.hidden` KHÔNG đủ, và đây là chỗ đã đo thật: vỏ nhúng của VSCode giấu webview
+ * bằng cách cho nó `display:none`, mà Page Visibility API không đếm chuyện đó - thử ra
+ * `document.hidden === false`, `setInterval` vẫn chạy đủ nhịp và `requestAnimationFrame`
+ * vẫn quay 60 fps trong một cái iframe không ai thấy. Tức là thu gọn panel AI Monitor xong
+ * thì server vẫn bị hỏi 207 KB mỗi 3 giây, mãi mãi.
+ *
+ * Vì vậy vỏ nhúng tự báo xuống qua postMessage; `S.embedHidden` là cờ đó. Mở trang trong
+ * browser thường thì không ai gửi gì, cờ nằm im ở false và mọi thứ như cũ. */
+function pageVisible() {
+  return !document.hidden && !S.embedHidden;
+}
+
+function onVisibility() {
+  schedule();
+  if (typeof officeSync === 'function') officeSync();
+}
+
+window.addEventListener('message', (ev) => {
+  const m = ev.data;
+  if (!m || m.command !== 'aimon.visibility') return;
+  const hidden = !m.visible;
+  if (hidden === S.embedHidden) return;
+  S.embedHidden = hidden;
+  onVisibility();
+  // Hiện lại thì nạp ngay một nhịp: chờ hết chu kỳ mới có số là người dùng nhìn thấy dữ
+  // liệu cũ của lúc trước khi ẩn, tưởng tool treo.
+  if (!hidden) loadSnapshot();
+});
 
 function schedule() {
   if (S.timer) { clearInterval(S.timer); S.timer = null; }
-  if (S.interval > 0) {
-    S.timer = setInterval(() => { if (!document.hidden) loadSnapshot(); }, S.interval);
+  // Ẩn thì KHÔNG đặt timer nào cả, thay vì đặt rồi bỏ qua trong callback: chi phí một lần
+  // đánh thức mỗi 3 giây thì nhỏ, nhưng nó giữ cả tiến trình renderer khỏi ngủ.
+  if (S.interval > 0 && pageVisible()) {
+    S.timer = setInterval(() => { if (pageVisible()) loadSnapshot(); }, S.interval);
   }
 }
 

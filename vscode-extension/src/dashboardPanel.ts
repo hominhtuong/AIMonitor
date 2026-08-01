@@ -3,7 +3,12 @@ import { AimonServerSession } from './serverSession';
 import { AimonConfig, resolveTheme, editorIsLight } from './config';
 import { dashboardUrl } from './usage';
 import { PythonNotFoundError } from './serverManager';
-import { renderErrorPage, renderLoadingPage, renderNoPythonPage } from './webviewPages';
+import {
+  renderErrorPage,
+  renderLoadingPage,
+  renderNoPythonPage,
+  dashboardFramePage,
+} from './webviewPages';
 
 const HOLDER = 'tab';
 
@@ -58,9 +63,19 @@ export class DashboardPanel {
         void vscode.env.openExternal(vscode.Uri.parse('https://www.python.org/downloads/'));
       }
     });
+    // Tab bị chuyển sang sau lưng vẫn sống nhờ retainContextWhenHidden - và vẫn poll nếu
+    // không ai báo cho nó biết. Xem chú thích ở dashboardFramePage.
+    panel.onDidChangeViewState(() => this.pushVisibility());
     panel.onDidDispose(() => {
       DashboardPanel.current = undefined;
       void this.session.release(HOLDER);
+    });
+  }
+
+  private pushVisibility(): void {
+    void this.panel.webview.postMessage({
+      command: 'aimon.visibility',
+      visible: this.panel.visible,
     });
   }
 
@@ -78,7 +93,8 @@ export class DashboardPanel {
         aiKinds: this.config.aiKinds,
         officePack: this.config.officePack,
       });
-      this.panel.webview.html = iframePage(url);
+      this.panel.webview.html = dashboardFramePage(url, true);
+      this.pushVisibility();
     } catch (err) {
       if (err instanceof PythonNotFoundError) {
         this.panel.webview.html = renderNoPythonPage();
@@ -89,10 +105,4 @@ export class DashboardPanel {
       );
     }
   }
-}
-
-function iframePage(url: string): string {
-  return `<!DOCTYPE html><html><body style="margin:0;padding:0;overflow:hidden">` +
-    `<iframe src="${url}" style="border:0;width:100vw;height:100vh"></iframe>` +
-    `</body></html>`;
 }

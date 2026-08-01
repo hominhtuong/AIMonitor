@@ -33,6 +33,11 @@ còn bao lâu nữa thì đụng hạn mức - và tắt được cái nào.
 Chạy hoàn toàn trên máy bạn. Không gửi dữ liệu đi đâu, không cần đăng nhập, không cài thêm gì
 ngoài Python (macOS và Linux có sẵn).
 
+**Bật cả ngày cũng gần như không tốn gì.** Đo trên máy M2 8 nhân đang chạy hơn 500 tiến trình:
+**0.7% CPU của cả máy và khoảng 30 MB RAM** khi mở dashboard, **0.01% CPU** khi chỉ hiện nút ở
+thanh trạng thái. Đóng panel là về 0 - không có tiến trình nào chạy ngầm phía sau. Số đo đầy
+đủ và cách đo: [docs/hieu-nang.md](docs/hieu-nang.md).
+
 <img src="assets/screenshot-vi.png" width="656" alt="Giao diện AI Monitor">
 
 ---
@@ -310,6 +315,35 @@ Trong extension VSCode, ba ô đường dẫn (Python, thư mục dữ liệu Cl
 Mỗi ô có nút **Detect again** để dò lại và chọn từ danh sách. Đường dẫn nào chết - ví dụ bảng
 giá đi kèm sau khi extension cập nhật - sẽ tự được thay ở lần khởi động sau. Xoá trắng một ô
 là quay lại chế độ tự dò mỗi lần chạy, và extension sẽ không tự điền lại nữa.
+
+---
+
+## 7c. Hiệu năng: tool này ăn bao nhiêu của máy bạn
+
+Số đo thật, không phải ước lượng - trên Apple M2 (8 nhân, 16 GB) đang chạy hơn 500 tiến trình
+và 870 MB transcript của Claude. Cách đo và số đầy đủ: **[docs/hieu-nang.md](docs/hieu-nang.md)**.
+
+| Bạn đang làm gì | CPU (của cả máy) | RAM |
+| --- | --- | --- |
+| Chưa mở / đã đóng panel | **0%** - không có tiến trình nào | 0 |
+| Chỉ hiện nút ở thanh trạng thái | **0.01%** | 30 MB |
+| Panel mở nhưng đang bị che | **0%** - ngừng hỏi hẳn | 30 MB |
+| Đang mở dashboard | **0.37%** | 30 MB + ~40 MB cho trang |
+| Dashboard + khung nhìn Văn phòng | **0.70%** | 30 MB + ~47 MB cho trang |
+
+Vài điều đáng biết:
+
+- **Không mở thì không chạy gì.** Nút ở thanh trạng thái không bao giờ tự bật server, nó chỉ
+  hiện số nếu đã có server chạy sẵn. Đóng panel là tiến trình thoát.
+- **Bị che là nằm im.** Thu gọn panel thì cả vòng hỏi dữ liệu lẫn hoạt cảnh dừng hẳn - đã
+  kiểm bằng cách đếm số request thật, không phải đọc code rồi đoán.
+- **Một lần làm mới tốn 86 ms CPU** (tính cả tiến trình con `ps` và `lsof`), và chỉ chạy mỗi
+  3 giây trong lúc bạn đang nhìn.
+- **Khung nhìn Văn phòng là phần nặng nhất**, nhưng chỉ nặng khi có nhân vật đang di chuyển.
+  Mọi người ngồi yên ở bàn thì nó vẽ 5 khung mỗi giây thay vì 60.
+- **Windows tốn hơn.** Bên đó không có `ps` nên phải bật PowerShell để đọc danh sách tiến
+  trình - ước chừng 10-35% một nhân, so với 3% trên macOS. Chưa đo được trên máy Windows thật,
+  xem mục Windows trong tài liệu.
 
 ---
 

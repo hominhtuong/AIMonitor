@@ -2,7 +2,7 @@
   "name": "aimonitor",
   "displayName": "AI Monitor",
   "description": "See every AI process, token, and account limit on your machine, inside VSCode. Runs fully offline.",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "publisher": "mituultra",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -249,7 +249,8 @@
             "pets",
             "slime",
             "mascot",
-            "crew"
+            "crew",
+            "legends"
           ],
           "enumDescriptions": [
             "Voyage - thirty-six sailors, hats, goggles and beards",
@@ -258,7 +259,8 @@
             "Pets - cat, dog, rabbit, sheep, cow, pig, chick, duckling, frog",
             "Slimes - ten coloured blobs",
             "Mascots - ten round mascots, each with its own hat",
-            "The Crew - five friends, told apart by hair, glasses and outfit"
+            "The Crew - five friends, told apart by hair, glasses and outfit",
+            "Legends - ten footballers, told apart by kit colour, hair and shirt number"
           ],
           "default": "voyage",
           "order": 12,
