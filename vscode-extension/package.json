@@ -250,12 +250,14 @@
           "enum": [
             "office",
             "farm",
-            "delivery"
+            "delivery",
+            "farm2"
           ],
           "enumDescriptions": [
             "Office - desks, chairs and monitors; the original scene",
             "Farm - each agent works a plot: ploughing with an ox, chopping wood, harvesting",
-            "Delivery - each agent has an address and a scooter, and rides to the depot and back"
+            "Delivery - each agent has an address and a scooter, and rides to the depot and back",
+            "Farm v2 - 16x16 pixel farm cut from your own FARM SCENE artwork, with farmers and barnyard animals"
           ],
           "default": "",
           "order": 10,

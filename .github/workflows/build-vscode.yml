@@ -139,6 +139,8 @@ jobs:
                    extension/aimon/static/packimport.js \
                    extension/aimon/static/scene-farm.js \
                    extension/aimon/static/scene-delivery.js \
+                   extension/aimon/static/scene-farm-v2.js \
+                   extension/aimon/static/sprites-farm.js \
                    extension/media/icon.svg extension/images/icon.png \
                    extension/README.md extension/CHANGELOG.md extension/LICENSE.txt; do
             echo "$files" | grep -qx "$f" || { echo "THIẾU $f"; exit 1; }

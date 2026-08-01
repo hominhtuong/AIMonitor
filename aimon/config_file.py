@@ -50,7 +50,7 @@ OFFICE_PACKS = ("voyage", "ninja", "office", "pets", "slime", "mascot", "crew", 
 
 # Các bối cảnh nằm ở static/office.js (Văn phòng) và static/scene-*.js. Cùng lý do như trên:
 # ở đây chỉ chặn giá trị rác, trang web vẫn tự kiểm lại lần nữa.
-OFFICE_SCENES = ("office", "farm", "delivery")
+OFFICE_SCENES = ("office", "farm", "delivery", "farm2")
 
 _THEMES = ("auto", "dark", "light")
 
