@@ -26,6 +26,10 @@ mục "Tích hợp vào office.js".
 
 - Thêm bối cảnh "Nông trại v2" (`scene-farm-v2.js`) chạy trên **hệ nhân vật 16x16 riêng**
   (`sprites-farm.js`), fork từ `sprites.js`.
+
+> **ID scene là `farm2`, không phải `farm-v2`.** CI (build-vscode.yml) bắt id bối cảnh bằng
+> regex `\w+`, không nhận gạch ngang. `farm-v2` sẽ lặng lẽ biến mất khỏi mọi bảng kiểm.
+> Tên hiển thị ("Nông trại v2") qua i18n thì có gạch ngang thoải mái.
 - Bối cảnh mới vẽ **đúng art 16x16 của người dùng** (bố cục cắt từ ảnh mẫu FARM SCENE).
 - Không thay đổi hành vi của ba bối cảnh cũ.
 - Không sửa `sprites.js`, `scene-farm.js`, `scene-delivery.js`, `aimon/office.py`,
