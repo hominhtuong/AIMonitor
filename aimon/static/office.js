@@ -79,6 +79,7 @@ const OF = {
   canvas: null,
   ctx: null,
   atlas: null,
+  atlasFarm: null,       // atlas 16x16 riêng cho bối cảnh farm-v2 (xem sprites-farm.js)
   bg: null,              // nền tĩnh đã nướng, ở PIXEL GỐC (260x176)
   bgKey: '',             // chữ ký của nền đã nướng: bối cảnh + kiểu nền + bảng màu
   freeTimer: null,       // hẹn giờ trả lại vùng nhớ ảnh sau khi rời tab
@@ -136,10 +137,10 @@ const SCENES = [];
 /* Thứ tự bày ra trong bảng chọn. Khai riêng chứ không lấy theo thứ tự đăng ký: bối cảnh nạp
  * theo yêu cầu nên thứ tự đăng ký phụ thuộc người dùng chọn gì trước, và bảng chọn sẽ đảo chỗ
  * mỗi lần mở máy. */
-const SCENE_ORDER = ['office', 'farm', 'delivery'];
+const SCENE_ORDER = ['office', 'farm', 'delivery', 'farm2'];
 
 /* Bối cảnh nạp theo yêu cầu. Văn phòng nằm ngay trong file này vì nó là bối cảnh mặc định và
- * phải có mặt ngay; hai bối cảnh còn lại là file riêng, chỉ tải khi người dùng thật sự cần.
+ * phải có mặt ngay; ba bối cảnh còn lại là file riêng, chỉ tải khi người dùng thật sự cần.
  *
  * Cộng lại chúng chừng 34 KB thô, và người chỉ dùng Văn phòng thì không tải một byte nào.
  * Đây là đường DUY NHẤT khả thi cho việc nạp lười ở repo này: `office.js` và `app.js` gọi
@@ -148,6 +149,7 @@ const SCENE_ORDER = ['office', 'farm', 'delivery'];
 const SCENE_LAZY = [
   { id: 'farm', src: '/static/scene-farm.js' },
   { id: 'delivery', src: '/static/scene-delivery.js' },
+  { id: 'farm2', src: '/static/scene-farm-v2.js' },
 ];
 const SCENE_LOADS = new Map();      // id -> Promise, để hai lời gọi cùng lúc không tải hai lần
 
@@ -274,11 +276,13 @@ function setScene(id) {
   // họ thì đổi bối cảnh xong cả nhà mất hình đã chọn, nhìn như tool tự ý sửa đồ của mình.
   let picked = null;
   try { picked = localStorage.getItem(PACK_KEY); } catch (e) { /* bỏ qua */ }
-  if (picked == null && CS().defaultPack && packById(CS().defaultPack).id === CS().defaultPack) {
+  if (!CS().fixedChars && picked == null && CS().defaultPack
+      && packById(CS().defaultPack).id === CS().defaultPack) {
     OF.pack = CS().defaultPack;
   }
 
-  ensureAtlas();
+  if (CS().fixedChars) ensureAtlasFarm();
+  else ensureAtlas();
   renderScenes();
   renderRooms();
   renderPacks();
@@ -384,9 +388,18 @@ function charIndexFor(id) {
   return charAt(OF.pack, slotFor(id));
 }
 
+/* Chỉ số nhân vật theo BỐI CẢNH: farm-v2 dùng index vào FARMER_CHARS (theo chỗ ngồi), còn ba
+ * bối cảnh 16x20 dùng pack như trước. Mọi chỗ chọn nhân vật (reskinAll, syncAgents) phải đi
+ * qua hàm này, đừng gọi thẳng charIndexFor. */
+function sceneCharFor(id) {
+  const sc = CS();
+  if (sc.charIndexFor) return sc.charIndexFor(id);
+  return charIndexFor(id);
+}
+
 /** Áp lại nhân vật cho mọi người đang có trong khung hình. */
 function reskinAll() {
-  OF.ents.forEach((e) => { e.charIndex = charIndexFor(e.id); });
+  OF.ents.forEach((e) => { e.charIndex = sceneCharFor(e.id); });
   ensureAtlas();
 }
 
@@ -409,9 +422,21 @@ function neededChars() {
 }
 
 function ensureAtlas(force) {
+  if (CS().fixedChars) return;   // farm-v2 vẽ bằng atlas riêng (ensureAtlasFarm), không cần atlas 16x20
   const want = neededChars();
   if (!force && OF.atlas && OF.atlas.covers(want)) return;
   OF.atlas = buildSpriteAtlas(want);
+  invalidate();
+}
+
+/* Atlas 16x16 riêng cho bối cảnh farm-v2. Nướng MỘT LẦN (10 nông dân x 17 frame cố định) —
+ * không đổi theo bộ hay theo lựa chọn ép riêng nên không cần `covers()`. Tự no-op khi không
+ * phải farm-v2, nên gọi vô điều kiện trong officeInit cũng vô hại. */
+function ensureAtlasFarm() {
+  if (CS().id !== 'farm2') return;
+  if (OF.atlasFarm) return;
+  if (typeof buildAtlas_farm !== 'function') return;   // sprites-farm.js chưa nạp
+  OF.atlasFarm = buildAtlas_farm(null);
   invalidate();
 }
 
@@ -423,6 +448,11 @@ function freeAtlas() {
     OF.atlas.canvas.width = 0;
     OF.atlas.canvas.height = 0;
     OF.atlas = null;
+  }
+  if (OF.atlasFarm) {
+    OF.atlasFarm.canvas.width = 0;
+    OF.atlasFarm.canvas.height = 0;
+    OF.atlasFarm = null;
   }
   if (OF.bg) {
     OF.bg.width = 0;
@@ -500,6 +530,10 @@ function renderRooms() {
   const host = document.getElementById('office-rooms');
   if (!host) return;
   const rooms = CS().rooms;
+  const box = host.closest('details');
+  // Chỉ một kiểu nền (farm-v2) thì chọn làm gì - giấu cả bảng.
+  if (rooms.length <= 1) { if (box) box.hidden = true; return; }
+  if (box) box.hidden = false;
   // Số ô đổi khi đổi bối cảnh, mà id nền cũng khác nhau - so cả hai chứ đừng chỉ so số lượng.
   const want = rooms.map((r) => r.id).join(',');
   if (host.dataset.rooms !== want) {
@@ -649,6 +683,10 @@ function deleteCustomPack(id) {
  *  renderCharPreview, mỗi lần một getImageData cộng một lượt hậu kỳ, cho những ô nằm trong
  *  một `<details>` đang đóng mà người dùng không nhìn thấy cái nào. */
 function renderPacks() {
+  const box = document.getElementById('office-skinbox');
+  // Scene cố định (farm-v2) có nhân vật riêng, không dùng pack nào - giấu cả bảng chọn bộ.
+  if (CS().fixedChars) { if (box) box.hidden = true; return; }
+  if (box) box.hidden = false;
   const host = document.getElementById('office-skins');
   if (!host) return;
 
@@ -705,7 +743,6 @@ function renderPacks() {
     const del = b.querySelector('.del');
     if (del) del.title = t('import.remove');
   });
-  const box = document.getElementById('office-skinbox');
   const sum = box && box.querySelector('summary');
   if (sum) sum.textContent = t('office.pack_pick');
   if (box && box.open) paintCharPreviews();
@@ -844,7 +881,7 @@ function syncAgents(payload) {
     seen.add(a.id);
     let e = OF.ents.get(a.id);
     if (!e) {
-      e = newEntity(a.id, 'agent', charIndexFor(a.id));
+      e = newEntity(a.id, 'agent', sceneCharFor(a.id));
       OF.ents.set(a.id, e);
     }
     e.data = a;
@@ -859,7 +896,7 @@ function syncAgents(payload) {
       seen.add(sub.id);
       let se = OF.ents.get(sub.id);
       if (!se) {
-        se = newEntity(sub.id, 'sub', charIndexFor(sub.id));
+        se = newEntity(sub.id, 'sub', sceneCharFor(sub.id));
         OF.ents.set(sub.id, se);
       }
       se.data = { ...sub, state: 'busy', action: 'work', parent: a.id };
@@ -1314,10 +1351,15 @@ function entityInfo(e) {
 }
 
 function drawEntity(g, e, info) {
-  const [sx, sy, sw, sh] = OF.atlas.cell(e.charIndex, info.frame);
+  const farm = CS().id === 'farm2';
+  const atlas = farm ? OF.atlasFarm : OF.atlas;
+  const SW = farm ? SPRITE_W_FARM : SPRITE_W;
+  const SH = farm ? SPRITE_H_FARM : SPRITE_H;
+  const SS = farm ? SPRITE_SS_FARM : SPRITE_SS;
+  const [sx, sy, sw, sh] = atlas.cell(e.charIndex, info.frame);
   // Atlas vẽ ở lưới con (gấp SPRITE_SS lần), còn cảnh đo bằng pixel gốc - nên đích luôn là
   // kích thước ô CHIA cho SPRITE_SS. Vẽ đúng sw/sh là nhân vật to gấp ba, tràn kín phòng.
-  const dw = sw / SPRITE_SS, dh = sh / SPRITE_SS;
+  const dw = sw / SS, dh = sh / SS;
 
   // Người ngồi không vẽ chân (chân khuất sau ghế), nên cái bóng ở đáy sprite hoá ra một
   // vệt tách rời lơ lửng dưới thân. Ngồi thì bóng cũng khuất sau ghế - bỏ luôn.
@@ -1332,7 +1374,7 @@ function drawEntity(g, e, info) {
     // là cái bóng mờ tới mức không còn thấy trên nền sàn sáng.
     g.fillStyle = OF.pal.shadow;
     g.beginPath();
-    g.ellipse(info.x + SPRITE_W / 2, info.y + SPRITE_H - 0.6, 5, 1.6, 0, 0, Math.PI * 2);
+    g.ellipse(info.x + SW / 2, info.y + SH - 0.6, 5, 1.6, 0, 0, Math.PI * 2);
     g.fill();
     g.restore();
   }
@@ -1348,20 +1390,20 @@ function drawEntity(g, e, info) {
   // xe). Cắt ở NGUỒN chứ không che bằng một mảng màu đè lên: che thì cái đè phải khớp đúng
   // màu nền, mà nền lại đổi theo theme và theo kiểu nền.
   const cut = info.cut || 0;
-  const ssh = sh - cut * SPRITE_SS;
+  const ssh = sh - cut * SS;
   const ddh = dh - cut;
   if (info.small) {
     // sub-agent vẽ nhỏ hơn một chút để phân biệt với người gọi nó mà không cần chú thích
-    g.translate(info.x + SPRITE_W / 2, info.ey + SPRITE_H);
+    g.translate(info.x + SW / 2, info.ey + SH);
     g.scale(0.8, 0.8);
-    g.translate(-SPRITE_W / 2, -SPRITE_H);
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, ssh, -1, -1, dw, ddh);
+    g.translate(-SW / 2, -SH);
+    g.drawImage(atlas.canvas, sx, sy, sw, ssh, -1, -1, dw, ddh);
   } else if (info.flip) {
-    g.translate(info.x + SPRITE_W, info.ey);
+    g.translate(info.x + SW, info.ey);
     g.scale(-1, 1);
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, ssh, -1, -1, dw, ddh);
+    g.drawImage(atlas.canvas, sx, sy, sw, ssh, -1, -1, dw, ddh);
   } else {
-    g.drawImage(OF.atlas.canvas, sx, sy, sw, ssh, info.x - 1, info.ey - 1, dw, ddh);
+    g.drawImage(atlas.canvas, sx, sy, sw, ssh, info.x - 1, info.ey - 1, dw, ddh);
   }
   g.restore();
 }
@@ -1562,9 +1604,10 @@ function roomPos(clientX, clientY) {
  *  khung hình không ăn gì. */
 function entAt(clientX, clientY) {
   const { x, y } = roomPos(clientX, clientY);
+  const H = CS().id === 'farm2' ? SPRITE_H_FARM : SPRITE_H;
   for (const [id, e] of OF.ents) {
     if (e.kind !== 'agent') continue;
-    if (x >= e.x - 1 && x <= e.x + SPRITE_W + 1 && y >= e.y - 1 && y <= e.y + SPRITE_H + 1) return id;
+    if (x >= e.x - 1 && x <= e.x + SPRITE_W + 1 && y >= e.y - 1 && y <= e.y + H + 1) return id;
   }
   return null;
 }
@@ -1736,12 +1779,12 @@ function renderDetail() {
     <div class="grid">${cells.map((c) =>
       `<div class="cell"><div class="v" data-flash="1">${esc(c.v)}</div><div class="k">${esc(c.k)}</div></div>`).join('')}</div>
     ${doing}${subs}
-    ${agentSkinRow(OF.sel, e.charIndex)}
+    ${CS().fixedChars ? '' : agentSkinRow(OF.sel, e.charIndex)}
     <div class="h2row"><h2>${t('office.tree_title', { n: root ? root.children.length : 0 })}</h2></div>
     ${tree}
   </div>`);
   // morph() vừa dựng lại DOM nên mấy canvas xem trước đang trống, phải tô ngay sau đó.
-  paintCharPreviews();
+  if (!CS().fixedChars) paintCharPreviews();
 }
 
 /* ------------------------------------------------------------- vòng dữ liệu */
@@ -1814,6 +1857,7 @@ function officeInit() {
   initPack();
   buildScene();
   ensureAtlas();     // sau initPack: phải biết bộ nào đang chọn thì mới biết nướng gì
+  ensureAtlasFarm(); // vô hại nếu không phải farm-v2: hàm tự no-op theo bối cảnh
 
   OF.canvas.addEventListener('mousemove', onMove);
   OF.canvas.addEventListener('mouseleave', () => setHover(null));
@@ -1889,6 +1933,7 @@ function officeStart() {
   OF.pal = readPalette();       // theme có thể đã đổi từ lần mở trước
   OF.last = 0;
   ensureAtlas();                // vùng nhớ ảnh có thể đã bị thả trong lúc rời tab
+  ensureAtlasFarm();            // như trên, cho atlas 16x16 của farm-v2
   invalidate();                 // canvas vừa bị dọn lúc đóng tab, phải vẽ lại từ đầu
   resize();
   loadPulse();
