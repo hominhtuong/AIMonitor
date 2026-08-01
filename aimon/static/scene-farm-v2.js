@@ -41,6 +41,11 @@ function f2Stations() {
         x, y, row,
         seatX: x + F2_PLOT_W / 2 - 1,
         seatY: y + 5,
+        // Chỗ đứng của sub-agent: cạnh luống, ngang chỗ nông dân đứng (feet ở y+21).
+        helpers: [
+          { x: x - 15, y: y + 16 },
+          { x: x + F2_PLOT_W + 1, y: y + 16 },
+        ],
         box: { x: x - 2, y: y - 12, w: F2_PLOT_W + 4, h: F2_PLOT_H + 24 },
         labelX: x + F2_PLOT_W / 2,
         bubbleY: y + 2,
