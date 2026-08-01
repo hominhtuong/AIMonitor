@@ -82,8 +82,13 @@ export class AimonStatusBar {
         this.render(null);
         return;
       }
-      const snap = await getJson(instance.host, instance.port, '/api/snapshot');
-      this.render(snap ? summarize(snap) : null);
+      // `/api/usage` chứ KHÔNG phải `/api/snapshot`: thanh trạng thái chỉ đọc `usage` và
+      // `totals.today.cost`, tức 2.3 KB trong 207 KB. Hỏi bằng snapshot là bắt server quét
+      // `ps` toàn máy cộng `lsof` (86 ms CPU tính cả tiến trình con) chỉ để in ra hai con số
+      // phần trăm - mà mỗi cửa sổ VSCode lại hỏi 6 giây một lần. Đo được: 3.5 ms so với
+      // 86 ms, xem docs/hieu-nang.md.
+      const usage = await getJson(instance.host, instance.port, '/api/usage');
+      this.render(usage ? summarize(usage) : null);
     } finally {
       this.schedule();
     }

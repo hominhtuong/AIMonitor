@@ -45,7 +45,7 @@ DEFAULTS = {
 
 # Các bộ nhân vật nằm ở static/sprites.js (nơi vẽ ra chúng). Ở đây chỉ cần biết chuỗi nào
 # hợp lệ để không ghi rác vào cấu hình; trang web vẫn tự kiểm lại lần nữa.
-OFFICE_PACKS = ("voyage", "ninja", "office", "pets", "slime", "mascot", "crew")
+OFFICE_PACKS = ("voyage", "ninja", "office", "pets", "slime", "mascot", "crew", "legends")
 
 _THEMES = ("auto", "dark", "light")
 

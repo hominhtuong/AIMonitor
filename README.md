@@ -34,6 +34,12 @@ can safely kill.
 Everything runs on your machine. No data leaves it, no account needed, nothing to install
 beyond Python (already present on macOS and Linux).
 
+**It costs almost nothing to leave running.** Measured on an 8-core M2 with 500+ processes:
+**0.7% of the machine's CPU and ~30 MB of RAM** with the dashboard open, and **0.01% CPU**
+when only the status bar is showing. Close the panel and it drops to zero - there is no
+background process left behind. Full numbers and method:
+[docs/hieu-nang.md](docs/hieu-nang.md).
+
 <img src="assets/screenshot.png" width="656" alt="AI Monitor dashboard">
 
 ---
@@ -319,6 +325,35 @@ instead of three blank boxes. Each one has a **Detect again** button that scans 
 pick from a list. A path that stops working - the bundled pricing file after an extension
 update, say - is replaced on the next start. Clearing a box puts it back to detecting every
 time, and the extension will not fill it in again.
+
+---
+
+## 7c. Performance: what it costs your machine
+
+Measured, not estimated - on an Apple M2 (8 cores, 16 GB) running 500+ processes and 870 MB
+of Claude transcripts. Method and full numbers: **[docs/hieu-nang.md](docs/hieu-nang.md)**.
+
+| What you are doing | CPU (of the whole machine) | RAM |
+| --- | --- | --- |
+| Not opened / panel closed | **0%** - no process running | 0 |
+| Status bar only | **0.01%** | 30 MB |
+| Panel open but hidden behind another view | **0%** - polling stops | 30 MB |
+| Dashboard open | **0.37%** | 30 MB + ~40 MB page |
+| Dashboard + Office view | **0.70%** | 30 MB + ~47 MB page |
+
+A few things worth knowing:
+
+- **Nothing runs until you open it.** The status bar never starts the server; it only shows
+  numbers if a server is already running. Close the panel and the process exits.
+- **Hidden means idle.** Collapse the panel and both the polling and the animation stop
+  completely - verified by counting requests, not by reading code.
+- **One refresh costs 86 ms of CPU** (including the `ps` and `lsof` child processes) and runs
+  every 3 seconds only while you are looking at it.
+- **The Office view is the only heavy part**, and only while characters are moving. With
+  everyone sitting at their desk it draws 5 frames per second instead of 60.
+- **Windows costs more.** There is no `ps` there, so process listing spawns PowerShell -
+  roughly 10-35% of one core, versus 3% on macOS. Not measured on real hardware yet; see the
+  Windows section of the doc.
 
 ---
 

@@ -3,7 +3,13 @@ import { AimonServerSession } from './serverSession';
 import { AimonConfig, resolveTheme, editorIsLight } from './config';
 import { dashboardUrl } from './usage';
 import { PythonNotFoundError } from './serverManager';
-import { renderErrorPage, renderLoadingPage, renderNoPythonPage, WINGET_COMMAND } from './webviewPages';
+import {
+  renderErrorPage,
+  renderLoadingPage,
+  renderNoPythonPage,
+  dashboardFramePage,
+  WINGET_COMMAND,
+} from './webviewPages';
 
 const HOLDER = 'sidebar';
 
@@ -37,6 +43,14 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
       if (msg?.command === 'install-python') void this.openPythonDownload();
     });
 
+    // `retainContextWhenHidden` giữ webview sống khi user thu gọn panel - cần thiết, nếu
+    // không server bị giết rồi spawn lại liên tục. Cái giá là trang bên trong KHÔNG biết
+    // mình đang bị giấu: VSCode giấu bằng `display:none`, mà Page Visibility API không tính
+    // chuyện đó, nên `document.hidden` vẫn false và trang cứ hỏi server 207 KB mỗi 3 giây
+    // cộng vòng vẽ 60 fps, mãi mãi, cho một cái panel không ai nhìn. Đã đo tận nơi, xem
+    // docs/hieu-nang.md. Đây là chỗ duy nhất biết sự thật, nên phải tự báo xuống.
+    webviewView.onDidChangeVisibility(() => this.pushVisibility());
+
     webviewView.onDidDispose(() => {
       this.view = undefined;
       void this.session.release(HOLDER);
@@ -67,7 +81,8 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
         aiKinds: this.config.aiKinds,
         officePack: this.config.officePack,
       });
-      view.webview.html = iframePage(url);
+      view.webview.html = dashboardFramePage(url, false);
+      this.pushVisibility();
     } catch (err) {
       if (err instanceof PythonNotFoundError) {
         view.webview.html = renderNoPythonPage();
@@ -76,6 +91,12 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
       }
       view.webview.html = renderErrorPage(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  private pushVisibility(): void {
+    const view = this.view;
+    if (!view) return;
+    void view.webview.postMessage({ command: 'aimon.visibility', visible: view.visible });
   }
 
   private async promptInstallPython(): Promise<void> {
@@ -96,10 +117,4 @@ export class DashboardViewProvider implements vscode.WebviewViewProvider {
   private async openPythonDownload(): Promise<void> {
     await vscode.env.openExternal(vscode.Uri.parse('https://www.python.org/downloads/'));
   }
-}
-
-function iframePage(url: string): string {
-  return `<!DOCTYPE html><html><body style="margin:0;padding:0">` +
-    `<iframe src="${url}" style="border:0;width:100%;height:100vh"></iframe>` +
-    `</body></html>`;
 }

@@ -641,8 +641,8 @@ ngoài kia gần như luôn kèm giấy phép riêng cho phần asset, khác gi�
 
 ### Bộ nhân vật (sprites.js)
 
-**Bảy bộ**: Hải trình và Nhẫn giả mỗi bộ 36 nhân vật, Văn phòng (người), Thú cưng, Slime,
-Mascot mỗi bộ 10, Năm anh em 5. Bộ ĐẦU TIÊN trong `BUILTIN_PACKS` là mặc định - `initPack()` rơi về
+**Tám bộ**: Hải trình và Nhẫn giả mỗi bộ 36 nhân vật, Văn phòng (người), Thú cưng, Slime,
+Mascot, Danh thủ mỗi bộ 10, Năm anh em 5. Bộ ĐẦU TIÊN trong `BUILTIN_PACKS` là mặc định - `initPack()` rơi về
 `PACKS[0].id` chứ không viết cứng tên, nên đổi thứ tự là đổi luôn mặc định. Chọn một bộ thì CẢ PHÒNG theo bộ đó, và mỗi agent nhận một nhân vật KHÁC nhau trong
 bộ; hết nhân vật thì quay vòng dùng lại. Bấm vào một người trong phòng rồi chọn ở dãy dưới
 bảng chi tiết thì đổi riêng người đó.
@@ -671,6 +671,41 @@ mực đen**:
 - Gọng kính đen phải là kiểu **browline** (một thanh ngang trên, gọng chỉ khép ở mép ngoài và
   đáy) kèm một chấm loá trong tròng. Bản đầu vẽ khung vuông KÍN bốn cạnh cho hai mắt: cộng
   với tóc đen phía trên, cả cái đầu thành một khối đen đặc, không còn mặt mũi gì.
+
+### Bộ Danh thủ - nhận ra người bằng thứ khán giả thật dùng
+
+Mười cầu thủ, cùng bài toán của bộ Năm anh em nhưng lời giải khác: khán giả trên sân không
+nhận ra cầu thủ bằng khuôn mặt, họ nhận bằng **màu áo + kiểu tóc + số áo**. Ba dấu hiệu đó
+phải khác nhau giữa mọi người, bảng đối chiếu nằm ở đầu `FOOTBALL_CHARS`. Hai người tóc ngắn
+thường thì màu tóc phải cách nhau hẳn (nâu sẫm với đỏ), hai bộ đồ trắng thì khác cả màu viền,
+màu quần lẫn số.
+
+Số áo vẽ bằng font 3x5 khai trong file, **không dùng `fillText`**: font hệ thống mỗi máy một
+khác, và ở cỡ này chữ do font sinh ra bị khử răng cưa thành vệt xám. Ô font luôn là bội của
+1/3 pixel gốc (một chữ số dùng ô 1 pixel, hai chữ số nén còn 2/3) - lấy cỡ lẻ thì nét chữ chỗ
+dày 2 chỗ dày 3 pixel lưới con, con số nhìn như bị mọt ăn. Số chỉ vẽ ở **lưng**: đó vừa là
+chỗ số thật nằm, vừa là mặt người xem nhìn nhiều nhất vì ngồi ở bàn là quay lưng ra. Nhớ cộng
+`dy` vào toạ độ số, không thì tư thế gục xuống hạ thân 2 pixel mà số đứng nguyên chỗ cũ.
+
+Chân phải đủ **bốn mảng chồng lên nhau trong 4 pixel dọc**: quần đùi, một quãng da trần, tất
+cao, rồi giày. Đó là silhouette nói "cầu thủ" từ xa, và là lý do bộ này không dùng lại
+`legs()` của bộ Văn phòng.
+
+Ba cái bẫy đã dính:
+
+- **Râu phải là một mảng bo tròn rồi KHOÉT chỗ miệng ra**, không phải ghép quai hàm, ria mép
+  và cằm thành bốn thanh thẳng: bốn thanh khép kín thành cái khung chữ nhật đen quanh miệng,
+  nhìn như đeo rọ mõm. Cùng đúng cái bẫy gọng kính kín ở bộ Năm anh em. Mảng râu cũng phải
+  cách mai tóc một quãng da, nếu không râu nối liền tóc thành hai thanh dọc chạy suốt mặt.
+- **Đừng vẽ vệt sáng lên đỉnh đầu.** Tóc gần đen mà nâng sáng đủ để thấy thì ra màu ghi, lại
+  nằm đúng chỗ hậu kỳ `RIM_LIGHT` nâng sáng thêm lần nữa - thành một thanh xám trắng vắt
+  ngang đầu, nhìn hệt cái băng đô. Đỉnh khối đã tự sáng sẵn.
+- **Cánh tay ở tư thế nhìn ngang phải có vạch tối dọc mép.** Tay đè lên thân nên cùng nằm
+  trong silhouette, hậu kỳ không viền cho nó được; thiếu vạch thì khúc cẳng tay màu da giữa
+  cái áo trông như một lỗ thủng.
+
+Kit chỉ có **màu áo, không có huy hiệu hay logo CLB nào** - huy hiệu là nhãn hiệu có chủ,
+cùng lý do đã ghi cho phần asset, mà ở 3 pixel nó cũng chỉ là một vệt bẩn trên ngực áo.
 
 ### Lưới con `SPRITE_SS` - chỗ nét vẽ đến từ
 
@@ -818,7 +853,7 @@ cho mọi người, nên rê chuột vào một người đang gõ phím là `go
 nhân vật giật mình nhảy khỏi ghế. Cú ngoái lại chỉ là `e.glance` đếm ngược, `frameFor()` đọc
 nó rồi trả khung `kf`; nó tự hết, không cần gỡ lúc bỏ chuột ra.
 
-Khung `kf` (ngồi quay mặt ra) phải có ở CẢ BẢY bộ - `sit(..., 'turn')` giữ nguyên cái thân
+Khung `kf` (ngồi quay mặt ra) phải có ở CẢ TÁM bộ - `sit(..., 'turn')` giữ nguyên cái thân
 ngồi, chỉ đổi đầu sang mặt trước và hoạ tiết lưng sang hoạ tiết ngực. Riêng bộ Năm anh em thì
 đây là lúc DUY NHẤT thấy được gọng kính của người đang ngồi, mà ba trong năm người chỉ khác
 nhau ở chỗ đó.
@@ -976,6 +1011,52 @@ false`): ảnh gốc đã có viền sẵn, tô thêm là viền đôi dày cộ
 Đo trên 10 tấm thật: 6-81ms mỗi tấm. Ảnh nào nền sát màu thân nhân vật (bầy cừu kem trên nền
 kem) thì flood fill ăn lẹm vào thân và tách thiếu - giới hạn đã biết của việc tách nền tự động,
 nên có `note_single` báo cho người dùng thay vì lặng lẽ đưa ra một bộ hỏng.
+
+## Hiệu năng - năm cơ chế đừng gỡ
+
+Số đo đầy đủ và cách đo lại: **`docs/hieu-nang.md`**. Ở đây chỉ ghi những chỗ dễ vô tình phá.
+
+**Đo CPU của server phải tính cả tiến trình con.** `ps` và `lsof` là tiến trình con nên
+`ps -o time=` trên chính server không thấy chúng - đo kiểu đó ra 34 ms một lần build trong khi
+số thật là 86 ms. Dùng `resource.getrusage(RUSAGE_CHILDREN)`.
+
+1. **`/api/usage` cho thanh trạng thái.** Nó chỉ đọc `usage` + `totals.today.cost`, tức 2.3 KB
+   trong 197 KB, mà mỗi cửa sổ VSCode lại hỏi 6 giây một lần. Endpoint này không dựng cây tiến
+   trình, không gọi `lsof`, **không đẻ tiến trình con nào** - 3.5 ms so với 86 ms. Vẫn phải gọi
+   `C.scan()` chứ đừng đọc thẳng `C.windows()`: `windows()` chỉ cộng lại thứ `scan()` đã nạp,
+   bỏ bước đó là số đứng im mãi ở lần đọc đầu.
+
+2. **Vỏ nhúng phải tự báo xuống là panel đang bị giấu** (`dashboardFramePage` +
+   `onDidChangeVisibility`). `retainContextWhenHidden` là bắt buộc, nhưng VSCode giấu webview
+   bằng `display:none` mà **Page Visibility API không tính chuyện đó**: đã đo, `document.hidden`
+   vẫn false, `setInterval` vẫn đủ nhịp, `requestAnimationFrame` vẫn 60 fps. Nên
+   `if (!document.hidden)` trong `app.js` KHÔNG bảo vệ được ca này - thu gọn panel xong server
+   vẫn bị hỏi 197 KB mỗi 3 giây, mãi mãi. Tin đi hai chặng vì iframe khác origin.
+
+3. **`frameSig()` - bỏ khung vẽ trùng.** Phòng đứng yên thì 60 fps xuống 5 fps. So bằng CHỮ KÝ
+   suy từ thứ `draw()` đọc, **không** bằng cờ bẩn do từng hàm `step*` tự khai: cờ bẩn sót một
+   nhánh là màn hình đứng hình mà không ai biết vì sao. Thêm trạng thái ảnh hưởng tới hình thì
+   phải thêm vào chữ ký; thứ không nằm trong chữ ký (bảng màu, kiểu phòng, atlas mới, resize)
+   thì gọi `invalidate()`.
+
+4. **Atlas nướng lười theo bộ** (`buildSpriteAtlas(want)` + `ensureAtlas()`). 35.4 MB xuống
+   7.0 MB, 193 ms xuống 60 ms. Hai chỗ phải giữ: nướng **cả bộ đang chọn** chứ không chỉ mấy
+   người đang có mặt (agent vào ra liên tục, lấy đúng người đang có thì ai vào cũng nướng lại),
+   và `CHAR_GEN` - bảng phẳng đổi khi nhập/xoá bộ thì chỉ số cũ trỏ sang nhân vật khác, không
+   có nó thì xoá một bộ là cả phòng đổi mặt lung tung.
+
+5. **`?ports=0` và `ports.cached()`.** `lsof` tốn 28 ms cộng một tiến trình con, mà bốn tab
+   không dùng tới dữ liệu cổng. `cached()` trả nguyên cache thay vì bỏ hẳn ba khoá ra khỏi
+   payload: thiếu khoá thì frontend phải kiểm `undefined` ở mọi chỗ đọc tới, sót một chỗ là tab
+   Cổng vỡ. Bấm sang tab Cổng thì `loadSnapshot()` chạy lại ngay, không chờ hết nhịp.
+
+Gzip bật theo `Accept-Encoding`, mức 3 cho JSON (gọi mỗi 3 giây) và mức 6 cho file tĩnh (chỉ
+nạp khi webview dựng lại); dưới 1 KB thì không nén.
+
+**Đừng cắt `seen_msgs` / `hourly` trong `claude.py`** để tiết kiệm RAM. Lợi ích là vài MB, còn
+cắt `seen_msgs` là mở đường cho `--include-partial-messages` đếm trùng (token phồng gần gấp
+đôi), cắt `hourly` thì `_history_row()` cộng `msgs` trên toàn bộ bucket nên phiên dài bị tụt số,
+và `history_start()` mất mốc đầu của cả lịch sử.
 
 ## Guard khi kill
 

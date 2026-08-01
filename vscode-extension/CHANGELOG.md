@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.0.1
+
+- **Uses a fraction of what it used to.** With the panel open, AI Monitor now costs about
+  0.7% of an 8-core machine and 30 MB of RAM; with only the status bar showing, 0.01%. Every
+  number in this list was measured on a real machine running 500+ processes, before and
+  after - see [docs/hieu-nang.md](https://github.com/hominhtuong/AIMonitor/blob/main/docs/hieu-nang.md).
+
+- **A collapsed panel now really does nothing.** VSCode keeps a hidden webview alive, and the
+  page had no way of knowing it was hidden - so the dashboard kept asking the server for
+  200 KB every 3 seconds and kept animating at 60 fps behind a panel nobody was looking at.
+  It now stops completely and picks up where it left off when you open it again.
+
+- **The status bar stopped pulling the whole dataset.** It only ever displays two percentages
+  and today's cost, but it was downloading a full machine snapshot every 6 seconds - in every
+  window you had open. It now asks for 2.4 KB instead of 200 KB, and no longer makes the
+  server scan every process on your machine just to draw a label.
+
+- **The Office view stops drawing when nothing moves.** With everyone sitting at their desk it
+  now renders 5 frames per second instead of 60. Characters that are walking still animate at
+  full speed. The cat also stopped padding its feet while sitting still, which it had been
+  doing since the view was added.
+
+- **Character sets load one at a time.** Opening the Office view used to render all 127
+  characters from all sets into a 35 MB texture; it now renders just the set in use, which is
+  7 MB for the default one and 2 MB for the smaller sets. The view opens three times faster.
+
+- **Everything is compressed on the way to the page.** Assets went from 290 KB to 99 KB and
+  each refresh from 197 KB to 35 KB. This mostly matters over Remote-SSH, where the dashboard
+  travels through VSCode's port forwarding: 236 MB per hour became 42 MB.
+
+- **A new character set: Legends.** Ten footballers, told apart the way you tell them apart
+  from the stands - kit colour, hair and shirt number. Numbers are drawn with a built-in pixel
+  font so they stay sharp at any zoom.
+
 ## 2.0.0
 
 - **Every character redrawn at three times the resolution.** Heads are round instead of
