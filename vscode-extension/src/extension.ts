@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import { DashboardViewProvider } from './dashboardViewProvider';
 import { DashboardPanel } from './dashboardPanel';
+import { OfficePipWindow } from './pipWindow';
 import { AimonServerSession } from './serverSession';
 import { AimonStatusBar } from './statusBar';
-import { readConfig, updateConfig } from './config';
+import { readConfig, updateConfig, setExtensionVersion } from './config';
 import { findPythons } from './pythonFinder';
 import {
   syncDetectedSettings,
@@ -18,8 +19,29 @@ let statusBar: AimonStatusBar | undefined;
 let provider: DashboardViewProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Footer của trang bày số này cạnh phiên bản server: hai số lệch nhau nghĩa là extension
+  // đang dùng lại một server cũ còn sống (mặc định `aimon.reuseRunningInstance`).
+  setExtensionVersion(String(context.extension.packageJSON?.version ?? ''));
   let config = readConfig();
   session = new AimonServerSession(context.extensionUri.fsPath, config);
+
+  /** Mở dashboard đầy đủ theo đúng lựa chọn `aimon.openIn` của người dùng. */
+  const openDashboard = async (): Promise<void> => {
+    const cfg = readConfig();
+    if (cfg.openIn === 'panel') {
+      await vscode.commands.executeCommand('aimon.dashboardView.focus');
+      return;
+    }
+    await DashboardPanel.show(session!, cfg, context.extensionUri);
+  };
+
+  /** Bấm một nhân vật trong cửa sổ nổi: mở dashboard rồi đóng cửa sổ nổi lại. Để cả hai cùng
+   *  chạy là hai vòng /api/pulse cho một căn phòng. */
+  const pickFromPip = (): void => {
+    OfficePipWindow.close();
+    void openDashboard();
+  };
+
   provider = new DashboardViewProvider(session, config);
   statusBar = new AimonStatusBar(session, config);
 
@@ -32,14 +54,10 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     statusBar,
 
-    vscode.commands.registerCommand('aimon.openDashboard', async () => {
-      const cfg = readConfig();
-      if (cfg.openIn === 'panel') {
-        await vscode.commands.executeCommand('aimon.dashboardView.focus');
-        return;
-      }
-      await DashboardPanel.show(session!, cfg, context.extensionUri);
-    }),
+    vscode.commands.registerCommand('aimon.openDashboard', () => openDashboard()),
+
+    vscode.commands.registerCommand('aimon.openOfficeWindow', () =>
+      OfficePipWindow.show(session!, readConfig(), pickFromPip)),
 
     vscode.commands.registerCommand('aimon.selectPython', () => pickPython()),
     vscode.commands.registerCommand('aimon.selectClaudeDir', () => pickClaudeDir()),
@@ -52,6 +70,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await session!.dispose();
       await provider!.reload();
       await DashboardPanel.refreshOpen(readConfig());
+      await OfficePipWindow.refreshOpen(readConfig());
       vscode.window.showInformationMessage('AI Monitor: đã khởi động lại server.');
     }),
 
@@ -63,6 +82,7 @@ export function activate(context: vscode.ExtensionContext): void {
       statusBar!.apply(config);
       await provider!.reload();
       await DashboardPanel.refreshOpen(config);
+      await OfficePipWindow.refreshOpen(config);
     }),
 
     // Đổi theme VSCode mà aimon.theme để 'auto' thì dashboard phải đổi theo.
@@ -70,6 +90,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (readConfig().theme !== 'auto') return;
       await provider!.reload();
       await DashboardPanel.refreshOpen(readConfig());
+      await OfficePipWindow.refreshOpen(readConfig());
     })
   );
 

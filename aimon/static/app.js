@@ -17,7 +17,12 @@ const S = {
   modalOpen: false,
   // Vỏ nhúng (extension VSCode) báo xuống là panel đang bị giấu. Xem pageVisible().
   embedHidden: false,
+  // `?view=office`: cả trang chỉ còn căn phòng, dùng cho cửa sổ nổi (PIP) của extension.
+  // Xem applyEmbedOptions().
+  pip: false,
   caps: { pause: true, os: 'macos' },
+  // Phiên bản của vỏ đang nhúng trang (`?ext=`). Xem versionLine().
+  extVersion: '',
   // Số vừa đổi thì chữ sáng lên rồi mờ dần về màu cũ trong 1.1s. Chỉ đổi màu chữ,
   // không đụng nền và không đổi kích thước nên không gây giật. Không còn công tắc.
   fx: true,
@@ -346,7 +351,24 @@ function renderAll() {
   setStatus('');   // chạy bình thường thì không cần nhãn nào
   // giờ cập nhật chuyển thành tooltip của nút Làm mới, không chiếm chỗ trên thanh đầu
   $('#refresh').title = t('hdr.updated', { time: clockOf(S.snap.ts) });
-  setText('#ver', (S.caps.os || '') + (S.caps.pause ? '' : t('hdr.no_pause')));
+  setText('#ver', versionLine() + (S.caps.pause ? '' : t('hdr.no_pause')));
+}
+
+/** Dòng cuối trang: phiên bản đang chạy THẬT + hệ điều hành.
+ *
+ * `version` lấy từ `/api/config.js`, tức của SERVER đang phục vụ trang - không phải của vỏ
+ * đang nhúng nó. Extension mặc định dùng lại server có sẵn (app macOS, .exe, hay cửa sổ VSCode
+ * khác), nên cài extension bản mới mà server cũ còn sống thì trang vẫn là trang cũ. Lệch nhau
+ * thì bày cả hai số, vì đó chính là lúc người dùng cần biết. */
+function versionLine() {
+  const cfg = window.AIMON_CONFIG || {};
+  const parts = [];
+  if (cfg.version) parts.push('v' + cfg.version);
+  if (S.extVersion && S.extVersion !== cfg.version) {
+    parts.push(t('foot.ext', { v: S.extVersion }));
+  }
+  if (S.caps.os) parts.push(S.caps.os);
+  return parts.join(' · ');
 }
 
 function renderHeader() {
@@ -847,17 +869,21 @@ function syncKindBar() {
   if (el) el.hidden = !KIND_TABS.has(S.tab);
 }
 
+/** Bật một tab. Tách riêng khỏi handler của nút vì chế độ cửa sổ nổi (`?view=office`) phải
+ *  bật thẳng tab Văn phòng lúc dựng trang, không qua cú bấm nào. */
+function showTab(name) {
+  S.tab = name;
+  document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === name));
+  document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'pane-' + name));
+  syncKindBar();
+  if (name === 'hist') loadHistory();
+  // Tab Cổng dùng dữ liệu mà bốn tab kia không xin, nên vừa sang là phải nạp lại ngay -
+  // không thì người dùng nhìn số cũ tới hết một nhịp làm mới.
+  if (name === 'net') loadSnapshot();
+}
+
 document.querySelectorAll('.tabs button').forEach((b) => {
-  b.addEventListener('click', () => {
-    S.tab = b.dataset.tab;
-    document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
-    document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'pane-' + S.tab));
-    syncKindBar();
-    if (S.tab === 'hist') loadHistory();
-    // Tab Cổng dùng dữ liệu mà bốn tab kia không xin, nên vừa sang là phải nạp lại ngay -
-    // không thì người dùng nhìn số cũ tới hết một nhịp làm mới.
-    if (S.tab === 'net') loadSnapshot();
-  });
+  b.addEventListener('click', () => showTab(b.dataset.tab));
 });
 
 $('#hist-range').addEventListener('change', () => loadHistory());
@@ -996,6 +1022,20 @@ function applyEmbedOptions() {
   }
 
   if (q.get('compact') === '1') document.body.classList.add('compact');
+  S.extVersion = q.get('ext') || '';
+
+  /* Chế độ cửa sổ nổi: cả trang chỉ còn đúng căn phòng, không header, không tab, không bảng
+   * chi tiết. Bấm vào một nhân vật thì báo lên vỏ nhúng để nó mở dashboard đầy đủ ra - ở đây
+   * không có chỗ nào bày cây tiến trình cho tử tế.
+   *
+   * Tắt luôn vòng /api/snapshot: căn phòng chỉ sống bằng /api/pulse (2 KB mỗi giây), còn
+   * snapshot là 197 KB mỗi 3 giây cho những bảng biểu mà cửa sổ này không hề vẽ. */
+  if (q.get('view') === 'office') {
+    S.pip = true;
+    S.interval = 0;
+    document.body.classList.add('pip');
+    showTab('office');
+  }
 
   /* Bộ lọc loại agent. Thứ tự KHÁC theme một chỗ, và cố ý: lựa chọn người dùng bấm trên
    * trang đứng TRƯỚC `?kinds=` của extension.
@@ -1019,5 +1059,10 @@ function applyEmbedOptions() {
 applyEmbedOptions();
 applyStaticI18n();
 syncKindBar();
-loadSnapshot();
+// Số phiên bản không chờ snapshot: trang mở ra mà server hỏng thì đó đúng là lúc người ta
+// cần đọc nó nhất.
+setText('#ver', versionLine());
+// Cửa sổ nổi không vẽ gì lấy từ /api/snapshot, kể cả một lần đầu tiên: 197 KB cho những
+// bảng biểu đang bị CSS giấu đi hết.
+if (!S.pip) loadSnapshot();
 schedule();

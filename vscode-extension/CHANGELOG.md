@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.2.0
+
+- **The Office view is now the Stage, and it has three scenes.** Same ten agents, three very
+  different places to watch them work:
+
+  - **Office** - what you had before: desks, chairs, monitors. Nothing changed.
+  - **Farm** - each agent works a plot, and *what* they do follows the tool they are running.
+    `Bash` becomes a woodcutter splitting logs, `Edit` becomes a farmer ploughing behind an ox,
+    `Read` becomes someone harvesting with a sickle, `WebFetch` becomes carrying water. The
+    crop on each plot grows while its owner is genuinely busy, so one glance across the field
+    tells you who has been working longest. Chickens and a dog wander the bottom of the frame.
+  - **Delivery** - each agent gets a street address and a scooter. Busy means riding to the
+    depot and back; the stack of parcels behind the rider is how many tools that agent has in
+    flight right now.
+
+  Each scene brings four backdrops of its own (rice field, vegetable patch, orchard, winter
+  crop; city, suburb, night, sunset), and all eight character sets - plus any set you imported
+  yourself - work in every scene. Pick a scene under the view, or set `aimon.officeScene`.
+
+- **Lighter than the version before it, in three ways.** The room background is now baked once
+  instead of being redrawn several hundred draw calls at a time, every frame. The image memory
+  is handed back a minute after you leave the tab - it used to be held until you closed the
+  window. And the character-set previews are only drawn once you actually open the picker.
+
+- **Scene code is fetched only when you use it.** Sticking to the Office scene downloads
+  nothing extra at all.
+
+## 2.1.1
+
+- **The Office can float on top of everything.** Run **AI Monitor: Open the Office in a
+  Floating Window** from the command palette and the room moves into a small window of its
+  own, pinned above your browser, your terminal, anything - so you can watch your agents work
+  while you do something else. Click a character in it and the full dashboard comes back.
+
+  It costs 2 KB per second: that window draws the room and nothing else, so it does not pull
+  the process table, the ports or the account limits at all.
+
+- **The footer tells you which version is actually running.** It shows the version of the
+  server serving the page, and - when they differ - the version of the extension too. Those
+  two can disagree: AI Monitor reuses a server that is already running, so installing a new
+  extension while an older server is still alive leaves you looking at the older page.
+  `AI Monitor: Restart server` fixes it.
+
 ## 2.0.1
 
 - **Uses a fraction of what it used to.** With the panel open, AI Monitor now costs about

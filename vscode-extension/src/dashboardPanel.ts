@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AimonServerSession } from './serverSession';
-import { AimonConfig, resolveTheme, editorIsLight } from './config';
+import { AimonConfig, resolveTheme, editorIsLight, extensionVersion } from './config';
 import { dashboardUrl } from './usage';
 import { PythonNotFoundError } from './serverManager';
 import {
@@ -92,6 +92,8 @@ export class DashboardPanel {
         compact: false,
         aiKinds: this.config.aiKinds,
         officePack: this.config.officePack,
+        officeScene: this.config.officeScene,
+        extVersion: extensionVersion(),
       });
       this.panel.webview.html = dashboardFramePage(url, true);
       this.pushVisibility();

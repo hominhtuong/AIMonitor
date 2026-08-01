@@ -47,37 +47,78 @@ jobs:
       - name: Unit test
         run: npm test
 
-      - name: Danh sách bộ nhân vật phải khớp ở cả ba nơi
+      - name: Bộ nhân vật và bối cảnh phải khớp ở mọi nơi
         working-directory: .
         run: |
-          # sprites.js là nơi VẼ ra chúng; config_file.py chặn giá trị rác ghi vào config;
-          # package.json dựng dropdown trong Settings. Lệch một nơi thì hoặc người dùng chọn
-          # được một bộ không tồn tại, hoặc bộ mới không hiện ra - cả hai đều lặng lẽ.
+          # sprites.js / office.js / scene-*.js là nơi VẼ ra chúng; config_file.py chặn giá trị
+          # rác ghi vào config; package.json dựng dropdown trong Settings. Lệch một nơi thì hoặc
+          # người dùng chọn được thứ không tồn tại, hoặc thứ mới không hiện ra - cả hai lặng lẽ.
           python - <<'PY'
-          import json, re, sys
+          import json, re, sys, glob, os
+          sys.path.insert(0, '.')
+          from aimon.config_file import OFFICE_PACKS, OFFICE_SCENES
+          pkg = json.load(open('vscode-extension/package.json', encoding='utf-8'))
+          props = pkg['contributes']['configuration']['properties']
+          i18n = open('aimon/static/i18n.js', encoding='utf-8').read()
+
+          def both_langs(key, what):
+              n = i18n.count("'%s':" % key)
+              assert n == 2, '%s co %d ban dich, phai co 2 (en + vi) [%s]' % (key, n, what)
+
+          # --- bộ nhân vật ---
           js = open('aimon/static/sprites.js', encoding='utf-8').read()
           packs = re.findall(r"\{ id: '(\w+)', chars:", js)
-          sys.path.insert(0, '.')
-          from aimon.config_file import OFFICE_PACKS
-          pkg = json.load(open('vscode-extension/package.json', encoding='utf-8'))
-          enum = pkg['contributes']['configuration']['properties']['aimon.officePack']['enum']
           assert len(packs) >= 1, 'khong doc duoc bo nao tu sprites.js'
-          assert sorted(packs) == sorted(OFFICE_PACKS), f'sprites.js {sorted(packs)} != config_file.py {sorted(OFFICE_PACKS)}'
-          assert sorted(packs) == sorted(enum), f'sprites.js {sorted(packs)} != package.json {sorted(enum)}'
-          # Mỗi bộ phải có nhãn ở CẢ hai ngôn ngữ, nếu không t() trả về chính tên khoá và
-          # bảng chọn hiện ra chữ "office.pack_pets".
-          i18n = open('aimon/static/i18n.js', encoding='utf-8').read()
+          assert sorted(packs) == sorted(OFFICE_PACKS), 'sprites.js != config_file.py'
+          assert sorted(packs) == sorted(props['aimon.officePack']['enum']), 'sprites.js != package.json'
           for p in packs:
-              n = i18n.count("'office.pack_%s':" % p)
-              assert n == 2, f'office.pack_{p} co {n} ban dich, phai co 2 (en + vi)'
-          # Kiểu phòng chỉ khai ở office.js nên không có gì để đối chiếu chéo, nhưng nhãn
-          # vẫn phải đủ hai ngôn ngữ - thiếu thì bảng chọn hiện ra chữ "office.room_loft".
-          rooms = re.findall(r"^\s*id: '(\w+)',$", open('aimon/static/office.js', encoding='utf-8').read(), re.M)
-          assert rooms, 'khong doc duoc kieu phong nao tu office.js'
+              both_langs('office.pack_%s' % p, 'bo nhan vat')
+
+          # --- bối cảnh ---
+          core0 = open('aimon/static/office.js', encoding='utf-8').read()
+          files = ['aimon/static/office.js'] + sorted(glob.glob('aimon/static/scene-*.js'))
+          scenes, rooms, counts = [], [], {}
+          for f in files:
+              src = open(f, encoding='utf-8').read()
+              for m in re.finditer(r"registerScene\(\{\s*\n\s*id: '(\w+)',", src):
+                  scenes.append(m.group(1))
+              # Mọi `id: 'x',` viết thẳng đều là bối cảnh hoặc kiểu nền; id của chỗ làm việc
+              # được ghép chuỗi (`'f' + row + ...`) nên không lọt vào đây.
+              rooms += re.findall(r"^\s*id: '(\w+)',$", src, re.M)
+              for m in re.finditer(r"id: '(\w+)',\n\s*stationCount: (\d+),", src):
+                  counts[m.group(1)] = int(m.group(2))
+          rooms = [r for r in rooms if r not in scenes]
+          assert scenes, 'khong doc duoc boi canh nao'
+          # SCENE_ORDER dung bay bang chon, SCENE_LAZY quyet dinh file nao nap theo yeu cau.
+          # Lech thi hoac boi canh khong hien ra, hoac bam vao mot o khong bao gio tai duoc.
+          order = re.search(r"const SCENE_ORDER = \[([^\]]*)\]", core0).group(1)
+          order = re.findall(r"'(\w+)'", order)
+          lazy = re.findall(r"\{ id: '(\w+)', src: '([^']+)' \}", core0)
+          assert sorted(order) == sorted(scenes), 'SCENE_ORDER %s != boi canh %s' % (sorted(order), sorted(scenes))
+          assert sorted(i for i, _ in lazy) == sorted(s for s in scenes if s != order[0]), \
+              'SCENE_LAZY phai gom dung nhung boi canh KHONG nam trong office.js'
+          for sid, src in lazy:
+              f = 'aimon/static/' + src.split('/')[-1]
+              assert os.path.exists(f), 'SCENE_LAZY tro toi file khong ton tai: ' + f
+          assert sorted(scenes) == sorted(OFFICE_SCENES), 'scene js %s != config_file.py %s' % (sorted(scenes), sorted(OFFICE_SCENES))
+          assert sorted(scenes) == sorted(props['aimon.officeScene']['enum']), 'scene js != package.json'
+          for sc in scenes:
+              both_langs('office.scene_%s' % sc, 'boi canh')
           for r in rooms:
-              n = i18n.count("'office.room_%s':" % r)
-              assert n == 2, f'office.room_{r} co {n} ban dich, phai co 2 (en + vi)'
-          print(f'{len(packs)} bo, {len(rooms)} kieu phong, khop va du 2 ban dich')
+              both_langs('office.room_%s' % r, 'kieu nen')
+
+          # --- mỗi bối cảnh phải đủ chỗ cho MAX_AGENTS agent ---
+          # Thiếu chỗ thì agent thứ N không bao giờ được chia chỗ và đứng mãi ngoài cửa, mà
+          # không có gì báo. MIN_STATIONS ở office.js phải bằng MAX_AGENTS ở office.py.
+          from aimon.office import MAX_AGENTS
+          core = open('aimon/static/office.js', encoding='utf-8').read()
+          mins = int(re.search(r'const MIN_STATIONS = (\d+);', core).group(1))
+          assert mins == MAX_AGENTS, 'MIN_STATIONS %d != MAX_AGENTS %d' % (mins, MAX_AGENTS)
+          for sc in scenes:
+              assert sc in counts, 'boi canh %s khong khai stationCount' % sc
+              assert counts[sc] >= mins, 'boi canh %s chi co %d cho, can >= %d' % (sc, counts[sc], mins)
+
+          print('%d bo, %d boi canh, %d kieu nen, khop va du 2 ban dich' % (len(packs), len(scenes), len(rooms)))
           PY
 
       - name: Đóng gói .vsix
@@ -96,6 +137,8 @@ jobs:
                    extension/aimon/static/app.js \
                    extension/aimon/static/office.js extension/aimon/static/sprites.js \
                    extension/aimon/static/packimport.js \
+                   extension/aimon/static/scene-farm.js \
+                   extension/aimon/static/scene-delivery.js \
                    extension/media/icon.svg extension/images/icon.png \
                    extension/README.md extension/CHANGELOG.md extension/LICENSE.txt; do
             echo "$files" | grep -qx "$f" || { echo "THIẾU $f"; exit 1; }

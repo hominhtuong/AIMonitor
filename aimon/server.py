@@ -48,7 +48,7 @@ BASE = os.path.join(sys._MEIPASS, "aimon") if getattr(sys, "frozen", False) else
 STATIC_DIR = os.path.join(BASE, "static")
 IS_WINDOWS = sys.platform.startswith("win")
 
-VERSION = "2.0.1"
+VERSION = "2.2.0"
 
 DEFAULT_PORT = 8899
 PORT_SCAN_TRIES = 20  # 8899..8919 rồi mới xin cổng ngẫu nhiên
@@ -295,7 +295,12 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/config.js":
             # Trả JS chứ không phải JSON, và index.html nạp nó TRƯỚC app.js: nhờ vậy trang
             # biết theme ngay từ lúc dựng, không vẽ nền tối rồi mới nháy sang nền sáng.
-            body = ("window.AIMON_CONFIG=" + json.dumps(CFG.frontend()) + ";").encode("utf-8")
+            # `version` là phiên bản của SERVER đang phục vụ trang này, không phải của vỏ đang
+            # nhúng nó. Hai số này lệch nhau được: extension mặc định dùng lại server đang chạy
+            # sẵn (app macOS, .exe, cửa sổ VSCode khác), nên cài extension bản mới mà server cũ
+            # còn sống thì trang vẫn là trang cũ. Footer bày cả hai chính vì ca đó.
+            cfg = dict(CFG.frontend(), version=VERSION)
+            body = ("window.AIMON_CONFIG=" + json.dumps(cfg) + ";").encode("utf-8")
             return self._send(body, "application/javascript; charset=utf-8")
         return self._json({"error": "not found"}, 404)
 
