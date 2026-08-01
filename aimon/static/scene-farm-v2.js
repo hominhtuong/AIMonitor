@@ -24,7 +24,9 @@ function f2pal() {
     wood: '#8a5a2b', woodDark: '#5d3a1c', woodLight: '#b07b4a',
     roof: '#4a90d9', roofDark: '#3d5a80', coopRed: '#c4553f', coopRedDark: '#8f3327',
     stone: '#9aa5b1', stoneDark: '#6f7a85', straw: '#e0c050', hay: '#d9b26a',
-    water: '#4a90d9', crop: '#4caf50', cropRipe: '#e0c050', dark: '#1f2a1c',
+    water: '#4a90d9', waterDark: '#3d6f9e', crop: '#4caf50', cropRipe: '#e0c050', dark: '#1f2a1c',
+    hillFar: '#8fbf56', hillLine: '#7db04a', hillTree: '#6a9e3f',
+    path: '#b08a5a', pathDark: '#8a6a45',
     fence: '#b07b4a', fenceDark: '#5d3a1c',
   };
 }
@@ -118,13 +120,25 @@ function f2IsWrite(e) {
   return tool === 'Write' || tool === 'MultiEdit' || tool === 'NotebookEdit';
 }
 
+const F2_SWING = 4;           // đảo tư thế mỗi giây (2 chu kỳ/giây) — e.anim là giây
+const F2_BLINK_PERIOD = 4;    // giây giữa hai lần nháy
+const F2_BLINK_DUR = 0.2;     // giây mỗi lần nháy
+
+/* Tư thế nông dân. Đạo cụ xoay 2 nhịp A/B; `rest` thì cầm bình yên và nháy mắt. `blink` là
+ * khung mắt nhắm. `frameFor(e)` trong frameSig() đã chứa kết quả hàm này nên tư thế đổi là
+ * lõi tự vẽ lại — không cần thêm móc. Phải RẺ và xác định trong một tick (gọi cả khi tính
+ * chữ ký lẫn khi vẽ). */
 function f2FrameFor(e) {
   if (e.cheer > 0) return Math.floor(e.anim * 9) % 2 ? 'd1' : 'd2';
-  if (e.path.length) return null;                       // đi bộ: để lõi chọn d*/u*/s*
+  if (e.path.length) return null;                       // đi bộ: để lõi chọn d*, u*, s*
   if (e.mode !== 'sit') return 'd0';
-  if (f2IsWrite(e)) return 'plant';
   const act = currentAction(e);
-  return F2_ROLE_MAP[act] || 'water';
+  const base = f2IsWrite(e) ? 'plant' : (F2_ROLE_MAP[act] || 'water');
+  if (act === 'rest') {
+    const p = e.anim % F2_BLINK_PERIOD;
+    return p < F2_BLINK_DUR ? 'blink' : base + 'A';
+  }
+  return base + (Math.floor(e.anim * F2_SWING) % 2 ? 'B' : 'A');
 }
 
 /* Nền nướng 260x176 cắt từ ảnh FARM SCENE: nhà gỗ mái xanh (trái), chuồng đỏ + tháp đá
@@ -133,11 +147,15 @@ function f2FrameFor(e) {
 function f2DrawStatic(g, p, roomId) {
   const f = f2pal();
   px2(g, 0, 0, 260, 176, f.grass);                      // nền cỏ
+  drawF2Hills(g, f);                                    // đồi xa — sau cỏ, trước mọi thứ
   drawF2House(g, f, 14, 30);                            // nhà gỗ mái xanh (trái)
   drawF2Coop(g, f, 196, 34);                            // chuồng đỏ
   drawF2Tower(g, f, 236, 26);                           // tháp đá (phải cùng)
-  drawF2Tree(g, f, 176, 22);  drawF2Tree(g, f, 88, 20); // cây trang trí
+  drawF2FruitTree(g, f, 58, 26);  drawF2Tree(g, f, 88, 20);   // vườn cây (2 mới + 2 cũ)
+  drawF2FruitTree(g, f, 150, 26); drawF2Tree(g, f, 176, 22);
   drawF2Well(g, f, 128, 30);                            // giếng giữa trang trí trên
+  drawF2Hay(g, f);                                      // bó rơm cạnh chuồng
+  drawF2Pond(g, f);                                     // ao góc phải dưới
   // Hai luống đất lớn (nền đất) — phần cây trồng vẽ ở f2DrawStation
   px2(g, 28, F2_ROW_Y[0] - 4, 204, F2_PLOT_H + 8, f.soil);
   px2(g, 28, F2_ROW_Y[1] - 4, 204, F2_PLOT_H + 8, f.soil);
@@ -152,6 +170,8 @@ function f2DrawStatic(g, p, roomId) {
   // là chỗ agent đi khi đổi dãy, vẽ cột vào đó là người đi xuyên qua hàng rào.
   drawF2FenceRow(g, f, 0);   // trên
   drawF2FenceRow(g, f, F2_FENCE_Y);  // dưới
+  drawF2Path(g, f);         // đường đất — sau lối đi/rào để liên tục
+  drawF2Flowers(g, f);      // hoa cỏ — trên cùng, không bị gì che
 }
 
 function drawF2FenceRow(g, f, y) {
@@ -218,6 +238,81 @@ function drawF2Tree(g, f, x, y) {
   px2(g, x + 3, y - 2, 4, 3, darken('#4caf50', 0.2));
 }
 
+/* Đồi xa — vẽ TRƯỚC mọi thứ khác sau nền cỏ nên nằm sau nhà/cây. Dải lượn sóng + đường chân
+ * trời + mấy chỏm cây xa mờ giữa hàng rào trên (y=0..8) và dãy nhà (bắt đầu y≈20). */
+function drawF2Hills(g, f) {
+  for (let x = 0; x < 260; x += 8) {
+    const h = 4 + ((x / 8) % 3);
+    px2(g, x, 22 - h, 8, h, f.hillFar);
+  }
+  px2(g, 0, 22, 260, 1, f.hillLine);
+  px2(g, 40, 11, 7, 5, f.hillTree);
+  px2(g, 130, 10, 8, 6, f.hillTree);
+  px2(g, 212, 11, 6, 5, f.hillTree);
+}
+
+/* Đường đất — từ cửa nhà uốn sang lối đi TÂY rồi chạy dọc xuống. KHÔNG cắt qua dải luống
+ * (x28..232, y66..82) hay lối đi ngang (y96..104, y142..150). Vẽ SAU lối đi/hàng rào để
+ * liên tục. */
+function drawF2Path(g, f) {
+  px2(g, 22, 44, 18, 5, f.path);
+  px2(g, 12, 50, 20, 5, f.path);
+  px2(g, 6, 56, 18, 5, f.path);
+  px2(g, 4, 61, 6, 80, f.path);
+  px2(g, 4, 141, 6, 9, f.path);
+  px2(g, 26, 46, 2, 1, f.pathDark);
+  px2(g, 16, 52, 1, 2, f.pathDark);
+  px2(g, 7, 70, 2, 2, f.pathDark);
+  px2(g, 7, 95, 1, 1, f.pathDark);
+  px2(g, 7, 120, 2, 1, f.pathDark);
+}
+
+/* Hoa + cỏ điểm xuyết — nằm trong dải cỏ (y>150 giữa lối và rào dưới, hay góc trên) nên
+ * không đè luống/lối. */
+function drawF2Flowers(g, f) {
+  const FL = ['#e05a4e', '#f5f5f5', '#f0b830', '#e8a0c8'];
+  const spots = [[8, 160], [30, 168], [60, 168], [150, 168], [120, 168], [20, 20], [250, 160], [90, 30]];
+  spots.forEach(([sx, sy], i) => {
+    px2(g, sx, sy - 2, 1, 2, f.grassDark);
+    px2(g, sx - 1, sy - 3, 3, 2, FL[i % FL.length]);
+  });
+  const tufts = [[14, 164], [46, 166], [240, 162], [80, 169], [250, 90]];
+  tufts.forEach(([tx, ty]) => {
+    px2(g, tx, ty - 3, 1, 3, f.grassDark);
+    px2(g, tx + 1, ty - 4, 1, 4, f.grass);
+  });
+}
+
+/* Ao nước góc phải dưới (y150..168, dưới lối y142..150, trên rào y168). Gợn sáng lấp lánh
+ * vẽ ở f2DrawAnimated (không nướng — phải nhúc nhích). */
+function drawF2Pond(g, f) {
+  px2(g, 188, 150, 40, 18, f.waterDark);
+  px2(g, 190, 152, 36, 14, f.water);
+  px2(g, 194, 154, 28, 4, lighten(f.water, 0.12));
+  px2(g, 186, 148, 44, 2, f.grassDark);
+  px2(g, 186, 148, 2, 22, f.grassDark);
+  px2(g, 228, 148, 2, 22, f.grassDark);
+  px2(g, 186, 168, 44, 2, f.grassDark);
+}
+
+/* Bó rơm cạnh chuồng (chuồng ở x196..226, y34..56) — x160..190, y52..62 là đất trống. */
+function drawF2Hay(g, f) {
+  px2(g, 160, 52, 14, 10, f.hay);
+  px2(g, 160, 52, 14, 2, lighten(f.hay, 0.15));
+  px2(g, 160, 60, 14, 2, darken(f.hay, 0.2));
+  px2(g, 178, 54, 12, 8, f.hay);
+  px2(g, 178, 54, 12, 2, lighten(f.hay, 0.15));
+  px2(g, 178, 60, 12, 2, darken(f.hay, 0.2));
+}
+
+/* Cây ăn quả — tái dùng drawF2Tree rồi thêm quả đỏ/cam vào tán. */
+function drawF2FruitTree(g, f, x, y) {
+  drawF2Tree(g, f, x, y);
+  px2(g, x + 2, y + 2, 2, 2, '#e05a4e');
+  px2(g, x + 6, y + 4, 2, 2, '#e05a4e');
+  px2(g, x + 4, y + 1, 2, 2, '#f0b830');
+}
+
 /* Cây trồng không lớn dần (YAGNI — spec đã duyệt), vẽ tĩnh ở mỗi luống. Chú ý: `drawStation`
  * được lõi gọi với `(g, st, ent)` — tham số 3 là **entity** đang ngồi chỗ đó (hoặc undefined
  * khi trống), không phải chỉ số chỗ. Đừng dùng nó để tính toán, chỉ vẽ theo `st`. */
@@ -229,6 +324,28 @@ function f2DrawStation(g, st) {
   px2(g, px, py, 4, 6, f.crop);
   px2(g, px + 1, py - 1, 2, 1, lighten(f.crop, 0.15));
   px2(g, px, py + 5, 4, 1, f.soilDark);
+}
+
+/* Nhịp thở: ngồi thì cả thân dịch xuống 1px một khoảnh khắc mỗi ~2 giây. Dùng `bobFor` (hook
+ * nhún của lõi, xem scene-delivery bobFor) nên KHÔNG cần sửa office.js. Pha phải trùng đúng
+ * `f2SceneSig` để frameSig thấy thay đổi mà vẽ lại. */
+const F2_BREATH = () => Math.floor(OF.clock * 4) % 8 === 0 ? 1 : 0;
+
+function f2BobFor(e) {
+  return (e.mode === 'sit' && e.kind === 'agent' ? F2_BREATH() : 0);
+}
+
+/* Chữ ký riêng của bối cảnh — chỉ những thứ nhúc nhích KHÔNG nằm trong frameSig lõi: pha
+ * gợn sáng ao + pha thở. Đổi là lõi vẽ lại. */
+function f2SceneSig() {
+  return 'p' + (Math.floor(OF.clock * 2) % 4) + ',b' + F2_BREATH();
+}
+
+/* Gợn sáng ao — 4 vị trí lấp lánh quay vòng ~2 lần/giây. Vẽ sau mọi thứ nên nằm trên mặt nước. */
+function f2DrawAnimated(g, p) {
+  const SP = [[196, 156], [210, 160], [220, 154], [202, 163]];
+  const s = SP[Math.floor(OF.clock * 2) % 4];
+  px2(g, s[0], s[1], 2, 1, '#dceefc');
 }
 
 function f2Ambient() {
@@ -279,6 +396,9 @@ registerScene({
   labelColor: () => (F2_LIGHT(f2pal()) ? '#1d2b1c' : '#f2f6ec'),
   shadowFor: () => true,
   frameFor: f2FrameFor,
+  bobFor: f2BobFor,             // thở khi ngồi
+  sceneSig: f2SceneSig,         // ao lấp lánh + pha thở kích vẽ lại
+  drawAnimated: f2DrawAnimated, // gợn sáng mặt ao
   charIndexFor: (id) => slotFor(id) % FARMER_CHARS.length,   // index theo chỗ vào FARMER_CHARS
   drawStatic: f2DrawStatic,
   drawStation: f2DrawStation,
