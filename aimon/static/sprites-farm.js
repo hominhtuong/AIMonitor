@@ -5,13 +5,13 @@
  *
  * LƯU Ý PHÂN BIỆT HAI HÀM CHẤM PIXEL:
  *  - `px`  (sprites.js:124) NHÂN với SPRITE_SS — chỉ dùng để vẽ trong ATLAS.
- *  - `px2` (office.js:1215) vẽ raw 1:1 — chỉ dùng để vẽ nền/nhân vật ở độ phân giải gốc.
- *  Nông dân đi vào atlas nên dùng bản nhân hệ số RIÊNG của farm (`pxF`), vì `px` khoá cứng
- *  vào hằng số SPRITE_SS của hệ 16x20. Bốn con vật nền vẽ thẳng lên canvas gốc nên dùng px2. */
+ *  - `px2` (office.js:1215) vẽ raw 1:1 — chỉ dùng để vẽ nền ở độ phân giải gốc.
+ *  Nông dân lẫn động vật đi vào atlas nên dùng bản nhân hệ số RIÊNG của farm (`pxF`), vì `px`
+ *  khoá cứng vào hằng số SPRITE_SS của hệ 16x20. */
 
 const SPRITE_W_FARM = 16;
 const SPRITE_H_FARM = 16;
-const SPRITE_SS_FARM = 3;            // lưới con giữ nguyên: 1 pixel gốc = 3 pixel atlas
+const SPRITE_SS_FARM = 4;            // lưới con ×4: 1 pixel gốc = 4 pixel atlas
 
 /* Chấm pixel có nhân hệ số, bản sao của `px` nhưng đọc SPRITE_SS_FARM. Bo HAI MÉP chứ không
  * bo gốc rồi nhân bề rộng — giống hệt px, để mảng liền nhau không hở khe ở toạ độ lẻ. */
@@ -21,6 +21,47 @@ function pxF(g, x, y, w, h, color) {
   if (x1 <= x0 || y1 <= y0) return;
   g.fillStyle = color;
   g.fillRect(x0, y0, x1 - x0, y1 - y0);
+}
+
+/* Bo góc thật theo lưới con — bản sao của roundBox (sprites.js) nhưng nhân SPRITE_SS_FARM.
+ * Ở lưới ×4 mọi nét tự mượt; đừng vát 1 pixel thô vì mất hết chất lượng vừa nâng cấp. */
+function roundBoxF(g, x, y, w, h, r, color) {
+  const S = SPRITE_SS_FARM;
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  const y0 = Math.round(y * S), y1 = Math.round((y + h) * S);
+  g.fillStyle = color;
+  for (let iy = y0; iy < y1; iy++) {
+    const cy = (iy + 0.5) / S - y;
+    let d = 0;
+    if (cy < rr) d = rr - cy;
+    else if (cy > h - rr) d = cy - (h - rr);
+    const inset = d > 0 ? rr - Math.sqrt(Math.max(0, rr * rr - d * d)) : 0;
+    const x0 = Math.round((x + inset) * S), x1 = Math.round((x + w - inset) * S);
+    if (x1 > x0) g.fillRect(x0, iy, x1 - x0, 1);
+  }
+}
+
+/* Chóp nhọn theo lưới con — bản sao của spike (sprites.js), nhân SPRITE_SS_FARM. */
+function spikeF(g, x, y, w, h, color) {
+  const S = SPRITE_SS_FARM;
+  const y0 = Math.round(y * S), y1 = Math.round((y + h) * S);
+  const cx = x + w / 2;
+  g.fillStyle = color;
+  for (let iy = y0; iy < y1; iy++) {
+    const t = (iy + 0.5 - y0) / Math.max(1, y1 - y0);
+    const ww = w * (0.3 + 0.7 * t);
+    const a = Math.round((cx - ww / 2) * S), b = Math.round((cx + ww / 2) * S);
+    if (b > a) g.fillRect(a, iy, b - a, 1);
+  }
+}
+
+/* Con mắt to — bản sao của eye (sprites.js) nhưng nhân SPRITE_SS_FARM: tròng bo góc, con ngươi,
+ * chấm loá góc trên trái, phản chiếu đáy. Thiếu chấm loá là ánh nhìn chết hẳn. */
+function eyeF(g, x, y, w, h, ink) {
+  const c = ink || INK;
+  roundBoxF(g, x, y, w, h, Math.min(w, h) * 0.4, c);
+  pxF(g, x + w * 0.28, y + h * 0.52, w * 0.5, h * 0.36, lighten(c, 0.22));
+  pxF(g, x + w * 0.1, y + h * 0.12, w * 0.36, h * 0.3, EYE_LIGHT);
 }
 
 /* Trật tự cột khung hình trong atlas farm. Mỗi đạo cụ có 2 tư thế A (nhấc/cầm cao) và
