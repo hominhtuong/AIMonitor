@@ -111,16 +111,17 @@ const FARMER_CHARS = [
  * mọi nét tự nằm trên lưới con. KHÔNG nét nào vượt quá y=15 hay x=15: 1 pixel gốc quanh ô là
  * viền để finishCell kẻ viền, vượt qua là tràn sang ô hàng xóm trong atlas. */
 
-/* Thân dưới (chân + giày) chung cho mọi hướng. `step` = 0/1/2 (nhịp đi bộ). */
+/* Thân dưới (chân + giày) chung cho mọi hướng. `step` = 0/1/2 (nhịp đi bộ). Giày bo góc
+ * (roundBoxF) thay giày vát 1 pixel; ống quần có quãng tối để chân không lẫn vào giày. */
 function farmLegs(g, c, step) {
   const P = c.pants, D = darken(P, 0.25), B = darken(P, 0.45);
   const l = step === 2 ? -1 : 0, r = step === 1 ? 1 : 0;   // hai chân so le
   pxF(g, 5 + l, 11, 3, 3, P);                              // chân trái
-  pxF(g, 5 + l, 14, 3, 1, B);                              // ống quần
+  pxF(g, 5 + l, 13.4, 3, 0.6, B);                          // ống quần
   pxF(g, 8 + r, 11, 3, 3, P);                              // chân phải
-  pxF(g, 8 + r, 14, 3, 1, B);
-  pxF(g, 4 + l, 15, 3, 1, darken(B, 0.2));                 // giày
-  pxF(g, 9 + r, 15, 3, 1, darken(B, 0.2));
+  pxF(g, 8 + r, 13.4, 3, 0.6, B);
+  roundBoxF(g, 4 + l, 14, 3.2, 1.6, 0.8, darken(B, 0.2));  // giày bo góc
+  roundBoxF(g, 8 + r, 14, 3.2, 1.6, 0.8, darken(B, 0.2));
   pxF(g, 5 + l, 10, 3, 1, D);                              // đũng quần
   pxF(g, 8 + r, 10, 3, 1, D);
 }
@@ -181,41 +182,41 @@ function farmAcc(g, c, dir) {
   if (k === 'rim')     { pxF(g, 5, 4, 6, 1, col); }
 }
 
-/* Thân áo nhìn xuống / lên / ngang. */
+/* Thân áo nhìn xuống / lên / ngang. 4 tông: vai sáng (L), áo chính (S), cạnh tối (D2), gấu
+ * tối. Nhìn xuống/ngang bo góc nhẹ để vai không phải thanh vuông cứng. */
 function farmBody(g, c, dir) {
-  const S = c.shirt, D = darken(S, 0.2), L = lighten(S, 0.15);
+  const S = c.shirt, D = darken(S, 0.2), L = lighten(S, 0.15), D2 = darken(S, 0.35);
   if (dir === 'up') {
-    pxF(g, 5, 7, 6, 4, D);                                 // lưng tối
-    pxF(g, 5, 7, 6, 1, L);                                 // viền vai sáng
-    pxF(g, 5, 11, 6, 1, D);
+    pxF(g, 5, 9, 6, 4, D);                                 // lưng tối
+    pxF(g, 5, 9, 6, 1, L);                                 // viền vai sáng
+    pxF(g, 5, 13, 6, 0.7, D2);                             // gấu
   } else if (dir === 'side') {
-    pxF(g, 4, 7, 8, 4, S);
-    pxF(g, 4, 7, 8, 1, L);
-    pxF(g, 10, 8, 1, 3, D);                                // cạnh tay
-    pxF(g, 4, 11, 8, 1, D);
+    roundBoxF(g, 4, 8, 8, 5, 1.2, S);                      // thân bo góc
+    pxF(g, 4, 8, 8, 1, L);                                 // vai sáng
+    pxF(g, 10, 9, 1, 4, D2);                               // cạnh tay
+    pxF(g, 4, 13, 8, 0.7, D2);                             // gấu
   } else {
-    pxF(g, 4, 7, 8, 4, S);
-    pxF(g, 4, 7, 8, 1, L);
-    pxF(g, 4, 8, 1, 3, D);                                 // nách hai bên
-    pxF(g, 11, 8, 1, 3, D);
-    pxF(g, 4, 10, 8, 1, D);
+    roundBoxF(g, 4, 8, 8, 5, 1.2, S);
+    pxF(g, 4, 8, 8, 1, L);
+    pxF(g, 4, 9, 1, 4, D2); pxF(g, 11, 9, 1, 4, D2);       // nách hai bên
+    pxF(g, 4, 12, 8, 0.7, D2);                             // gấu
   }
 }
 
-/* Cánh tay theo hướng. `gripX/gripY` là toạ độ bàn tay — chỗ đạo cụ nối vào. */
+/* Cánh tay theo hướng. `gripX/gripY` là toạ độ bàn tay — chỗ đạo cụ nối vào (nhánh down). */
 function farmArm(g, c, dir, gripX, gripY) {
   const F = '#eab28b', D = darken(c.shirt, 0.25);
   if (dir === 'side') {
-    pxF(g, 11, 8, 2, 2, c.shirt);                          // tay phải chìa ra
+    pxF(g, 11, 9, 2, 2, c.shirt);                          // tay phải chìa ra
     pxF(g, 13, 10, 1, 1, F);                               // bàn tay
   } else if (dir === 'up') {
-    pxF(g, 4, 8, 2, 2, D);                                 // hai tay chắp sau lưng
-    pxF(g, 5, 10, 1, 1, F);
+    pxF(g, 4, 10, 2, 2, D); pxF(g, 10, 10, 2, 2, D);       // hai tay chắp sau lưng
+    pxF(g, 5, 12, 1, 1, F);
   } else {
     pxF(g, gripX - 1, gripY - 2, 2, 1, c.shirt);
     pxF(g, gripX - 1, gripY - 1, 2, 1, F);
   }
-  if (dir === 'down') pxF(g, 3, 8, 1, 2, D);               // tay trái giấu
+  if (dir === 'down') pxF(g, 3, 9, 1, 2, D);               // tay trái giấu
 }
 
 /* Đạo cụ — tư thế A (nhấc/cầm cao) và B (giáng/cúi sâu xuống). Biên độ A↔B lớn hơn bản trước
