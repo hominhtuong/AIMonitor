@@ -210,6 +210,7 @@ function f2DrawStatic(g, p, roomId) {
   drawF2FenceRow(g, f, F2_FENCE_Y);  // dưới
   drawF2Path(g, f);         // đường đất — sau lối đi/rào để liên tục
   drawF2Flowers(g, f);      // hoa cỏ — trên cùng, không bị gì che
+  drawF2Decor(g, f);        // decor tĩnh — trên cùng, không bị gì che
 }
 
 function drawF2FenceRow(g, f, y) {
@@ -385,6 +386,13 @@ function drawF2Pond(g, f) {
   px2(g, 188, 150, 40, 18, f.waterDark);
   px2(g, 190, 152, 36, 14, f.water);
   px2(g, 194, 154, 28, 4, lighten(f.water, 0.12));
+  // Bèo nền (mảng xanh rải 3 chỗ)
+  px2(g, 198, 156, 3, 2, f.grassDark);
+  px2(g, 210, 158, 4, 2, f.grassDark);
+  px2(g, 218, 155, 2, 2, f.grassDark);
+  // Sỏi trắng viền bờ
+  const pebbles = [[192, 151], [206, 150], [220, 151], [230, 152], [188, 156], [228, 160]];
+  pebbles.forEach(([bx, by]) => px2(g, bx, by, 1, 1, '#e8e6e0'));
   px2(g, 186, 148, 44, 2, f.grassDark);
   px2(g, 186, 148, 2, 22, f.grassDark);
   px2(g, 228, 148, 2, 22, f.grassDark);
@@ -407,6 +415,57 @@ function drawF2FruitTree(g, f, x, y) {
   px2(g, x + 2, y + 2, 2, 2, '#e05a4e');
   px2(g, x + 6, y + 4, 2, 2, '#e05a4e');
   px2(g, x + 4, y + 1, 2, 2, '#f0b830');
+}
+
+/* Decor tĩnh nướng một lần — đá tảng, bụi cây, nấm, dưa hấu, ụ rơm, thùng gỗ, biển gỗ, đèn
+ * lồng. Mọi toạ độ đã đối chiếu với ô đang chiếm của nhà/chuồng/tháp/silo/giếng/cây/rơm/ao,
+ * lối ngang (y96..104, y142..150), bờ dọc (x0..10, x244..259), luống (x28..232, y66..131),
+ * đường đất (drawF2Path), chỗ đứng f2Stations (x-15..x+27, y+16..y+33) và hoa/đám cỏ
+ * (drawF2Flowers) — không chỗ nào đè nhau. */
+function drawF2Decor(g, f) {
+  // Đá tảng 2 viên: (34,16) cạnh rào trên (cách ống khói x41..44); (30,160) dải cỏ dưới
+  px2(g, 34, 16, 5, 3, f.stone);
+  px2(g, 34, 16, 5, 1, lighten(f.stone, 0.2));
+  px2(g, 33, 18, 6, 2, f.stoneDark);
+  px2(g, 30, 160, 4, 3, f.stone);
+  px2(g, 30, 160, 4, 1, lighten(f.stone, 0.2));
+  px2(g, 30, 163, 4, 2, f.stoneDark);
+  // Bụi cây (92,8) — cạnh rào trên, cách cây lớn (88,20) và hoa (100,24)
+  px2(g, 92, 8, 7, 5, '#4caf50');
+  px2(g, 93, 7, 5, 2, lighten('#4caf50', 0.15));
+  px2(g, 91, 10, 9, 3, darken('#4caf50', 0.15));
+  // Nấm 2 cây (góc dưới phải, giữa ao và đám cỏ — x233..246, y155..166)
+  px2(g, 244, 156, 3, 2, '#e05a4e');
+  px2(g, 244, 156, 3, 1, '#f5f5f5');
+  px2(g, 245, 158, 1, 2, '#f5f5f5');
+  px2(g, 234, 164, 2, 1, '#e05a4e');
+  px2(g, 235, 164, 1, 1, '#f5f5f5');
+  px2(g, 234, 165, 1, 1, '#f5f5f5');
+  // Dưa hấu (236,88) — cạnh luống trên, bên phải lối dọc (x244)
+  px2(g, 236, 88, 5, 4, '#2e7d32');
+  px2(g, 236, 88, 5, 1, '#1b5e20');
+  px2(g, 237, 90, 3, 1, '#1b5e20');
+  // Ụ rơm (70,160) — dải cỏ dưới, giữa hoa (60,168) và đám cỏ (80,169)
+  px2(g, 70, 160, 10, 6, f.straw);
+  px2(g, 70, 160, 10, 1, lighten(f.straw, 0.15));
+  px2(g, 70, 164, 10, 2, darken(f.straw, 0.2));
+  // Thùng gỗ 2 cái (152,162)+(162,163) — dưới rơm, trái ao, cạnh hoa (150,168)
+  px2(g, 152, 162, 6, 6, f.wood);
+  px2(g, 152, 162, 6, 1, f.woodLight);
+  px2(g, 152, 165, 6, 1, f.woodDark);
+  px2(g, 153, 163, 1, 3, darken(f.wood, 0.2));
+  px2(g, 156, 163, 1, 3, darken(f.wood, 0.2));
+  px2(g, 162, 163, 5, 5, f.wood);
+  px2(g, 162, 163, 5, 1, f.woodLight);
+  // Biển gỗ (50,44) — bên phải nhà (nhà x14..48), trên lối dọc tây
+  px2(g, 50, 44, 6, 4, f.woodLight);
+  px2(g, 50, 44, 6, 1, lighten(f.woodLight, 0.15));
+  px2(g, 51, 46, 4, 1, '#f0e6c8');
+  px2(g, 52, 48, 3, 2, f.woodDark);
+  // Đèn lồng (22,64) — bên trái đường đất (đường x4..9), dưới biển gỗ, trước ô chợ
+  px2(g, 22, 64, 2, 6, f.woodDark);
+  px2(g, 21, 62, 4, 3, '#f0b830');
+  px2(g, 22, 63, 2, 1, '#fff3d0');
 }
 
 /* Cây trồng 3 giai đoạn tĩnh theo cột (col 0..4 từ st.x=40/70/100/130/160):
