@@ -581,8 +581,55 @@ function f2SceneSig() {
     + ',c' + (Math.floor(OF.clock * 0.25) % 2);        // chim
 }
 
+/* Mây + đàn chim (spec mục 4.1, 4.2) — vẽ TRƯỚC overlay tối nên mây/chim tối theo trời.
+ * Trôi ngang theo OF.clock*0.5 (đổi mỗi 2 giây), lặp qua khỏi mép phải. */
+function drawF2Sky(g) {
+  // 3 đám mây: 2 dải trắng mờ, y 6/10/14
+  for (let i = 0; i < 3; i++) {
+    const x = ((i * 90 + Math.floor(OF.clock * 0.5)) % (ROOM_W + 40)) - 20;
+    const y = 6 + i * 4;
+    px2(g, x, y, 10, 2, 'rgba(245,245,245,0.55)');
+    px2(g, x + 3, y + 1, 5, 1, 'rgba(245,245,245,0.4)');
+  }
+  // Đàn 4 chấm chim: x trôi như mây, y dao động 8..20, cánh đập 2 khung
+  const bx = ((80 + Math.floor(OF.clock * 0.5)) % (ROOM_W + 60)) - 30;
+  for (let i = 0; i < 4; i++) {
+    const cy = 8 + ((Math.floor(OF.clock * 2) + i * 3) % 13);
+    const flap = Math.floor(OF.clock * 3 + i) % 2 ? 1 : -1;
+    px2(g, bx + i * 5, cy, 2, 1, '#4a5560');
+    px2(g, bx + i * 5 + 1, cy + flap, 1, 1, '#4a5560');
+  }
+}
+
+/* Bồ câu trắng — dùng lại drawChickenFarm (chữ ký thật: g, pal, c, x, y; spec ghi gọn
+ * nhưng phải truyền object entity). Chu kỳ ~30s: bay chuồng (200,50) → nóc nhà
+ * (35,18) [12s], đậu mổ mổ [12s], bay về [6s]. flip=true khi bay ngược. */
+function drawF2Dove(g, p) {
+  const t = Math.floor(OF.clock) % 30;
+  let x, y, flip, eat;
+  if (t < 12) {
+    const u = t / 12;
+    x = 200 + (35 - 200) * u;
+    y = 50 + (18 - 50) * u;
+    flip = false; eat = 0;
+  } else if (t < 24) {
+    x = 35; y = 18;
+    flip = false; eat = 1;
+  } else {
+    const u = (t - 24) / 6;
+    x = 35 + (200 - 35) * u;
+    y = 18 + (50 - 18) * u;
+    flip = true; eat = 0;
+  }
+  drawChickenFarm(g, p, {
+    tone: '#f5efe0', flip, wait: -1, anim: OF.clock, eat, sleep: false,
+  }, Math.round(x), Math.round(y));
+}
+
 /* Gợn sáng ao + cờ chuồng + khói + đom đóm — vẽ sau mọi thứ nên nằm trên mặt nước/nóc nhà. */
 function f2DrawAnimated(g, p) {
+  drawF2Sky(g);          // mây + đàn chim — trước overlay tối
+  drawF2Dove(g, p);      // bồ câu bay — trước overlay tối
   const SP = [[196, 156], [210, 160], [220, 154], [202, 163]];
   const s = SP[Math.floor(OF.clock * 2) % 4];
   px2(g, s[0], s[1], 2, 1, '#dceefc');
