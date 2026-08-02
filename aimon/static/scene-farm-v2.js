@@ -271,7 +271,7 @@ function drawF2Path(g, f) {
  * không đè luống/lối. */
 function drawF2Flowers(g, f) {
   const FL = ['#e05a4e', '#f5f5f5', '#f0b830', '#e8a0c8'];
-  const spots = [[8, 160], [30, 168], [60, 168], [150, 168], [120, 168], [20, 20], [250, 160], [96, 24]];
+  const spots = [[8, 160], [30, 168], [60, 168], [150, 168], [120, 168], [20, 20], [250, 160], [100, 24]];
   spots.forEach(([sx, sy], i) => {
     px2(g, sx, sy - 2, 1, 2, f.grassDark);
     px2(g, sx - 1, sy - 3, 3, 2, FL[i % FL.length]);
@@ -363,7 +363,7 @@ function f2Ambient() {
       speed: 11, restMin: 2.5, restVar: 4, tone: a.tones[ai % a.tones.length], draw: a.draw,
       pick: () => {
         const bot = a.y === F2_AISLE_Y[1];
-        const x = bot ? 12 + Math.random() * 172 : 12 + Math.random() * (ROOM_W - 40);
+        const x = bot ? 12 + Math.random() * 160 : 12 + Math.random() * (ROOM_W - 40);
         return { x, y: a.y + Math.random() * 4 };
       },
     });
