@@ -185,6 +185,7 @@ function f2DrawStatic(g, p, roomId) {
   drawF2Grass(g, f);                                    // cỏ có kết cấu
   drawF2Hills(g, f);                                    // đồi xa — sau cỏ, trước mọi thứ
   drawF2House(g, f, 14, 30);                            // nhà gỗ mái xanh (trái)
+  drawF2Silo(g, f, 226, 30);                        // silo — sau đồi, TRƯỚC chuồng (đứng sau mái)
   drawF2Coop(g, f, 196, 34);                            // chuồng đỏ
   drawF2Tower(g, f, 236, 26);                           // tháp đá (phải cùng)
   drawF2FruitTree(g, f, 58, 26);  drawF2Tree(g, f, 88, 20);   // vườn cây (2 mới + 2 cũ)
@@ -213,59 +214,117 @@ function f2DrawStatic(g, p, roomId) {
 
 function drawF2FenceRow(g, f, y) {
   for (let x = 0; x < 260; x += 16) {
-    px2(g, x, y + 1, 14, 2, f.woodLight);
-    px2(g, x + 1, y + 4, 1, 4, f.woodDark);
-    px2(g, x + 12, y + 4, 1, 4, f.woodDark);
+    // ván rào: 2 thanh ngang + vân dọc + đinh
+    px2(g, x, y + 1, 14, 1, f.woodLight);
+    px2(g, x, y + 3, 14, 1, f.wood);
+    px2(g, x, y + 5, 14, 1, darken(f.wood, 0.15));
+    px2(g, x + 3, y + 1, 1, 5, darken(f.wood, 0.2));
+    px2(g, x + 9, y + 1, 1, 5, darken(f.wood, 0.2));
+    px2(g, x + 1, y + 1, 1, 1, lighten(f.woodLight, 0.2));   // đinh
+    px2(g, x + 11, y + 1, 1, 1, lighten(f.woodLight, 0.2));
+    px2(g, x + 4, y + 5, 1, 2, f.woodLight);                 // cọc nhọn
+    px2(g, x + 10, y + 5, 1, 2, f.woodLight);
   }
   px2(g, 0, y + 1, 260, 1, f.wood);
 }
 
 function drawF2House(g, f, x, y) {
-  // Tường gỗ
+  // Móng đá
+  px2(g, x - 2, y + 24, 38, 2, f.stoneDark);
+  px2(g, x - 1, y + 23, 36, 1, f.stone);
+  // Tường gỗ có vân (mỗi 6px một vệt tối dọc)
   px2(g, x, y, 34, 24, f.wood);
+  for (let vx = x + 3; vx < x + 34; vx += 6) {
+    px2(g, vx, y + 3, 1, 19, darken(f.wood, 0.12));
+  }
   px2(g, x, y, 34, 2, f.woodLight);
   px2(g, x, y + 22, 34, 2, f.woodDark);
-  // Mái xanh (hai nửa dốc)
+  // Ống khói (phải, nhô lên khỏi mái)
+  px2(g, x + 27, y - 14, 4, 8, f.stoneDark);
+  px2(g, x + 27, y - 14, 4, 1, f.stone);
+  px2(g, x + 28, y - 10, 1, 2, '#6a6f7a');
+  // Mái xanh hai nửa dốc + gờ mái
   px2(g, x - 4, y - 8, 42, 4, f.roofDark);
   px2(g, x - 2, y - 6, 38, 6, f.roof);
   px2(g, x - 2, y - 6, 38, 1, lighten(f.roof, 0.15));
-  // Cửa + cửa sổ
+  px2(g, x - 4, y - 4, 42, 1, darken(f.roof, 0.2));
+  // Cửa + cửa sổ khung trắng
   px2(g, x + 12, y + 12, 8, 12, f.woodDark);
   px2(g, x + 14, y + 14, 4, 6, f.dark);
-  px2(g, x + 3, y + 6, 6, 6, f.straw);
-  px2(g, x + 24, y + 6, 6, 6, f.straw);
+  px2(g, x + 13, y + 13, 1, 3, '#f5f5f5');
+  px2(g, x + 18, y + 13, 1, 3, '#f5f5f5');
+  px2(g, x + 12, y + 12, 8, 1, '#f5f5f5');
+  px2(g, x + 2, y + 6, 7, 6, f.straw);
+  px2(g, x + 2, y + 6, 7, 1, '#f5f5f5');
+  px2(g, x + 24, y + 6, 7, 6, f.straw);
+  px2(g, x + 24, y + 6, 7, 1, '#f5f5f5');
 }
 
 function drawF2Coop(g, f, x, y) {
-  // Thân chuồng đỏ
+  // Thân chuồng đỏ — vách đan ngang dọc
   px2(g, x, y + 6, 30, 22, f.coopRed);
+  for (let hx = x + 3; hx < x + 30; hx += 6) {
+    px2(g, hx, y + 8, 1, 18, darken(f.coopRed, 0.15));
+  }
+  for (let hy = y + 10; hy < y + 26; hy += 6) {
+    px2(g, x + 1, hy, 28, 1, darken(f.coopRed, 0.1));
+  }
   px2(g, x, y + 6, 30, 2, lighten(f.coopRed, 0.15));
   px2(g, x, y + 26, 30, 2, f.coopRedDark);
-  // Mái
+  // Mái đỏ có gờ
   px2(g, x - 4, y, 38, 6, f.coopRedDark);
   px2(g, x - 2, y + 2, 34, 4, f.coopRed);
+  px2(g, x - 4, y + 5, 38, 1, darken(f.coopRed, 0.25));
   // Cửa chuồng + cửa sổ
   px2(g, x + 12, y + 14, 6, 12, f.woodDark);
+  px2(g, x + 13, y + 16, 4, 6, f.dark);
   px2(g, x + 4, y + 12, 4, 4, f.stoneDark);
   px2(g, x + 22, y + 12, 4, 4, f.stoneDark);
 }
 
 function drawF2Tower(g, f, x, y) {
-  // Tháp đá
+  // Tháp đá — vân gạch
   px2(g, x, y + 4, 12, 26, f.stone);
+  for (let bx = x; bx < x + 12; bx += 4) {
+    px2(g, bx, y + 4, 1, 26, darken(f.stone, 0.12));
+  }
   px2(g, x, y + 4, 2, 26, lighten(f.stone, 0.15));
   px2(g, x + 10, y + 4, 2, 26, f.stoneDark);
   px2(g, x - 2, y, 16, 5, f.stoneDark);
   px2(g, x, y + 2, 12, 3, f.stone);
-  px2(g, x + 4, y + 16, 4, 5, f.stoneDark);           // cửa
+  px2(g, x + 4, y + 16, 4, 5, f.stoneDark);
+}
+
+/* Silo kim loại chen giữa chuồng đỏ (thân chuồng x196..225) và tháp đá (thân x236..247) —
+ * thân silo x226..233, y38..59. Gọi TRƯỚC drawF2Coop trong f2DrawStatic để phần chạm mái chuồng
+ * (mái chuồng kéo tới x229, y34..39) bị mái vẽ đè lên → nhìn như silo đứng sau chuồng. */
+function drawF2Silo(g, f, x, y) {
+  px2(g, x, y + 8, 8, 22, '#c0c8d0');
+  px2(g, x, y + 8, 8, 2, lighten('#c0c8d0', 0.15));
+  px2(g, x + 7, y + 8, 1, 22, darken('#c0c8d0', 0.2));
+  px2(g, x, y + 28, 8, 2, darken('#c0c8d0', 0.3));
+  px2(g, x, y + 4, 8, 5, '#9aa5b1');
+  px2(g, x, y + 4, 8, 2, lighten('#9aa5b1', 0.12));
+  px2(g, x - 1, y + 1, 10, 4, '#8a5a2b');       // nắp gỗ
+  px2(g, x - 1, y + 1, 10, 1, lighten('#8a5a2b', 0.2));
 }
 
 function drawF2Well(g, f, x, y) {
+  // Thành giếng
   px2(g, x - 3, y + 2, 20, 8, f.stone);
   px2(g, x - 3, y + 2, 20, 2, lighten(f.stone, 0.15));
+  px2(g, x - 1, y + 10, 16, 2, f.stoneDark);
+  // Hai cột + xà
   px2(g, x - 1, y - 8, 2, 10, f.wood);
   px2(g, x + 13, y - 8, 2, 10, f.wood);
-  px2(g, x - 1, y - 8, 16, 2, f.woodLight);           // xà ngang
+  px2(g, x - 2, y - 8, 18, 2, f.woodLight);
+  // Mái che giếng (chóp)
+  px2(g, x - 4, y - 14, 22, 6, f.roofDark);
+  px2(g, x - 2, y - 12, 18, 4, f.roof);
+  // Thùng gỗ bên cạnh
+  px2(g, x + 18, y + 4, 5, 5, f.wood);
+  px2(g, x + 18, y + 4, 5, 1, f.woodLight);
+  px2(g, x + 18, y + 8, 5, 1, f.woodDark);
 }
 
 function drawF2Tree(g, f, x, y) {
