@@ -518,17 +518,35 @@ function f2BobFor(e) {
   return (e.mode === 'sit' && e.kind === 'agent' ? F2_BREATH() : 0);
 }
 
-/* Chữ ký riêng của bối cảnh — chỉ những thứ nhúc nhích KHÔNG nằm trong frameSig lõi: pha
- * gợn sáng ao + pha thở. Đổi là lõi vẽ lại. */
+/* Chữ ký riêng của bối cảnh — mọi thứ nhúc nhích KHÔNG nằm trong frameSig lõi: pha gợn sáng ao,
+ * pha thở, pha cờ chuồng, pha khói, pha đom đóm. Đổi là lõi vẽ lại — đúng invariant "chỉ vẽ
+ * lại khi có gì đổi". */
 function f2SceneSig() {
-  return 'p' + (Math.floor(OF.clock * 2) % 4) + ',b' + F2_BREATH();
+  return 'p' + (Math.floor(OF.clock * 2) % 4)
+    + ',b' + F2_BREATH()
+    + ',f' + (Math.floor(OF.clock * 2) % 2)       // cờ chuồng 2 pha
+    + ',k' + (Math.floor(OF.clock * 2) % 3)       // khói ống khói 3 pha
+    + ',m' + (Math.floor(OF.clock * 1) % 2);      // đom đóm 2 pha
 }
 
-/* Gợn sáng ao — 4 vị trí lấp lánh quay vòng ~2 lần/giây. Vẽ sau mọi thứ nên nằm trên mặt nước. */
+/* Gợn sáng ao + cờ chuồng + khói + đom đóm — vẽ sau mọi thứ nên nằm trên mặt nước/nóc nhà. */
 function f2DrawAnimated(g, p) {
   const SP = [[196, 156], [210, 160], [220, 154], [202, 163]];
   const s = SP[Math.floor(OF.clock * 2) % 4];
   px2(g, s[0], s[1], 2, 1, '#dceefc');
+  // Cờ chuồng (đỉnh mái chuồng — chuồng x196..225, mái đỉnh y34)
+  const fl = Math.floor(OF.clock * 2) % 2;
+  px2(g, 209, 31, 1, 4, '#8a5a2b');               // cột cờ
+  px2(g, 210, 31, 4, 2, '#e05a4e');               // lá cờ
+  if (fl) px2(g, 213, 31, 1, 1, '#e8a0c8');       // đuôi phất
+  // Khói ống khói (ống khói x41..44, y16..23 — Task 2; khói bốc từ miệng ống lên)
+  const k = Math.floor(OF.clock * 2) % 3;
+  px2(g, 42, 15 - k, 2, 1, '#e8e6e0');
+  px2(g, 41, 14 - k, 1, 1, '#f2f0ec');
+  // Đom đóm quanh đèn lồng (đèn x21..24, y62..70 — Task 3)
+  const m = Math.floor(OF.clock * 1) % 2;
+  px2(g, 24 + m, 60 - m, 1, 1, '#fff3a0');
+  px2(g, 17, 66 + (1 - m), 1, 1, '#fff3a0');
 }
 
 function f2Ambient() {
