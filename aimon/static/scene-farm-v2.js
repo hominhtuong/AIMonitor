@@ -457,6 +457,7 @@ function drawF2Decor(g, f) {
   px2(g, 156, 163, 1, 3, darken(f.wood, 0.2));
   px2(g, 162, 163, 5, 5, f.wood);
   px2(g, 162, 163, 5, 1, f.woodLight);
+  px2(g, 164, 164, 1, 3, darken(f.wood, 0.2));
   // Biển gỗ (50,44) — bên phải nhà (nhà x14..48), trên lối dọc tây
   px2(g, 50, 44, 6, 4, f.woodLight);
   px2(g, 50, 44, 6, 1, lighten(f.woodLight, 0.15));
