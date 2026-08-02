@@ -29,12 +29,14 @@ function pxF(g, x, y, w, h, color) {
 const FRAME_INDEX_FARM = {
   d0: 0, d1: 1, d2: 2,          // đi xuống / idle
   u0: 3, u1: 4, u2: 5,          // đi lên
-  s0: 6, s1: 7, s2: 8,          // đi ngang
+  s0: 6, s1: 7, s2: 8,          // đi ngang (dùng cho cả trái/phải — flip khi sang trái)
   hoeA: 9, hoeB: 10, plantA: 11, plantB: 12,
   harvestA: 13, harvestB: 14, axeA: 15, axeB: 16,
   waterA: 17, waterB: 18, fishA: 19, fishB: 20,
   interactA: 21, interactB: 22, carryA: 23, carryB: 24,
   blink: 25,
+  // Khung mới: tư thế ngồi nhìn LÊN (gáy — người đang xem map/plan)
+  kUp: 26,
 };
 const FARM_FRAME_KEYS = Object.keys(FRAME_INDEX_FARM);
 
@@ -160,6 +162,9 @@ function farmArm(g, c, dir, gripX, gripY) {
   if (dir === 'side') {
     pxF(g, 11, 8, 2, 2, c.shirt);                          // tay phải chìa ra
     pxF(g, 13, 10, 1, 1, F);                               // bàn tay
+  } else if (dir === 'up') {
+    pxF(g, 4, 8, 2, 2, D);                                 // hai tay chắp sau lưng
+    pxF(g, 5, 10, 1, 1, F);
   } else {
     pxF(g, gripX - 1, gripY - 2, 2, 1, c.shirt);
     pxF(g, gripX - 1, gripY - 1, 2, 1, F);
@@ -268,8 +273,8 @@ function drawFarmerFarm(g, c, key) {
   const tool = FARM_FRAME_TOOL[key];
   const pose = /[AB]$/.test(key) ? key[key.length - 1] : 'A';
   const closed = key === 'blink';
-  const dir = closed ? 'd' : tool ? 's' : key[0];
-  const step = (tool || closed) ? 0
+  const dir = closed ? 'd' : tool ? 's' : (key === 'kUp' ? 'k' : key[0]);
+  const step = (tool || closed || key === 'kUp') ? 0
     : key === 'd1' || key === 'u1' || key === 's1' ? 1
     : key === 'd2' || key === 'u2' || key === 's2' ? 2 : 0;
   if (dir === 'd') {
@@ -282,6 +287,14 @@ function drawFarmerFarm(g, c, key) {
     farmBody(g, c, 'up');
     farmAcc(g, c, 'up');
     farmHead(g, c, false, closed);
+  } else if (dir === 'k') {
+    // Ngồi nhìn lên: chân chụm + thân ngả nhẹ + tay sau lưng
+    farmLegs(g, c, 0);
+    pxF(g, 5, 12, 6, 1, darken(c.pants, 0.3));
+    farmBody(g, c, 'up');
+    farmAcc(g, c, 'up');
+    farmHead(g, c, false, closed);
+    farmArm(g, c, 'up');
   } else {
     farmLegs(g, c, step);
     farmBody(g, c, 'side');
