@@ -623,7 +623,7 @@ function drawF2Dove(g, p) {
     flip = false; eat = 0; wait = -1;  // bay phải (35→200), dx>0
   }
   drawChickenFarm(g, p, {
-    tone: '#f5efe0', flip, wait, anim: OF.clock, eat, sleep: false,
+    species: 'chicken', tone: '#f5efe0', flip, wait, anim: OF.clock, eat, sleep: false,
   }, Math.round(x), Math.round(y));
 }
 
@@ -714,11 +714,11 @@ function f2DrawAnimated(g, p) {
 function f2Ambient() {
   const out = [];
   const animals = [
-    { draw: drawChickenFarm, tones: ['#f5efe0', '#e6d3ae', '#f0e6d2'], y: F2_AISLE_Y[1] },
-    { draw: drawCowFarm, tones: ['#e8e0d0', '#d8cfc0'], y: F2_AISLE_Y[0] },
-    { draw: drawPigFarm, tones: ['#f0c8c0', '#e6b8b0'], y: F2_AISLE_Y[1] },
-    { draw: drawSheepFarm, tones: ['#f2f0ea', '#e6e0d8'], y: F2_AISLE_Y[0] },
-    { draw: drawChickenFarm, tones: ['#f5efe0'], y: F2_AISLE_Y[1] },   // bồ câu — gà tone trắng hơn
+    { draw: drawChickenFarm, species: 'chicken', tones: ['#f5efe0', '#e6d3ae', '#f0e6d2'], y: F2_AISLE_Y[1] },
+    { draw: drawCowFarm, species: 'cow', tones: ['#e8e0d0', '#d8cfc0'], y: F2_AISLE_Y[0] },
+    { draw: drawPigFarm, species: 'pig', tones: ['#f0c8c0', '#e6b8b0'], y: F2_AISLE_Y[1] },
+    { draw: drawSheepFarm, species: 'sheep', tones: ['#f2f0ea', '#e6e0d8'], y: F2_AISLE_Y[0] },
+    { draw: drawChickenFarm, species: 'chicken', tones: ['#f5efe0'], y: F2_AISLE_Y[1] },   // bồ câu — gà tone trắng hơn
   ];
   animals.forEach((a, ai) => {
     const x = Math.min(30 + ai * 62, ROOM_W - 20);
