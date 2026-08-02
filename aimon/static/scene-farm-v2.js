@@ -603,26 +603,27 @@ function drawF2Sky(g) {
 
 /* Bồ câu trắng — dùng lại drawChickenFarm (chữ ký thật: g, pal, c, x, y; spec ghi gọn
  * nhưng phải truyền object entity). Chu kỳ ~30s: bay chuồng (200,50) → nóc nhà
- * (35,18) [12s], đậu mổ mổ [12s], bay về [6s]. flip=true khi bay ngược. */
+ * (35,18) [12s], đậu mổ mổ [12s], bay về [6s]. Convention flip = dx < 0 (bay trái
+ * = flip=true, như mọi ambient animal trong codebase). */
 function drawF2Dove(g, p) {
   const t = Math.floor(OF.clock) % 30;
-  let x, y, flip, eat;
+  let x, y, flip, eat, wait;
   if (t < 12) {
     const u = t / 12;
     x = 200 + (35 - 200) * u;
     y = 50 + (18 - 50) * u;
-    flip = false; eat = 0;
+    flip = true; eat = 0; wait = -1;   // bay trái (200→35), dx<0
   } else if (t < 24) {
     x = 35; y = 18;
-    flip = false; eat = 1;
+    flip = false; eat = 1; wait = 1;   // đậu mổ mổ — wait>0 = đứng yên, không bước chân
   } else {
     const u = (t - 24) / 6;
     x = 35 + (200 - 35) * u;
     y = 18 + (50 - 18) * u;
-    flip = true; eat = 0;
+    flip = false; eat = 0; wait = -1;  // bay phải (35→200), dx>0
   }
   drawChickenFarm(g, p, {
-    tone: '#f5efe0', flip, wait: -1, anim: OF.clock, eat, sleep: false,
+    tone: '#f5efe0', flip, wait, anim: OF.clock, eat, sleep: false,
   }, Math.round(x), Math.round(y));
 }
 
