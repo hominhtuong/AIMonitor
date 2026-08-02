@@ -638,6 +638,17 @@ function drawF2Night(g) {
   }
 }
 
+/* 8 nét mưa chéo (spec mục 4.4) — x trôi theo giây, y rơi nhanh. Vẽ SAU overlay tối
+ * nên nét nước sáng trên nền đêm. */
+function drawF2RainDrops(g) {
+  for (let i = 0; i < 8; i++) {
+    const rx = ((i * 31 + Math.floor(OF.clock * 1)) % (ROOM_W + 10)) - 5;
+    const ry = ((i * 47 + Math.floor(OF.clock * 8)) % (ROOM_H + 8)) - 4;
+    px2(g, rx, ry, 1, 2, 'rgba(200,220,235,0.5)');
+    px2(g, rx - 1, ry + 2, 1, 2, 'rgba(200,220,235,0.35)');
+  }
+}
+
 /* Cửa chuồng đóng 18h..6h (spec mục 4.5) — vẽ tấm gỗ đè lên LỖ MỞ nướng
  * (x209..212 y49..58). Vẽ SAU overlay để cửa thấy rõ lúc tối. */
 function drawF2CoopDoor(g, f) {
@@ -654,23 +665,37 @@ function f2DrawAnimated(g, p) {
   drawF2Sky(g);          // 1. mây
   drawF2Dove(g, p);      // 2. bồ câu
   drawF2Night(g);        // 3. overlay tối
-  drawF2CoopDoor(g, f2pal());         // 5. cửa chuồng đóng 18h..6h
+  if (f2Rain()) drawF2RainDrops(g);   // 4. mưa — vẽ sau overlay
+  drawF2CoopDoor(g, f2pal());         // 5. cửa chuồng đóng
+  // Gợn sáng ao (spec 4.7) — khi mưa đổi nhanh hơn (4 lần/giây) và thêm 2 điểm lấp lánh
   const SP = [[196, 156], [210, 160], [220, 154], [202, 163]];
-  const s = SP[Math.floor(OF.clock * 2) % 4];
+  const rain = f2Rain();
+  const rate = rain ? 4 : 2;
+  const s = SP[Math.floor(OF.clock * rate) % 4];
   px2(g, s[0], s[1], 2, 1, '#dceefc');
-  // Cờ chuồng (đỉnh mái chuồng — chuồng x196..225, mái đỉnh y34)
+  if (rain) {
+    const s2 = SP[Math.floor(OF.clock * rate + 2) % 4];
+    px2(g, s2[0] + 4, s2[1] + 2, 2, 1, '#e4f2ff');
+    const s3 = SP[Math.floor(OF.clock * rate + 3) % 4];
+    px2(g, s3[0] - 3, s3[1] + 1, 2, 1, '#e4f2ff');
+  }
+  // Cờ chuồng — mưa thì không phất (bỏ đuôi)
   const fl = Math.floor(OF.clock * 2) % 2;
-  px2(g, 209, 31, 1, 4, '#8a5a2b');               // cột cờ
-  px2(g, 210, 31, 4, 2, '#e05a4e');               // lá cờ
-  if (fl) px2(g, 213, 31, 1, 1, '#e8a0c8');       // đuôi phất
-  // Khói ống khói (ống khói x41..44, y16..23 — Task 2; khói bốc từ miệng ống lên)
+  px2(g, 209, 31, 1, 4, '#8a5a2b');
+  px2(g, 210, 31, 4, 2, '#e05a4e');
+  if (fl && !rain) px2(g, 213, 31, 1, 1, '#e8a0c8');
+  // Khói ống khói (spec 4.8) — rảnh 1 cột (như nay), busy 2 cột, mưa 1 cột mảnh
   const k = Math.floor(OF.clock * 2) % 3;
+  const smoke2 = f2AnyBusy() && !rain;   // cột thứ 2 chỉ khi busy và khô
   px2(g, 42, 15 - k, 2, 1, '#e8e6e0');
-  px2(g, 41, 14 - k, 1, 1, '#f2f0ec');
-  // Đom đóm quanh đèn lồng (đèn x21..24, y62..70 — Task 3)
-  const m = Math.floor(OF.clock * 1) % 2;
-  px2(g, 24 + m, 60 - m, 1, 1, '#fff3a0');
-  px2(g, 17, 66 + (1 - m), 1, 1, '#fff3a0');
+  if (!rain) px2(g, 41, 14 - k, 1, 1, '#f2f0ec');
+  if (smoke2) px2(g, 46, 16 - k, 2, 1, '#e8e6e0');
+  // Đom đóm — KHÔNG vẽ khi mưa
+  if (!rain) {
+    const m = Math.floor(OF.clock * 1) % 2;
+    px2(g, 24 + m, 60 - m, 1, 1, '#fff3a0');
+    px2(g, 17, 66 + (1 - m), 1, 1, '#fff3a0');
+  }
 }
 
 function f2Ambient() {
