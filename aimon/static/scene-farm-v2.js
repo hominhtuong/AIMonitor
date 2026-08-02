@@ -252,8 +252,8 @@ function drawF2Hills(g, f) {
 }
 
 /* Đường đất — từ cửa nhà uốn sang lối đi TÂY rồi chạy dọc xuống. KHÔNG cắt qua dải luống
- * (x28..232, y66..82) hay lối đi ngang (y96..104, y142..150). Vẽ SAU lối đi/hàng rào để
- * liên tục. */
+ * (x28..232, y66..82); hai lối đi ngang (y96..104, y142..150) thì cắt qua và VẼ ĐÈ LÊN
+ * (vẽ sau cùng nên liên tục). */
 function drawF2Path(g, f) {
   px2(g, 22, 44, 18, 5, f.path);
   px2(g, 12, 50, 20, 5, f.path);
@@ -271,7 +271,7 @@ function drawF2Path(g, f) {
  * không đè luống/lối. */
 function drawF2Flowers(g, f) {
   const FL = ['#e05a4e', '#f5f5f5', '#f0b830', '#e8a0c8'];
-  const spots = [[8, 160], [30, 168], [60, 168], [150, 168], [120, 168], [20, 20], [250, 160], [90, 30]];
+  const spots = [[8, 160], [30, 168], [60, 168], [150, 168], [120, 168], [20, 20], [250, 160], [96, 24]];
   spots.forEach(([sx, sy], i) => {
     px2(g, sx, sy - 2, 1, 2, f.grassDark);
     px2(g, sx - 1, sy - 3, 3, 2, FL[i % FL.length]);
@@ -361,7 +361,11 @@ function f2Ambient() {
     out.push({
       x, y: a.y, tx: x, ty: a.y, wait: 1 + ai,
       speed: 11, restMin: 2.5, restVar: 4, tone: a.tones[ai % a.tones.length], draw: a.draw,
-      pick: () => ({ x: 12 + Math.random() * (ROOM_W - 40), y: a.y + Math.random() * 4 }),
+      pick: () => {
+        const bot = a.y === F2_AISLE_Y[1];
+        const x = bot ? 12 + Math.random() * 172 : 12 + Math.random() * (ROOM_W - 40);
+        return { x, y: a.y + Math.random() * 4 };
+      },
     });
   });
   return out;
