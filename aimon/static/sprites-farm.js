@@ -125,27 +125,32 @@ function farmLegs(g, c, step) {
   pxF(g, 8 + r, 10, 3, 1, D);
 }
 
-/* Đầu + nón rơm. Nhìn xuống (`turn=false`) hoặc quay ra (`turn=true`). Mặt rộng 6 pixel
- * giữa thân; nón rơm rộng 12. `closed=true` = tư thế blink (mắt nhắm) — bỏ hẳn pixel mắt tối. */
+/* Đầu chibi + nón rơm. Nón bo góc (roundBoxF), mặt rộng 8 pixel chiếm nửa sprite, mắt to có
+ * chấm loá (eyeF), má hồng, miệng cười cong 2 nét lệch 1/3 pixel. `turn=false` = nhìn xuống
+ * (gáy — tư thế làm việc chính, chỉ thấy tóc sau gáy); `turn=true` = quay ra (profil, một mắt
+ * + mũi + cười); `closed=true` = mắt nhắm (khung blink). */
 function farmHead(g, c, turn, closed) {
-  const F = '#eab28b', E = '#222222', CH = '#8c5a35';      // da, mắt, tóc mai
-  const hx = 5;
-  pxF(g, hx - 1, 1, 8, 1, darken(c.hat, 0.15));            // vành nón (hàng trên)
-  pxF(g, hx, 2, 6, 1, darken(c.hat, 0.1));
-  pxF(g, hx, 3, 6, 1, c.hat);                              // chóp nón
-  pxF(g, hx, 4, 6, 1, darken(c.hat, 0.05));
-  pxF(g, hx, 5, 1, 1, CH); pxF(g, hx + 5, 5, 1, 1, CH);    // tóc mai hai bên
-  pxF(g, hx, 5, 6, 1, F);                                  // trán
+  const F = '#eab28b', CH = '#8c5a35';            // da, tóc mai
+  const hat = c.hat;
+  roundBoxF(g, 3, 0, 10, 1.4, 1.4, darken(hat, 0.12));   // vành nón
+  roundBoxF(g, 5, 1, 6, 3, 1.4, hat);                    // chóp nón
+  pxF(g, 5.6, 1.2, 0.9, 2.4, lighten(hat, 0.2));         // nắng mé trái chóp
+  pxF(g, 5, 3.4, 6, 0.7, darken(hat, 0.25));             // dây nón
+  pxF(g, 4, 4.6, 1, 1.4, CH); pxF(g, 11, 4.6, 1, 1.4, CH);   // tóc mai hai bên
+  roundBoxF(g, 4, 4, 8, 6, 2, F);                        // khối mặt
   if (turn) {
-    pxF(g, hx + 1, 6, 4, 2, F);
-    if (!closed) { pxF(g, hx + 2, 6, 1, 1, E); pxF(g, hx + 4, 6, 1, 1, E); }
-    else pxF(g, hx + 2, 6, 2, 1, '#c98a55');
-    pxF(g, hx + 2, 8, 2, 1, '#d08a5a');                    // miệng
+    if (closed) {
+      pxF(g, 6.6, 6.4, 1.8, 0.5, '#8a4a2e');             // mắt nhắm
+    } else {
+      eyeF(g, 6.6, 5.8, 2, 2);                           // mắt to
+    }
+    pxF(g, 11, 6.6, 1, 0.9, '#d08a5a');                  // mũi nghiêng
+    pxF(g, 7.4, 8.4, 1.6, 0.34, '#d08a5a');              // miệng cười (2 nét)
+    pxF(g, 7.7, 8.74, 1.2, 0.32, '#d08a5a');
+    pxF(g, 4.2, 7.4, 1, 0.8, BLUSH);                     // má
   } else {
-    pxF(g, hx + 1, 6, 4, 2, F);
-    if (!closed) pxF(g, hx + 3, 6, 1, 1, E);               // gáy (một mắt nheo)
-    else pxF(g, hx + 2, 6, 2, 1, '#c98a55');
-    pxF(g, hx + 1, 8, 4, 1, F);
+    pxF(g, 5, 4.6, 6, 2.6, CH);                          // tóc sau gáy
+    pxF(g, 4.5, 5.4, 1, 2, CH); pxF(g, 10.5, 5.4, 1, 2, CH);
   }
 }
 
