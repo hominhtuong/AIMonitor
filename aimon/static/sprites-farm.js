@@ -107,13 +107,15 @@ const FARMER_CHARS = [
     acc: { kind: 'waist', color: '#e8d8a0' } },
 ];
 
-/* Bốn loài động vật nền, mỗi loài 2 khung (W0 = đứng/chân chụm, W1 = chân bước). Khung này
- * KHÔNG được trùng khoá với FRAME_INDEX_FARM (nông dân) — hai tập chỉ số riêng biệt. */
+/* Bốn loài động vật nền, mỗi loài 2 khung (W0 = đứng/chân chụm, W1 = chân bước). Chỉ số phải
+ * bắt đầu từ 27 (sau FRAME_INDEX_FARM) để KHÔNG trùng cột với frame nông dân — dù ở hàng khác
+ * nên pixel area đã tách rời, giữ giá trị riêng biệt giúp `cell()` của animal chỉ có thể trùng
+ * chính nó, không bao giờ nhầm vào farmer frame. */
 const FRAME_ANIMAL_FARM = {
-  chickenW0: 0, chickenW1: 1,
-  cowW0: 2, cowW1: 3,
-  pigW0: 4, pigW1: 5,
-  sheepW0: 6, sheepW1: 7,
+  chickenW0: 27, chickenW1: 28,
+  cowW0: 29, cowW1: 30,
+  pigW0: 31, pigW1: 32,
+  sheepW0: 33, sheepW1: 34,
 };
 const ANIMAL_SPECIES = ['chicken', 'cow', 'pig', 'sheep'];
 const ANIMAL_TONES = {
@@ -449,7 +451,7 @@ function drawFarmerFarm(g, c, key) {
  * biết bối cảnh nào. */
 function buildAtlas_farm(want) {
   const S = SPRITE_SS_FARM;
-  const cols = FARM_FRAME_KEYS.length;
+  const cols = Math.max(FARM_FRAME_KEYS.length, 35);   // 27 frame nông dân + 8 cột động vật
   const n = FARMER_CHARS.length || 1;
   const norm = (i) => ((Math.round(i) % n) + n) % n;
   const list = want && want.length
@@ -537,25 +539,35 @@ function buildAtlas_farm(want) {
  * Đầu gà cũ vẽ ở y-1 (px2) → rơi ra ngoài ô nội dung khi bake; quy ước: nội dung = old px2 + 1,
  * wrapper vẽ lại ở (x-1, y-1) để giữ vị trí y nguyên (cat-style office.js:1422-1432). */
 function drawAnimalSprite(g, pal, c, x, y) {
+  const species = c.species || 'chicken';
   if (!OF.atlasFarm) return;
-  const species = c.species;
   const moving = c.wait <= 0;
   const step = moving && Math.floor(c.anim * 6) % 2;
   const frameKey = species + (step ? 'W1' : 'W0');
   const [ox, oy, cw, ch] = OF.atlasFarm.animalCell(species, frameKey);
   const down = c.eat > 0 ? 1 : 0;
-  g.drawImage(OF.atlasFarm.canvas, ox, oy, cw, ch, x - 1, y - 1 + down, cw, ch);
+  const dw = cw / SPRITE_SS_FARM, dh = ch / SPRITE_SS_FARM;
+  if (c.flip) {
+    g.save();
+    g.translate(x + dw - 2, y);
+    g.scale(-1, 1);
+    g.drawImage(OF.atlasFarm.canvas, ox, oy, cw, ch, -1, -1, dw, dh);
+    g.restore();
+  } else {
+    g.drawImage(OF.atlasFarm.canvas, ox, oy, cw, ch, x - 1, y - 1 + down, dw, dh);
+  }
   if (c.sleep) drawAnimalSleepEyes(g, x - 1, y - 1 + down, species, c.flip);
 }
 
+/* Overlay mắt nhắm ngủ — vẽ fillRect thẳng trên ctx phòng (đã scale), toạ độ pixel phòng.
+ * `x` đã là tọa độ phòng (wrapper cộng offset -1 rồi). */
 function drawAnimalSleepEyes(g, x, y, species, flip) {
-  // Mắt nhắm đường cong nhẹ: 1 pixel gốc = 4 atlas px. Dùng pxF vì g là atlas ctx (pre-scaled).
-  const cx = x + (flip ? 6 : 4), cy = y + 1;      // toạ độ pixel gốc tương đối ô
-  const S = SPRITE_SS_FARM;
-  const y0 = Math.round((cy - 0.3) * S), y1 = Math.round((cy + 0.3) * S);
-  const x0 = Math.round((cx - 0.5) * S), x1 = Math.round((cx + 0.5) * S);
+  const cx = x + (flip ? 6 : 4) + 1;   // +1 vì wrapper trừ 1; đặt giữa đầu pixel phòng
+  const cy = y + 1;
   g.fillStyle = '#c98a55';
-  for (let iy = y0; iy < y1; iy++) {
-    g.fillRect(x0, iy, x1 - x0, 1);
-  }
+  g.fillRect(cx, cy, 2, 1);
 }
+const drawChickenFarm = drawAnimalSprite;
+const drawCowFarm = drawAnimalSprite;
+const drawPigFarm = drawAnimalSprite;
+const drawSheepFarm = drawAnimalSprite;
