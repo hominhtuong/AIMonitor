@@ -1585,7 +1585,9 @@ function resize() {
   // suy: lấy mẫu gần nhất ở tỷ lệ lẻ sẽ bỏ rơi hàng thì hàng không, và những nét mảnh 1/3
   // pixel - viền, chấm loá trong mắt - biến mất chỗ có chỗ không, nhìn như hình bị rách.
   // Đồ đạc và nền vẫn vẽ ở pixel gốc và vẫn tắt nội suy, chỉ nhân vật đi đường này.
-  OF.spriteSmooth = (OF.scale * OF.dpr) % SPRITE_SS !== 0;
+  // Farm dùng SPRITE_SS_FARM=4, hệ 16x20 dùng SPRITE_SS=3. Chọn hệ theo scene hiện tại.
+  const SS = CS().id === 'farm2' ? SPRITE_SS_FARM : SPRITE_SS;
+  OF.spriteSmooth = (OF.scale * OF.dpr) % SS !== 0;
   if (OF.ctx) OF.ctx.imageSmoothingEnabled = false;
   invalidate();
   if (OF.on) draw();
