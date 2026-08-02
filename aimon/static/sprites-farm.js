@@ -200,17 +200,17 @@ function farmLegs(g, c, step) {
 function farmHead(g, c, turn, closed) {
   const F = '#eab28b', CH = '#8c5a35';            // da, tóc mai
   const hat = c.hat;
-  roundBoxF(g, 3, 0, 10, 1.4, 1.4, darken(hat, 0.12));   // vành nón
+  roundBoxF(g, 4, 0, 8, 1.2, 0.8, darken(hat, 0.12));   // vành nón (rộng 8, chóp rộng 6 → lồi 1px mỗi bên)
   roundBoxF(g, 5, 1, 6, 3, 1.4, hat);                    // chóp nón
   pxF(g, 5.6, 1.2, 0.9, 2.4, lighten(hat, 0.2));         // nắng mé trái chóp
-  pxF(g, 5, 3.4, 6, 0.7, darken(hat, 0.25));             // dây nón
+  pxF(g, 4, 3.4, 8, 0.7, darken(hat, 0.25));             // dây nón
   pxF(g, 4, 4.6, 1, 1.4, CH); pxF(g, 11, 4.6, 1, 1.4, CH);   // tóc mai hai bên
   roundBoxF(g, 4, 4, 8, 6, 2, F);                        // khối mặt
   if (turn) {
     if (closed) {
       pxF(g, 6.6, 6.4, 1.8, 0.5, '#8a4a2e');             // mắt nhắm
     } else {
-      eyeF(g, 6.6, 5.8, 2, 2);                           // mắt to
+      eyeF(g, 7.2, 5.8, 2, 2);                           // mắt to
     }
     pxF(g, 11, 6.6, 1, 0.9, '#d08a5a');                  // mũi nghiêng
     pxF(g, 7.4, 8.4, 1.6, 0.34, '#d08a5a');              // miệng cười (2 nét)
