@@ -243,7 +243,7 @@ function drawF2Tree(g, f, x, y) {
 function drawF2Hills(g, f) {
   for (let x = 0; x < 260; x += 8) {
     const h = 4 + ((x / 8) % 3);
-    px2(g, x, 22 - h, 8, h, f.hillFar);
+    px2(g, x, 22 - h, Math.min(8, 260 - x), h, f.hillFar);
   }
   px2(g, 0, 22, 260, 1, f.hillLine);
   px2(g, 40, 11, 7, 5, f.hillTree);
