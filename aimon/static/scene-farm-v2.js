@@ -378,9 +378,9 @@ function f2DrawStation(g, st) {
     // lúa chín — bông vàng
     px2(g, px, py, 4, 4, f.crop);
     px2(g, px, py, 4, 1, lighten(f.crop, 0.15));
-    px2(g, px - 1, py + 1, 1, 3, '#e0c050');
-    px2(g, px + 4, py + 1, 1, 3, '#e0c050');
-    px2(g, px + 1, py - 1, 2, 1, '#e0c050');
+    px2(g, px - 1, py + 1, 1, 3, f.cropRipe);
+    px2(g, px + 4, py + 1, 1, 3, f.cropRipe);
+    px2(g, px + 1, py - 1, 2, 1, f.cropRipe);
     px2(g, px, py + 5, 4, 1, f.soilDark);
   }
 }
