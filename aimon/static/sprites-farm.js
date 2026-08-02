@@ -174,84 +174,98 @@ function farmArm(g, c, dir, gripX, gripY) {
 
 /* Đạo cụ — hai tư thế A (nhấc/cầm cao) và B (giáng/cúi xuống). Tay ở (12-13, y≈10-11).
  * Gỗ #8a5a2b, kim loại #b0bec5. KHÔNG nét nào vượt y=15 / x=15. */
+/* Đạo cụ — tư thế A (nhấc/cầm cao) và B (giáng/cúi sâu xuống). Biên độ A↔B lớn hơn bản trước
+ * để 2 nhịp dễ thấy. Gỗ #8a5a2b, kim loại #b0bec5. KHÔNG nét nào vượt y=15 / x=15. */
 function propHoe(g, y, pose) {
   if (pose === 'A') {
-    pxF(g, 13, 7, 1, 4, '#8a5a2b');
-    pxF(g, 11, 6, 3, 2, '#b0bec5');
+    pxF(g, 13, 5, 1, 6, '#8a5a2b');
+    pxF(g, 11, 4, 3, 3, '#b0bec5');
+    pxF(g, 12, 3, 1, 1, '#d8dee6');
   } else {
-    pxF(g, 13, 10, 1, 4, '#8a5a2b');
-    pxF(g, 11, 14, 3, 2, '#b0bec5');
+    pxF(g, 13, 11, 1, 4, '#8a5a2b');
+    pxF(g, 11, 15, 4, 1, '#b0bec5');
   }
 }
 function propPlant(g, y, pose) {
   pxF(g, 9, 9, 2, 3, '#7a5230');                       // túi hạt (tay trái) — cả hai tư thế
   pxF(g, 9, 8, 3, 1, '#a07030');
   if (pose === 'A') {
-    pxF(g, 13, 9, 1, 3, '#6d4c41');
-    pxF(g, 12, 8, 3, 2, '#4caf50');
+    pxF(g, 13, 8, 1, 4, '#6d4c41');
+    pxF(g, 12, 7, 3, 3, '#4caf50');
+    pxF(g, 12, 6, 3, 1, lighten('#4caf50', 0.2));
   } else {
     pxF(g, 13, 12, 1, 3, '#6d4c41');
-    pxF(g, 12, 14, 3, 2, '#4caf50');
+    pxF(g, 12, 15, 3, 1, '#4caf50');
   }
 }
 function propHarvest(g, y, pose) {
   if (pose === 'A') {
-    pxF(g, 13, 8, 1, 4, '#8a5a2b');
-    pxF(g, 12, 6, 3, 3, '#b0bec5');
+    pxF(g, 13, 6, 1, 5, '#8a5a2b');
+    pxF(g, 11, 5, 4, 4, '#b0bec5');                   // liềm cong: lưỡi to
+    pxF(g, 11, 5, 4, 1, lighten('#b0bec5', 0.2));
   } else {
-    pxF(g, 13, 10, 1, 4, '#8a5a2b');
-    pxF(g, 11, 14, 4, 2, '#b0bec5');
+    pxF(g, 13, 11, 1, 4, '#8a5a2b');
+    pxF(g, 10, 15, 5, 1, '#b0bec5');
   }
 }
 function propAxe(g, y, pose) {
   if (pose === 'A') {
-    pxF(g, 13, 5, 1, 6, '#8a5a2b');
-    pxF(g, 11, 4, 5, 2, '#b0bec5');
+    pxF(g, 13, 4, 1, 7, '#8a5a2b');
+    pxF(g, 10, 3, 6, 3, '#b0bec5');                   // lưỡi to
+    pxF(g, 11, 4, 4, 1, '#e8e6e0');
   } else {
-    pxF(g, 13, 10, 1, 4, '#8a5a2b');
-    pxF(g, 11, 14, 5, 2, '#b0bec5');
+    pxF(g, 13, 11, 1, 4, '#8a5a2b');
+    pxF(g, 9, 15, 7, 1, '#b0bec5');
   }
 }
 function propWater(g, y, pose) {
   if (pose === 'A') {
-    pxF(g, 11, 9, 4, 4, '#4a90d9');
-    pxF(g, 11, 9, 4, 1, '#9cc9ef');
-    pxF(g, 10, 7, 1, 3, '#3d5a80');
+    pxF(g, 11, 8, 5, 5, '#4a90d9');                   // thùng to hơn
+    pxF(g, 11, 8, 5, 1, '#9cc9ef');
+    pxF(g, 10, 6, 1, 3, '#3d5a80');                   // vòi
+    pxF(g, 9, 5, 1, 1, '#9cc9ef');                    // giọt rơi
   } else {
-    pxF(g, 10, 10, 4, 3, '#4a90d9');
-    pxF(g, 9, 7, 1, 4, '#3d5a80');                     // vòi nghiêng
-    pxF(g, 9, 11, 1, 1, '#9cc9ef');                    // giọt
-    pxF(g, 8, 13, 1, 1, '#9cc9ef');
+    pxF(g, 10, 11, 4, 4, '#4a90d9');
+    pxF(g, 9, 9, 1, 3, '#3d5a80');                    // vòi nghiêng xuống
+    pxF(g, 9, 12, 1, 1, '#9cc9ef');
+    pxF(g, 8, 14, 1, 1, '#9cc9ef');
+    pxF(g, 7, 15, 1, 1, '#9cc9ef');
   }
 }
 function propFish(g, y, pose) {
   if (pose === 'A') {
-    pxF(g, 13, 5, 1, 7, '#8a5a2b');
-    pxF(g, 13, 12, 1, 2, '#e8e6e0');
+    pxF(g, 13, 4, 1, 8, '#8a5a2b');
+    pxF(g, 13, 12, 1, 3, '#e8e6e0');                  // dây câu
+    pxF(g, 13, 15, 1, 1, '#b0bec5');                  // phao
   } else {
-    pxF(g, 13, 9, 1, 6, '#8a5a2b');
-    pxF(g, 13, 15, 1, 1, '#b0bec5');                   // phao
-    pxF(g, 13, 11, 1, 3, '#e8e6e0');
+    pxF(g, 13, 8, 1, 7, '#8a5a2b');
+    pxF(g, 13, 15, 1, 1, '#b0bec5');                  // phao chạm nước
+    pxF(g, 12, 10, 1, 3, '#e8e6e0');
+    pxF(g, 12, 14, 1, 1, '#b0bec5');
   }
 }
 function propInteract(g, y, pose) {
   if (pose === 'A') {
-    pxF(g, 11, 8, 4, 4, '#e8c547');
-    pxF(g, 12, 9, 2, 2, '#6d4c41');
-    pxF(g, 13, 12, 1, 2, '#8a5a2b');
+    pxF(g, 11, 7, 5, 5, '#e8c547');                   // bảng ghi to hơn
+    pxF(g, 12, 8, 3, 3, '#6d4c41');
+    pxF(g, 13, 12, 1, 3, '#8a5a2b');                  // bút chì dài
+    pxF(g, 13, 12, 1, 1, '#b0bec5');
   } else {
-    pxF(g, 11, 10, 4, 4, '#e8c547');
-    pxF(g, 12, 11, 2, 2, '#6d4c41');
-    pxF(g, 13, 14, 1, 1, '#8a5a2b');
+    pxF(g, 11, 10, 5, 5, '#e8c547');
+    pxF(g, 12, 11, 3, 3, '#6d4c41');
+    pxF(g, 13, 15, 1, 1, '#8a5a2b');
   }
 }
 function propCarry(g, y, pose) {
   if (pose === 'A') {
-    pxF(g, 4, 8, 3, 4, '#d9b26a');                     // sọt đeo sau lưng
-    pxF(g, 4, 8, 3, 1, '#e8c86a');
+    pxF(g, 3, 7, 4, 6, '#d9b26a');                    // sọt đeo sau lưng
+    pxF(g, 3, 7, 4, 1, '#e8c86a');
+    pxF(g, 3, 12, 4, 1, '#8a5a2b');
   } else {
-    pxF(g, 12, 9, 4, 4, '#d9b26a');                    // sọt xách tay
-    pxF(g, 12, 13, 4, 1, '#8a5a2b');
+    pxF(g, 12, 8, 5, 5, '#d9b26a');                   // sọt xách tay
+    pxF(g, 12, 8, 5, 1, '#e8c86a');
+    pxF(g, 12, 13, 5, 1, '#8a5a2b');
+    pxF(g, 14, 10, 2, 2, '#e0c050');                  // lúa trong sọt
   }
 }
 
