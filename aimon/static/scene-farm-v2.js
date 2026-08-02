@@ -434,14 +434,14 @@ function drawF2Decor(g, f) {
   px2(g, 92, 8, 7, 5, '#4caf50');
   px2(g, 93, 7, 5, 2, lighten('#4caf50', 0.15));
   px2(g, 91, 10, 9, 3, darken('#4caf50', 0.15));
-  // Nấm 2 cây (góc dưới phải, giữa ao và đám cỏ — x233..246, y155..166)
-  px2(g, 244, 156, 3, 2, '#e05a4e');
-  px2(g, 244, 156, 3, 1, '#f5f5f5');
+  // Nấm 2 cây (góc dưới phải, giữa ao và đám cỏ — x234..243, y155..166, tránh lối dọc x244)
+  px2(g, 240, 156, 3, 2, '#e05a4e');
+  px2(g, 240, 156, 3, 1, '#f5f5f5');
   px2(g, 245, 158, 1, 2, '#f5f5f5');
   px2(g, 234, 164, 2, 1, '#e05a4e');
   px2(g, 235, 164, 1, 1, '#f5f5f5');
   px2(g, 234, 165, 1, 1, '#f5f5f5');
-  // Dưa hấu (236,88) — cạnh luống trên, bên phải lối dọc (x244)
+  // Dưa hấu (236,88) — cạnh luống trên, bên trái lối dọc (x244)
   px2(g, 236, 88, 5, 4, '#2e7d32');
   px2(g, 236, 88, 5, 1, '#1b5e20');
   px2(g, 237, 90, 3, 1, '#1b5e20');
@@ -457,13 +457,14 @@ function drawF2Decor(g, f) {
   px2(g, 156, 163, 1, 3, darken(f.wood, 0.2));
   px2(g, 162, 163, 5, 5, f.wood);
   px2(g, 162, 163, 5, 1, f.woodLight);
+  px2(g, 162, 165, 5, 1, f.woodDark);
   px2(g, 164, 164, 1, 3, darken(f.wood, 0.2));
   // Biển gỗ (50,44) — bên phải nhà (nhà x14..48), trên lối dọc tây
   px2(g, 50, 44, 6, 4, f.woodLight);
   px2(g, 50, 44, 6, 1, lighten(f.woodLight, 0.15));
   px2(g, 51, 46, 4, 1, '#f0e6c8');
   px2(g, 52, 48, 3, 2, f.woodDark);
-  // Đèn lồng (22,64) — bên trái đường đất (đường x4..9), dưới biển gỗ, trước ô chợ
+  // Đèn lồng (22,64) — cạnh phải đường đất (đường x4..9), dưới biển gỗ
   px2(g, 22, 64, 2, 6, f.woodDark);
   px2(g, 21, 62, 4, 3, '#f0b830');
   px2(g, 22, 63, 2, 1, '#fff3d0');
