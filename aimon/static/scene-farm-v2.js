@@ -124,15 +124,19 @@ const F2_SWING = 4;           // đảo tư thế mỗi giây (2 chu kỳ/giây)
 const F2_BLINK_PERIOD = 4;    // giây giữa hai lần nháy
 const F2_BLINK_DUR = 0.2;     // giây mỗi lần nháy
 
-/* Tư thế nông dân. Đạo cụ xoay 2 nhịp A/B; `rest` thì cầm bình yên và nháy mắt. `blink` là
- * khung mắt nhắm. `frameFor(e)` trong frameSig() đã chứa kết quả hàm này nên tư thế đổi là
- * lõi tự vẽ lại — không cần thêm móc. Phải RẺ và xác định trong một tick (gọi cả khi tính
- * chữ ký lẫn khi vẽ). */
+/* Tư thế nông dân. Đạo cụ xoay 2 nhịp A/B; `rest` thì cầm bình yên và nháy mắt. Ngồi nhìn
+ * xuống là tư thế làm việc chính; `plan`/`read`/`delegate` ngồi nhìn LÊN (xem map/ghi chép).
+ * `blink` là khung mắt nhắm. `frameFor(e)` trong frameSig() đã chứa kết quả hàm này nên tư thế
+ * đổi là lõi tự vẽ lại. Phải RẺ và xác định trong một tick. */
 function f2FrameFor(e) {
   if (e.cheer > 0) return Math.floor(e.anim * 9) % 2 ? 'd1' : 'd2';
   if (e.path.length) return null;                       // đi bộ: để lõi chọn d*, u*, s*
   if (e.mode !== 'sit') return 'd0';
   const act = currentAction(e);
+  // plan/read/delegate: nhìn lên bảng/map (kUp tĩnh — không nháy); còn lại nhìn xuống làm việc
+  if (act === 'plan' || act === 'read' || act === 'delegate') {
+    return 'kUp';
+  }
   const base = f2IsWrite(e) ? 'plant' : (F2_ROLE_MAP[act] || 'water');
   if (act === 'rest') {
     const p = e.anim % F2_BLINK_PERIOD;
