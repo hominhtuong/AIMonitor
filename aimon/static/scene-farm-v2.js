@@ -280,9 +280,9 @@ function drawF2Coop(g, f, x, y) {
   px2(g, x - 4, y, 38, 6, f.coopRedDark);
   px2(g, x - 2, y + 2, 34, 4, f.coopRed);
   px2(g, x - 4, y + 5, 38, 1, darken(f.coopRed, 0.25));
-  // Cửa chuồng + cửa sổ
-  px2(g, x + 12, y + 14, 6, 12, f.woodDark);
-  px2(g, x + 13, y + 16, 4, 6, f.dark);
+  // Cửa mở (nướng): khung gỗ + lỗ tối bên trong. Tấm cửa đóng vẽ động ở f2DrawAnimated.
+  px2(g, x + 12, y + 14, 6, 12, f.woodDark);          // khung cửa
+  px2(g, x + 13, y + 15, 4, 10, f.dark);              // lỗ mở — bên trong chuồng tối
   px2(g, x + 4, y + 12, 4, 4, f.stoneDark);
   px2(g, x + 22, y + 12, 4, 4, f.stoneDark);
 }
@@ -627,10 +627,34 @@ function drawF2Dove(g, p) {
   }, Math.round(x), Math.round(y));
 }
 
+/* Overlay tối theo giờ (spec mục 4.3) — vẽ TRƯỚC entity nên chỉ phủ nền/mây/chim,
+ * agent vẽ sau vẫn sáng. Alpha đổ xuống đều: (1-bright)*0.35; vùng trời (y<40) thêm
+ * (1-bright)*0.15 nữa cho trời tối hẳn. */
+function drawF2Night(g) {
+  const bright = f2Bright();
+  if (bright < 1) {
+    px2(g, 0, 0, ROOM_W, ROOM_H, 'rgba(16,22,14,' + ((1 - bright) * 0.35).toFixed(3) + ')');
+    px2(g, 0, 0, ROOM_W, 40, 'rgba(16,22,14,' + ((1 - bright) * 0.15).toFixed(3) + ')');
+  }
+}
+
+/* Cửa chuồng đóng 18h..6h (spec mục 4.5) — vẽ tấm gỗ đè lên LỖ MỞ nướng
+ * (x209..212 y49..58). Vẽ SAU overlay để cửa thấy rõ lúc tối. */
+function drawF2CoopDoor(g, f) {
+  const h = F2_HOUR();
+  if (h >= 18 || h < 6) {
+    px2(g, 209, 49, 4, 10, f.woodDark);
+    px2(g, 209, 49, 4, 1, lighten(f.woodDark, 0.25));
+    px2(g, 210, 51, 2, 6, darken(f.woodDark, 0.2));
+  }
+}
+
 /* Gợn sáng ao + cờ chuồng + khói + đom đóm — vẽ sau mọi thứ nên nằm trên mặt nước/nóc nhà. */
 function f2DrawAnimated(g, p) {
-  drawF2Sky(g);          // mây + đàn chim — trước overlay tối
-  drawF2Dove(g, p);      // bồ câu bay — trước overlay tối
+  drawF2Sky(g);          // 1. mây
+  drawF2Dove(g, p);      // 2. bồ câu
+  drawF2Night(g);        // 3. overlay tối
+  drawF2CoopDoor(g, f2pal());         // 5. cửa chuồng đóng 18h..6h
   const SP = [[196, 156], [210, 160], [220, 154], [202, 163]];
   const s = SP[Math.floor(OF.clock * 2) % 4];
   px2(g, s[0], s[1], 2, 1, '#dceefc');
