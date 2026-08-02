@@ -225,7 +225,7 @@ function drawF2FenceRow(g, f, y) {
     px2(g, x + 4, y + 5, 1, 2, f.woodLight);                 // cọc nhọn
     px2(g, x + 10, y + 5, 1, 2, f.woodLight);
   }
-  px2(g, 0, y + 1, 260, 1, f.wood);
+  px2(g, 0, y + 3, 260, 1, f.wood);   // thanh ngang giữa liên tục — để y+1 cho ván trên + đinh
 }
 
 function drawF2House(g, f, x, y) {
@@ -242,7 +242,7 @@ function drawF2House(g, f, x, y) {
   // Ống khói (phải, nhô lên khỏi mái)
   px2(g, x + 27, y - 14, 4, 8, f.stoneDark);
   px2(g, x + 27, y - 14, 4, 1, f.stone);
-  px2(g, x + 28, y - 10, 1, 2, '#6a6f7a');
+  px2(g, x + 28, y - 12, 1, 2, '#6a6f7a');   // miệng ống khói tối — sát đỉnh, trên thân đá
   // Mái xanh hai nửa dốc + gờ mái
   px2(g, x - 4, y - 8, 42, 4, f.roofDark);
   px2(g, x - 2, y - 6, 38, 6, f.roof);
