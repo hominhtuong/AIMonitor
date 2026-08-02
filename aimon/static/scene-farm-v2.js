@@ -520,15 +520,61 @@ function f2BobFor(e) {
   return (e.mode === 'sit' && e.kind === 'agent' ? F2_BREATH() : 0);
 }
 
+/* Giờ máy thật. Tách hàm để không gọi new Date() rải rác. */
+function f2Hour() {
+  return new Date().getHours();
+}
+
+/* Độ sáng theo giờ: 1 = sáng, 0 = tối. Công thức đã chốt trong spec:
+ * bright = 1 - clamp((|h-12|-6)/6, 0, 1) → 6h..18h sáng, đêm nhịp đều. */
+function f2Bright(hour) {
+  const d = Math.abs(hour - 12);
+  return 1 - Math.max(0, Math.min(1, (d - 6) / 6));
+}
+
+/* Trạng thái mưa — roll mỗi giây dựa trên OF.clock (giây thật, tăng mỗi frame).
+ * Khô ≥ 90s (ngẫu nhiên 90..180) → roll 40% mưa; mưa 20..45s rồi quay lại khô.
+ * Hàm có side-effect (đổi F2_WEATHER) nên gọi đúng 1 lần mỗi lần vẽ. */
+let F2_WEATHER = 0;        // 0 = khô, 1 = mưa
+let F2_WEATHER_END = 0;    // giây OF.clock mưa kết thúc
+let F2_WEATHER_NEXT = 0;   // giây OF.clock được phép roll lại
+function f2Rain() {
+  const t = Math.floor(OF.clock);
+  if (F2_WEATHER) {
+    if (t >= F2_WEATHER_END) {
+      F2_WEATHER = 0;
+      F2_WEATHER_NEXT = t + 90 + Math.floor(Math.random() * 90);
+    }
+    return true;
+  }
+  if (t >= F2_WEATHER_NEXT) {
+    if (Math.random() < 0.4) {
+      F2_WEATHER = 1;
+      F2_WEATHER_END = t + 20 + Math.floor(Math.random() * 25);
+    } else {
+      F2_WEATHER_NEXT = t + 90 + Math.floor(Math.random() * 90);
+    }
+  }
+  return false;
+}
+
+/* Có agent đang làm việc trong phòng? Đèn nhà + khói dày dựa trên cái này. */
+function f2AnyBusy() {
+  return Array.from(OF.ents.values()).some((e) => e.kind === 'agent' && !e.leaving);
+}
+
 /* Chữ ký riêng của bối cảnh — mọi thứ nhúc nhích KHÔNG nằm trong frameSig lõi: pha gợn sáng ao,
- * pha thở, pha cờ chuồng, pha khói, pha đom đóm. Đổi là lõi vẽ lại — đúng invariant "chỉ vẽ
- * lại khi có gì đổi". */
+ * pha thở, pha cờ chuồng, pha khói, pha đom đóm, trạng thái mưa, giờ máy thật. Đổi là lõi vẽ
+ * lại — đúng invariant "chỉ vẽ lại khi có gì đổi". */
 function f2SceneSig() {
+  const rain = f2Rain() ? 1 : 0;
   return 'p' + (Math.floor(OF.clock * 2) % 4)
     + ',b' + F2_BREATH()
     + ',f' + (Math.floor(OF.clock * 2) % 2)       // cờ chuồng 2 pha
     + ',k' + (Math.floor(OF.clock * 2) % 3)       // khói ống khói 3 pha
-    + ',m' + (Math.floor(OF.clock * 1) % 2);      // đom đóm 2 pha
+    + ',m' + (rain ? 0 : Math.floor(OF.clock * 1) % 2)   // đom đóm — tắt khi mưa
+    + ',r' + rain
+    + ',h' + f2Hour();
 }
 
 /* Gợn sáng ao + cờ chuồng + khói + đom đóm — vẽ sau mọi thứ nên nằm trên mặt nước/nóc nhà. */
