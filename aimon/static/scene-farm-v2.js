@@ -356,13 +356,15 @@ function drawF2Hills(g, f) {
  * (x28..232, y66..82); hai lối đi ngang (y96..104, y142..150) thì cắt qua và VẼ ĐÈ LÊN
  * (vẽ sau cùng nên liên tục). */
 function drawF2Path(g, f) {
-  px2(g, 22, 44, 18, 5, f.path);
-  px2(g, 12, 50, 20, 5, f.path);
-  px2(g, 6, 56, 18, 5, f.path);
-  px2(g, 4, 61, 6, 80, f.path);
-  px2(g, 4, 141, 6, 9, f.path);
-  px2(g, 26, 46, 2, 1, f.pathDark);
-  px2(g, 16, 52, 1, 2, f.pathDark);
+  // Từ BẬC CỬA (nhà x14..48, tường y30..53, móng y53..56) — đường đất chỉ chạm đất,
+  // không đè lên tường/cửa. Uốn xuống trái tới lối dọc TÂY (x4..9) rồi chạy thẳng xuống.
+  px2(g, 25, 55, 9, 4, f.path);       // bậc cửa
+  px2(g, 15, 57, 14, 4, f.path);      // uốn chéo xuống trái
+  px2(g, 6, 58, 13, 4, f.path);       // nối về lối dọc
+  px2(g, 4, 61, 6, 80, f.path);       // lối dọc TÂY
+  px2(g, 4, 141, 6, 9, f.path);       // nối lối ngang dưới
+  px2(g, 28, 56, 1, 2, f.pathDark);
+  px2(g, 18, 59, 1, 2, f.pathDark);
   px2(g, 7, 70, 2, 2, f.pathDark);
   px2(g, 7, 95, 1, 1, f.pathDark);
   px2(g, 7, 120, 2, 1, f.pathDark);
