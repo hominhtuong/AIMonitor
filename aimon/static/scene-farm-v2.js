@@ -538,12 +538,14 @@ function f2Ambient() {
     { draw: drawCowFarm, tones: ['#e8e0d0', '#d8cfc0'], y: F2_AISLE_Y[0] },
     { draw: drawPigFarm, tones: ['#f0c8c0', '#e6b8b0'], y: F2_AISLE_Y[1] },
     { draw: drawSheepFarm, tones: ['#f2f0ea', '#e6e0d8'], y: F2_AISLE_Y[0] },
+    { draw: drawChickenFarm, tones: ['#f5efe0'], y: F2_AISLE_Y[1] },   // bồ câu — gà tone trắng hơn
   ];
   animals.forEach((a, ai) => {
     const x = 30 + ai * 62;
     out.push({
       x, y: a.y, tx: x, ty: a.y, wait: 1 + ai,
       speed: 11, restMin: 2.5, restVar: 4, tone: a.tones[ai % a.tones.length], draw: a.draw,
+      eat: 0, sleep: false,
       pick: () => {
         const bot = a.y === F2_AISLE_Y[1];
         const x = bot ? 12 + Math.random() * 160 : 12 + Math.random() * (ROOM_W - 40);

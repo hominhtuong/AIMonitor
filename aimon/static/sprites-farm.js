@@ -379,23 +379,29 @@ function buildAtlas_farm(want) {
   };
 }
 
-/* Bốn con vật nền — vẽ TRỰC TIẾP lên canvas gốc bằng px2 (1:1, không phải atlas). drawAmbient
- * gọi `c.draw(g, OF.pal, c, cx, cy)` nên chữ ký BẮT BUỘC 5 tham số, `c` là con vật đang diễn. */
+/* Bốn con vật nền — vẽ TRỰC TIẾP lên canvas gốc bằng px2. drawAmbient gọi
+ * `c.draw(g, OF.pal, c, cx, cy)` nên chữ ký BẮT BUỘC 5 tham số. Trạng thái:
+ *  - c.wait > 0  → đứng yên, chân chụm
+ *  - c.anim pha  → đi (chân bước)
+ *  - c.eat > 0   → ăn (cúi đầu xuống đất)
+ *  - c.sleep     → ngủ (mắt nhắm, thân hạ) */
 function drawChickenFarm(g, pal, c, x, y) {
   const t = c.tone || '#f5efe0';
   const moving = c.wait <= 0;
   const step = moving && Math.floor(c.anim * 6) % 2;
   const d = c.flip ? -1 : 1;
   const hx = x + (c.flip ? 1 : 4);
-  px2(g, x + 1, y + 2, 5, 4, t);
-  px2(g, x + 1, y + 5, 5, 1, darken(t, 0.25));
-  px2(g, x + (c.flip ? 5 : 0), y + 3, 1, 2, darken(t, 0.3));
-  px2(g, hx, y, 2, 3, t);
-  px2(g, hx, y - 1, 1, 1, '#e05a4e');
-  px2(g, hx + d, y + 1, 1, 1, '#f0b830');
-  px2(g, hx + (c.flip ? 0 : 1), y + 1, 1, 1, INK);
-  px2(g, x + 2, y + 6, 1, step ? 2 : 1, '#f0b830');
-  px2(g, x + 4, y + 6, 1, step ? 1 : 2, '#f0b830');
+  const down = c.eat > 0 ? 1 : 0;                   // cúi đầu khi ăn
+  px2(g, x + 1, y + 2 + down, 5, 4, t);
+  px2(g, x + 1, y + 5 + down, 5, 1, darken(t, 0.25));
+  px2(g, x + (c.flip ? 5 : 0), y + 3 + down, 1, 2, darken(t, 0.3));
+  px2(g, hx, y - down, 2, 3, t);                    // đầu hạ xuống đất
+  px2(g, hx, y - 1 - down, 1, 1, '#e05a4e');
+  px2(g, hx + d, y + 1 - down, 1, 1, '#f0b830');
+  if (!c.sleep) px2(g, hx + (c.flip ? 0 : 1), y + 1 - down, 1, 1, INK);
+  else px2(g, hx + (c.flip ? 0 : 1), y + 1 - down, 1, 1, '#c98a55');
+  px2(g, x + 2, y + 6 + down, 1, step ? 2 : 1, '#f0b830');
+  px2(g, x + 4, y + 6 + down, 1, step ? 1 : 2, '#f0b830');
 }
 
 function drawCowFarm(g, pal, c, x, y) {
@@ -404,14 +410,16 @@ function drawCowFarm(g, pal, c, x, y) {
   const step = moving && Math.floor(c.anim * 6) % 2;
   const d = c.flip ? -1 : 1;
   const hx = x + (c.flip ? 0 : 7);
-  px2(g, x + 1, y + 3, 9, 4, t);
-  px2(g, x + 1, y + 6, 9, 1, darken(t, 0.3));
-  px2(g, x + 3, y + 2, 5, 1, darken(t, 0.35));          // yếm
-  px2(g, hx, y + 1, 5, 4, t);
-  px2(g, hx + (c.flip ? 4 : 0), y + 1, 1, 2, '#8a5a2b'); // sừng
-  px2(g, hx + (c.flip ? 3 : 1), y + 2, 1, 1, '#6d4c41'); // mũi
-  px2(g, x + 2, y + 7, 1, step ? 2 : 1, '#8a5a2b');
-  px2(g, x + 7, y + 7, 1, step ? 2 : 1, '#8a5a2b');
+  const down = c.eat > 0 ? 1 : 0;
+  px2(g, x + 1, y + 3 + down, 9, 4, t);
+  px2(g, x + 1, y + 6 + down, 9, 1, darken(t, 0.3));
+  px2(g, x + 3, y + 2 + down, 5, 1, darken(t, 0.35));
+  px2(g, hx, y + 1 + down, 5, 4, t);
+  px2(g, hx + (c.flip ? 4 : 0), y + 1 + down, 1, 2, '#8a5a2b');
+  if (!c.sleep) px2(g, hx + (c.flip ? 3 : 1), y + 2 + down, 1, 1, '#6d4c41');
+  else px2(g, hx + (c.flip ? 3 : 1), y + 2 + down, 2, 1, '#c98a55');
+  px2(g, x + 2, y + 7 + down, 1, step ? 2 : 1, '#8a5a2b');
+  px2(g, x + 7, y + 7 + down, 1, step ? 2 : 1, '#8a5a2b');
 }
 
 function drawPigFarm(g, pal, c, x, y) {
@@ -420,13 +428,15 @@ function drawPigFarm(g, pal, c, x, y) {
   const step = moving && Math.floor(c.anim * 6) % 2;
   const d = c.flip ? -1 : 1;
   const hx = x + (c.flip ? 0 : 6);
-  px2(g, x + 2, y + 3, 7, 4, t);
-  px2(g, x + 2, y + 6, 7, 1, darken(t, 0.25));
-  px2(g, hx, y + 1, 5, 4, t);
-  px2(g, hx + 1, y + 4, 3, 1, darken(t, 0.3));          // mõm hồng
-  px2(g, hx + (c.flip ? 3 : 1), y + 3, 1, 1, '#6d4c41');
-  px2(g, x + 3, y + 7, 1, step ? 2 : 1, darken(t, 0.4));
-  px2(g, x + 6, y + 7, 1, step ? 2 : 1, darken(t, 0.4));
+  const down = c.eat > 0 ? 1 : 0;
+  px2(g, x + 2, y + 3 + down, 7, 4, t);
+  px2(g, x + 2, y + 6 + down, 7, 1, darken(t, 0.25));
+  px2(g, hx, y + 1 + down, 5, 4, t);
+  px2(g, hx + 1, y + 4 + down, 3, 1, darken(t, 0.3));
+  if (!c.sleep) px2(g, hx + (c.flip ? 3 : 1), y + 3 + down, 1, 1, '#6d4c41');
+  else px2(g, hx + (c.flip ? 3 : 1), y + 3 + down, 2, 1, '#c98a55');
+  px2(g, x + 3, y + 7 + down, 1, step ? 2 : 1, darken(t, 0.4));
+  px2(g, x + 6, y + 7 + down, 1, step ? 2 : 1, darken(t, 0.4));
 }
 
 function drawSheepFarm(g, pal, c, x, y) {
@@ -435,11 +445,13 @@ function drawSheepFarm(g, pal, c, x, y) {
   const step = moving && Math.floor(c.anim * 6) % 2;
   const d = c.flip ? -1 : 1;
   const hx = x + (c.flip ? 0 : 5);
-  px2(g, x + 1, y + 3, 9, 3, t);                        // bộ lông xù
-  px2(g, x + 2, y + 2, 7, 1, t);
-  px2(g, x + 3, y + 6, 5, 1, '#6d4c41');                // chân lộ ra
-  px2(g, hx, y + 1, 4, 3, '#5d4037');                   // mặt tối
-  px2(g, hx + (c.flip ? 3 : 0), y + 2, 1, 1, '#3e2723'); // tai
-  px2(g, x + 3, y + 7, 1, step ? 2 : 1, '#6d4c41');
-  px2(g, x + 6, y + 7, 1, step ? 2 : 1, '#6d4c41');
+  const down = c.eat > 0 ? 1 : 0;
+  px2(g, x + 1, y + 3 + down, 9, 3, t);
+  px2(g, x + 2, y + 2 + down, 7, 1, t);
+  px2(g, x + 3, y + 6 + down, 5, 1, '#6d4c41');
+  px2(g, hx, y + 1 + down, 4, 3, '#5d4037');
+  px2(g, hx + (c.flip ? 3 : 0), y + 2 + down, 1, 1, '#3e2723');
+  if (c.sleep) px2(g, hx + 1, y + 2 + down, 2, 1, '#c98a55');
+  px2(g, x + 3, y + 7 + down, 1, step ? 2 : 1, '#6d4c41');
+  px2(g, x + 6, y + 7 + down, 1, step ? 2 : 1, '#6d4c41');
 }
