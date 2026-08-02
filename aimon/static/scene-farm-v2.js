@@ -660,6 +660,18 @@ function drawF2CoopDoor(g, f) {
   }
 }
 
+/* Đèn nhà (spec 4.6) — sáng khi có agent busy (bất kể giờ). Ô sáng trong cửa sổ trái
+ * nhà (kính x17..21 y37..41) + hắt sáng đèn lồng khi trời tối (bright < 0.6). Vẽ CUỐI
+ * cùng (sau overlay) nên sáng nhất. */
+function drawF2HouseLight(g) {
+  if (!f2AnyBusy()) return;
+  px2(g, 17, 38, 3, 3, '#ffd28a');
+  px2(g, 18, 37, 1, 1, '#fff3d0');
+  if (f2Bright() < 0.6) {
+    px2(g, 21, 61, 4, 5, 'rgba(255,210,138,0.4)');
+  }
+}
+
 /* Gợn sáng ao + cờ chuồng + khói + đom đóm — vẽ sau mọi thứ nên nằm trên mặt nước/nóc nhà. */
 function f2DrawAnimated(g, p) {
   drawF2Sky(g);          // 1. mây
@@ -696,6 +708,7 @@ function f2DrawAnimated(g, p) {
     px2(g, 24 + m, 60 - m, 1, 1, '#fff3a0');
     px2(g, 17, 66 + (1 - m), 1, 1, '#fff3a0');
   }
+  drawF2HouseLight(g);   // 6. đèn nhà — vẽ cuối, trên overlay
 }
 
 function f2Ambient() {
