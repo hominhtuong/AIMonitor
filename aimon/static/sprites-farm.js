@@ -107,6 +107,71 @@ const FARMER_CHARS = [
     acc: { kind: 'waist', color: '#e8d8a0' } },
 ];
 
+/* Bốn loài động vật nền, mỗi loài 2 khung (W0 = đứng/chân chụm, W1 = chân bước). Khung này
+ * KHÔNG được trùng khoá với FRAME_INDEX_FARM (nông dân) — hai tập chỉ số riêng biệt. */
+const FRAME_ANIMAL_FARM = {
+  chickenW0: 0, chickenW1: 1,
+  cowW0: 2, cowW1: 3,
+  pigW0: 4, pigW1: 5,
+  sheepW0: 6, sheepW1: 7,
+};
+const ANIMAL_SPECIES = ['chicken', 'cow', 'pig', 'sheep'];
+const ANIMAL_TONES = {
+  chicken: '#f5efe0', cow: '#e8e0d0', pig: '#f0c8c0', sheep: '#f2f0ea',
+};
+/* Bản đồ tên loài → hàm vẽ ô atlas (draw*Cell). Hàm nhận `(g, tone, step)` — step=0|1. */
+const FARM_ANIMAL_CELL = {};
+
+/* Bốn hàm vẽ ô atlas động vật. Toạ độ nội dung = old px2 coord + 1 (vì wrapper vẽ lại ở -1,-1
+ * để giữ vị trí y nguyên với đầu gà ở y-1 trong px2). Dùng pxF thay px2. step=0 chân chụm,
+ * step=1 chân bước. Không vẽ trạng thái eat/sleep — wrapper lo phần đó. */
+function drawChickenCell(g, tone, step) {
+  pxF(g, 2, 3, 5, 4, tone);                             // thân
+  pxF(g, 2, 6, 5, 1, darken(tone, 0.25));               // bụng
+  pxF(g, 1, 4, 1, 2, darken(tone, 0.3));                // cánh trái
+  pxF(g, 5, 3, 2, 3, tone);                             // đầu
+  pxF(g, 5, 2, 1, 1, '#e05a4e');                        // mào đỏ
+  pxF(g, 6, 3, 1, 1, '#f0b830');                        // mỏ
+  pxF(g, 6, 3, 1, 1, INK);                              // mắt
+  pxF(g, 3, 7, 1, step ? 2 : 1, '#f0b830');             // chân trái
+  pxF(g, 5, 7, 1, step ? 1 : 2, '#f0b830');             // chân phải
+}
+function drawCowCell(g, tone, step) {
+  pxF(g, 2, 4, 9, 4, tone);                             // thân
+  pxF(g, 2, 7, 9, 1, darken(tone, 0.3));                // bụng
+  pxF(g, 4, 3, 5, 1, darken(tone, 0.35));               // lưng
+  pxF(g, 8, 2, 5, 4, tone);                             // đầu
+  pxF(g, 8, 2, 1, 2, '#8a5a2b');                        // sừng trái
+  pxF(g, 9, 3, 1, 1, '#6d4c41');                        // mắt
+  pxF(g, 3, 8, 1, step ? 2 : 1, '#8a5a2b');             // chân
+  pxF(g, 8, 8, 1, step ? 2 : 1, '#8a5a2b');
+}
+function drawPigCell(g, tone, step) {
+  pxF(g, 3, 4, 7, 4, tone);                             // thân
+  pxF(g, 3, 7, 7, 1, darken(tone, 0.25));               // bụng
+  pxF(g, 7, 2, 5, 4, tone);                             // đầu
+  pxF(g, 8, 5, 3, 1, darken(tone, 0.3));                // mõm
+  pxF(g, 8, 4, 1, 1, '#6d4c41');                        // mắt
+  pxF(g, 4, 8, 1, step ? 2 : 1, darken(tone, 0.4));     // chân
+  pxF(g, 7, 8, 1, step ? 2 : 1, darken(tone, 0.4));
+}
+function drawSheepCell(g, tone, step) {
+  const head = '#5d4037';
+  pxF(g, 2, 4, 9, 3, tone);                             // thân len
+  pxF(g, 3, 3, 7, 1, tone);                             // lưng
+  pxF(g, 4, 7, 5, 1, '#6d4c41');                        // chân nối thân
+  pxF(g, 6, 2, 4, 3, head);                             // đầu đen
+  pxF(g, 6, 3, 1, 1, '#3e2723');                        // mắt
+  pxF(g, 4, 8, 1, step ? 2 : 1, '#6d4c41');             // chân
+  pxF(g, 7, 8, 1, step ? 2 : 1, '#6d4c41');
+}
+FARM_ANIMAL_CELL.chicken = drawChickenCell;
+FARM_ANIMAL_CELL.cow = drawCowCell;
+FARM_ANIMAL_CELL.pig = drawPigCell;
+FARM_ANIMAL_CELL.sheep = drawSheepCell;
+
+
+
 /* Toạ độ là pixel gốc 16x16 (đáy sprite chạm y=15 là giày, vành nón ở y=0). Đi qua `pxF` nên
  * mọi nét tự nằm trên lưới con. KHÔNG nét nào vượt quá y=15 hay x=15: 1 pixel gốc quanh ô là
  * viền để finishCell kẻ viền, vượt qua là tràn sang ô hàng xóm trong atlas. */
@@ -378,9 +443,10 @@ function drawFarmerFarm(g, c, key) {
   }
 }
 
-/* Atlas nướng cả 10 nông dân x 17 frame. `want` = danh sách chỉ số nông dân (0..9) cần;
- * bỏ trống = nướng tất. Chỉ số trỏ vào FARMER_CHARS. Cùng API với buildSpriteAtlas để
- * office.js gọi `atlas.cell(charIndex, frame)` và `atlas.canvas` mà không biết bối cảnh nào. */
+/* Atlas nướng cả 10 nông dân x 27 frame + 4 động vật x 2 frame. `want` = danh sách chỉ số
+ * nông dân (0..9) cần; bỏ trống = nướng tất. Chỉ số trỏ vào FARMER_CHARS. Cùng API với
+ * buildSpriteAtlas để office.js gọi `atlas.cell(charIndex, frame)` và `atlas.canvas` mà không
+ * biết bối cảnh nào. */
 function buildAtlas_farm(want) {
   const S = SPRITE_SS_FARM;
   const cols = FARM_FRAME_KEYS.length;
@@ -390,7 +456,9 @@ function buildAtlas_farm(want) {
     ? Array.from(new Set(Array.from(want, norm))).sort((a, b) => a - b)
     : FARMER_CHARS.map((_, i) => i);
   const rowOf = new Map(list.map((idx, r) => [idx, r]));
-  const rows = list.length;
+  const farmerRows = list.length;
+  const animalRows = ANIMAL_SPECIES.length;
+  const rows = farmerRows + animalRows;
   const cw = (SPRITE_W_FARM + 2) * S;
   const ch = (SPRITE_H_FARM + 2) * S;
   const perCol = Math.max(1, Math.floor(4096 / ch));
@@ -417,6 +485,23 @@ function buildAtlas_farm(want) {
     });
   });
 
+  // Thêm 4 hàng động vật, mỗi hàng 2 ô (W0/W1) ở đầu hàng, phần còn lại trống
+  ANIMAL_SPECIES.forEach((sp, idx) => {
+    const r = farmerRows + idx;
+    const tone = ANIMAL_TONES[sp];
+    const drawFn = FARM_ANIMAL_CELL[sp];
+    if (!drawFn) return;
+    [0, 1].forEach((step) => {
+      const col = FRAME_ANIMAL_FARM[sp + (step ? 'W1' : 'W0')];
+      const [ox, oy] = originOf(r, col);
+      g.save();
+      g.translate(ox + S, oy + S);
+      drawFn(g, tone, step);
+      g.restore();
+      cells.push([ox, oy, true]);
+    });
+  });
+
   const img = g.getImageData(0, 0, cv.width, cv.height);
   cells.forEach(([ox, oy, outline]) => finishCell(img.data, cv.width, ox, oy, cw, ch, outline));
   g.putImageData(img, 0, 0);
@@ -424,7 +509,7 @@ function buildAtlas_farm(want) {
   return {
     canvas: cv,
     cols,
-    rows: list.length,
+    rows,
     covers(indices) {
       for (const i of indices) if (!rowOf.has(norm(i))) return false;
       return true;
@@ -435,82 +520,42 @@ function buildAtlas_farm(want) {
       const [ox, oy] = originOf(r, c);
       return [ox, oy, cw, ch];
     },
+    animalCell(species, frameKey) {
+      const idx = ANIMAL_SPECIES.indexOf(species);
+      if (idx < 0) return [0, 0, cw, ch];
+      const r = farmerRows + idx;
+      const c = FRAME_ANIMAL_FARM[frameKey] == null ? 0 : FRAME_ANIMAL_FARM[frameKey];
+      const [ox, oy] = originOf(r, c);
+      return [ox, oy, cw, ch];
+    },
   };
 }
 
-/* Bốn con vật nền — vẽ TRỰC TIẾP lên canvas gốc bằng px2. drawAmbient gọi
- * `c.draw(g, OF.pal, c, cx, cy)` nên chữ ký BẮT BUỘC 5 tham số. Trạng thái:
- *  - c.wait > 0  → đứng yên, chân chụm
- *  - c.anim pha  → đi (chân bước)
- *  - c.eat > 0   → ăn (cúi đầu xuống đất)
- *  - c.sleep     → ngủ (mắt nhắm, thân hạ) */
-function drawChickenFarm(g, pal, c, x, y) {
-  const t = c.tone || '#f5efe0';
+/* Vẽ 4 con vật nền bằng drawImage từ atlas (pre-baked ở lưới con ×4). Wrapper giữ chữ ký
+ * `(g, pal, c, x, y)` để scene-farm-v2.js KHÔNG phải đổi dòng gọi. c.tone được bỏ qua
+ * (màu đã nướng sẵn trong atlas), wrapper dùng frame W0/W1 theo step và vẽ mắt ngủ overlay.
+ * Đầu gà cũ vẽ ở y-1 (px2) → rơi ra ngoài ô nội dung khi bake; quy ước: nội dung = old px2 + 1,
+ * wrapper vẽ lại ở (x-1, y-1) để giữ vị trí y nguyên (cat-style office.js:1422-1432). */
+function drawAnimalSprite(g, pal, c, x, y) {
+  if (!OF.atlasFarm) return;
+  const species = c.species;
   const moving = c.wait <= 0;
   const step = moving && Math.floor(c.anim * 6) % 2;
-  const d = c.flip ? -1 : 1;
-  const hx = x + (c.flip ? 1 : 4);
-  const down = c.eat > 0 ? 1 : 0;                   // cúi đầu khi ăn
-  px2(g, x + 1, y + 2 + down, 5, 4, t);
-  px2(g, x + 1, y + 5 + down, 5, 1, darken(t, 0.25));
-  px2(g, x + (c.flip ? 5 : 0), y + 3 + down, 1, 2, darken(t, 0.3));
-  px2(g, hx, y + down, 2, 3, t);                    // đầu hạ xuống đất
-  px2(g, hx, y - 1 + down, 1, 1, '#e05a4e');
-  px2(g, hx + d, y + 1 + down, 1, 1, '#f0b830');
-  if (!c.sleep) px2(g, hx + (c.flip ? 0 : 1), y + 1 + down, 1, 1, INK);
-  else px2(g, hx + (c.flip ? 0 : 1), y + 1 + down, 1, 1, '#c98a55');
-  px2(g, x + 2, y + 6 + down, 1, step ? 2 : 1, '#f0b830');
-  px2(g, x + 4, y + 6 + down, 1, step ? 1 : 2, '#f0b830');
+  const frameKey = species + (step ? 'W1' : 'W0');
+  const [ox, oy, cw, ch] = OF.atlasFarm.animalCell(species, frameKey);
+  const down = c.eat > 0 ? 1 : 0;
+  g.drawImage(OF.atlasFarm.canvas, ox, oy, cw, ch, x - 1, y - 1 + down, cw, ch);
+  if (c.sleep) drawAnimalSleepEyes(g, x - 1, y - 1 + down, species, c.flip);
 }
 
-function drawCowFarm(g, pal, c, x, y) {
-  const t = c.tone || '#e8e0d0';
-  const moving = c.wait <= 0;
-  const step = moving && Math.floor(c.anim * 6) % 2;
-  const d = c.flip ? -1 : 1;
-  const hx = x + (c.flip ? 0 : 7);
-  const down = c.eat > 0 ? 1 : 0;
-  px2(g, x + 1, y + 3 + down, 9, 4, t);
-  px2(g, x + 1, y + 6 + down, 9, 1, darken(t, 0.3));
-  px2(g, x + 3, y + 2 + down, 5, 1, darken(t, 0.35));
-  px2(g, hx, y + 1 + down, 5, 4, t);
-  px2(g, hx + (c.flip ? 4 : 0), y + 1 + down, 1, 2, '#8a5a2b');
-  if (!c.sleep) px2(g, hx + (c.flip ? 3 : 1), y + 2 + down, 1, 1, '#6d4c41');
-  else px2(g, hx + (c.flip ? 3 : 1), y + 2 + down, 2, 1, '#c98a55');
-  px2(g, x + 2, y + 7 + down, 1, step ? 2 : 1, '#8a5a2b');
-  px2(g, x + 7, y + 7 + down, 1, step ? 2 : 1, '#8a5a2b');
-}
-
-function drawPigFarm(g, pal, c, x, y) {
-  const t = c.tone || '#f0c8c0';
-  const moving = c.wait <= 0;
-  const step = moving && Math.floor(c.anim * 6) % 2;
-  const d = c.flip ? -1 : 1;
-  const hx = x + (c.flip ? 0 : 6);
-  const down = c.eat > 0 ? 1 : 0;
-  px2(g, x + 2, y + 3 + down, 7, 4, t);
-  px2(g, x + 2, y + 6 + down, 7, 1, darken(t, 0.25));
-  px2(g, hx, y + 1 + down, 5, 4, t);
-  px2(g, hx + 1, y + 4 + down, 3, 1, darken(t, 0.3));
-  if (!c.sleep) px2(g, hx + (c.flip ? 3 : 1), y + 3 + down, 1, 1, '#6d4c41');
-  else px2(g, hx + (c.flip ? 3 : 1), y + 3 + down, 2, 1, '#c98a55');
-  px2(g, x + 3, y + 7 + down, 1, step ? 2 : 1, darken(t, 0.4));
-  px2(g, x + 6, y + 7 + down, 1, step ? 2 : 1, darken(t, 0.4));
-}
-
-function drawSheepFarm(g, pal, c, x, y) {
-  const t = c.tone || '#f2f0ea';
-  const moving = c.wait <= 0;
-  const step = moving && Math.floor(c.anim * 6) % 2;
-  const d = c.flip ? -1 : 1;
-  const hx = x + (c.flip ? 0 : 5);
-  const down = c.eat > 0 ? 1 : 0;
-  px2(g, x + 1, y + 3 + down, 9, 3, t);
-  px2(g, x + 2, y + 2 + down, 7, 1, t);
-  px2(g, x + 3, y + 6 + down, 5, 1, '#6d4c41');
-  px2(g, hx, y + 1 + down, 4, 3, '#5d4037');
-  px2(g, hx + (c.flip ? 3 : 0), y + 2 + down, 1, 1, '#3e2723');
-  if (c.sleep) px2(g, hx + 1, y + 2 + down, 2, 1, '#c98a55');
-  px2(g, x + 3, y + 7 + down, 1, step ? 2 : 1, '#6d4c41');
-  px2(g, x + 6, y + 7 + down, 1, step ? 2 : 1, '#6d4c41');
+function drawAnimalSleepEyes(g, x, y, species, flip) {
+  // Mắt nhắm đường cong nhẹ: 1 pixel gốc = 4 atlas px. Dùng pxF vì g là atlas ctx (pre-scaled).
+  const cx = x + (flip ? 6 : 4), cy = y + 1;      // toạ độ pixel gốc tương đối ô
+  const S = SPRITE_SS_FARM;
+  const y0 = Math.round((cy - 0.3) * S), y1 = Math.round((cy + 0.3) * S);
+  const x0 = Math.round((cx - 0.5) * S), x1 = Math.round((cx + 0.5) * S);
+  g.fillStyle = '#c98a55';
+  for (let iy = y0; iy < y1; iy++) {
+    g.fillRect(x0, iy, x1 - x0, 1);
+  }
 }
