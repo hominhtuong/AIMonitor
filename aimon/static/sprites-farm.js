@@ -172,8 +172,6 @@ function farmArm(g, c, dir, gripX, gripY) {
   if (dir === 'down') pxF(g, 3, 8, 1, 2, D);               // tay trái giấu
 }
 
-/* Đạo cụ — hai tư thế A (nhấc/cầm cao) và B (giáng/cúi xuống). Tay ở (12-13, y≈10-11).
- * Gỗ #8a5a2b, kim loại #b0bec5. KHÔNG nét nào vượt y=15 / x=15. */
 /* Đạo cụ — tư thế A (nhấc/cầm cao) và B (giáng/cúi sâu xuống). Biên độ A↔B lớn hơn bản trước
  * để 2 nhịp dễ thấy. Gỗ #8a5a2b, kim loại #b0bec5. KHÔNG nét nào vượt y=15 / x=15. */
 function propHoe(g, y, pose) {
@@ -262,9 +260,9 @@ function propCarry(g, y, pose) {
     pxF(g, 3, 7, 4, 1, '#e8c86a');
     pxF(g, 3, 12, 4, 1, '#8a5a2b');
   } else {
-    pxF(g, 12, 8, 5, 5, '#d9b26a');                   // sọt xách tay
-    pxF(g, 12, 8, 5, 1, '#e8c86a');
-    pxF(g, 12, 13, 5, 1, '#8a5a2b');
+    pxF(g, 12, 8, 4, 5, '#d9b26a');                   // sọt xách tay
+    pxF(g, 12, 8, 4, 1, '#e8c86a');
+    pxF(g, 12, 13, 4, 1, '#8a5a2b');
     pxF(g, 14, 10, 2, 2, '#e0c050');                  // lúa trong sọt
   }
 }
