@@ -725,7 +725,7 @@ function f2Ambient() {
     out.push({
       x, y: a.y, tx: x, ty: a.y, wait: 1 + ai,
       speed: 11, restMin: 2.5, restVar: 4, tone: a.tones[ai % a.tones.length], draw: a.draw,
-      eat: 0, sleep: false,
+      species: a.species, eat: 0, sleep: false,
       pick: () => {
         const bot = a.y === F2_AISLE_Y[1];
         const x = bot ? 12 + Math.random() * 160 : 12 + Math.random() * (ROOM_W - 40);
