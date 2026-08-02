@@ -141,12 +141,48 @@ function f2FrameFor(e) {
   return base + (Math.floor(e.anim * F2_SWING) % 2 ? 'B' : 'A');
 }
 
+/* Cỏ nền có kết cấu: chấm sáng/tối rải theo toạ độ CỐ ĐỊNH (không Math.random — nền nướng
+ * một lần nhưng phải xác định để CI/QA đối chiếu pixel được). Mọi thứ khác (đồi/nhà/chuồng/
+ * luống/lối/rào/đường/ao) vẽ ĐÈ lên nền này nên chấm nằm dưới chúng là ổn. */
+function drawF2Grass(g, f) {
+  px2(g, 0, 0, 260, 176, f.grass);
+  for (let y = 2; y < 176; y += 5) {
+    for (let x = 1 + ((y * 7) % 4); x < 260; x += 9) {
+      // Bỏ qua hai dải luống (đất sẽ phủ lên) — tiết kiệm nét không cần thiết
+      if ((y > 64 && y < 92) || (y > 110 && y < 138)) continue;
+      px2(g, x, y, 1, 1, (x + y) % 3 === 0 ? f.grass2 : f.grassDark);
+    }
+  }
+}
+
+/* Gờ luống: mỗi luống (5 x 2 dãy) có viền đất sáng và 2-3 vết cuốc chéo ở hai đầu. Vẽ trên
+ * nền đất luống đã có (px2 f.soil ở f2DrawStatic), trước cây trồng (f2DrawStation). */
+function drawF2FieldBeds(g, f) {
+  F2_ROW_Y.forEach((ry) => {
+    F2_PLOT_X.forEach((x, i) => {
+      const y = ry - 4;
+      // viền trái/phải + gờ dưới sáng
+      px2(g, x - 1, y, 1, F2_PLOT_H + 8, f.soilLight);
+      px2(g, x + F2_PLOT_W, y, 1, F2_PLOT_H + 8, f.soilLight);
+      px2(g, x - 1, y + F2_PLOT_H + 7, F2_PLOT_W + 2, 1, f.soilLight);
+      // vết cuốc: 2 chéo nhỏ gần hai đầu luống
+      const cuts = i % 2 === 0
+        ? [[2, 2, 3, 1], [F2_PLOT_W - 4, F2_PLOT_H + 2, 3, 1]]
+        : [[3, F2_PLOT_H + 2, 3, 1], [F2_PLOT_W - 3, 2, 3, 1]];
+      cuts.forEach(([cx, cy, cw, ch]) => {
+        px2(g, x + cx, y + cy, cw, ch, f.soilDark);
+        px2(g, x + cx + 1, y + cy + 1, cw, ch, f.soilLight);
+      });
+    });
+  });
+}
+
 /* Nền nướng 260x176 cắt từ ảnh FARM SCENE: nhà gỗ mái xanh (trái), chuồng đỏ + tháp đá
  * (phải), cây + giếng trang trí, 2 luống lớn, hàng rào gỗ trên/dưới. Luống vẽ đất ở đây,
  * cây trồng vẽ ở f2DrawStation (để ở trước người). */
 function f2DrawStatic(g, p, roomId) {
   const f = f2pal();
-  px2(g, 0, 0, 260, 176, f.grass);                      // nền cỏ
+  drawF2Grass(g, f);                                    // cỏ có kết cấu
   drawF2Hills(g, f);                                    // đồi xa — sau cỏ, trước mọi thứ
   drawF2House(g, f, 14, 30);                            // nhà gỗ mái xanh (trái)
   drawF2Coop(g, f, 196, 34);                            // chuồng đỏ
@@ -161,6 +197,7 @@ function f2DrawStatic(g, p, roomId) {
   px2(g, 28, F2_ROW_Y[1] - 4, 204, F2_PLOT_H + 8, f.soil);
   px2(g, 28, F2_ROW_Y[0] - 4, 204, 1, f.soilLight);
   px2(g, 28, F2_ROW_Y[1] - 4, 204, 1, f.soilLight);
+  drawF2FieldBeds(g, f);                                // gờ luống + vết cuốc
   // Hai lối ngang (mỗi dãy một lối NẰM DƯỚI dãy đó — xem F2_AISLE_Y)
   F2_AISLE_Y.forEach((ay) => {
     px2(g, 0, ay, 260, 8, f.grass2);
@@ -313,17 +350,39 @@ function drawF2FruitTree(g, f, x, y) {
   px2(g, x + 4, y + 1, 2, 2, '#f0b830');
 }
 
-/* Cây trồng không lớn dần (YAGNI — spec đã duyệt), vẽ tĩnh ở mỗi luống. Chú ý: `drawStation`
- * được lõi gọi với `(g, st, ent)` — tham số 3 là **entity** đang ngồi chỗ đó (hoặc undefined
- * khi trống), không phải chỉ số chỗ. Đừng dùng nó để tính toán, chỉ vẽ theo `st`. */
+/* Cây trồng 3 giai đoạn tĩnh theo cột (col 0..4 từ st.x=40/70/100/130/160):
+ * - col % 3 === 0: mầm xanh nhỏ   (3x3)
+ * - col % 3 === 1: cây con         (4x5 có lá)
+ * - col % 3 === 2: lúa vàng chín   (4x6, bông vàng)
+ * Không lớn dần theo thời gian (YAGNI — nền nướng một lần). `drawStation` được lõi gọi với
+ * `(g, st, ent)` — tham số 3 là entity, không dùng. */
 function f2DrawStation(g, st) {
   const f = f2pal();
-  // Cây trồng trang trí ở giữa luống, so le theo cột để không trông như dán sẵn
-  const px = st.x + 5 + ((st.x / 30) | 0) % 3;
+  const col = (st.x - 40) / 30 | 0;       // 0..4 — chỉ số luống ngang
+  const px = st.x + 5 + (col % 3);
   const py = st.y + 4;
-  px2(g, px, py, 4, 6, f.crop);
-  px2(g, px + 1, py - 1, 2, 1, lighten(f.crop, 0.15));
-  px2(g, px, py + 5, 4, 1, f.soilDark);
+  if (col % 3 === 0) {
+    // mầm xanh
+    px2(g, px + 1, py + 2, 2, 1, f.crop);
+    px2(g, px, py + 1, 1, 1, lighten(f.crop, 0.15));
+    px2(g, px + 3, py + 1, 1, 1, lighten(f.crop, 0.15));
+    px2(g, px, py + 4, 4, 1, f.soilDark);
+  } else if (col % 3 === 1) {
+    // cây con có lá
+    px2(g, px, py, 4, 4, f.crop);
+    px2(g, px + 1, py - 1, 2, 1, lighten(f.crop, 0.15));
+    px2(g, px - 1, py + 1, 1, 2, darken(f.crop, 0.2));
+    px2(g, px + 4, py + 1, 1, 2, darken(f.crop, 0.2));
+    px2(g, px, py + 5, 4, 1, f.soilDark);
+  } else {
+    // lúa chín — bông vàng
+    px2(g, px, py, 4, 4, f.crop);
+    px2(g, px, py, 4, 1, lighten(f.crop, 0.15));
+    px2(g, px - 1, py + 1, 1, 3, '#e0c050');
+    px2(g, px + 4, py + 1, 1, 3, '#e0c050');
+    px2(g, px + 1, py - 1, 2, 1, '#e0c050');
+    px2(g, px, py + 5, 4, 1, f.soilDark);
+  }
 }
 
 /* Nhịp thở: ngồi thì cả thân dịch xuống 1px một khoảnh khắc mỗi ~2 giây. Dùng `bobFor` (hook
