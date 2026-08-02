@@ -155,31 +155,32 @@ function farmHead(g, c, turn, closed) {
   }
 }
 
-/* Phụ kiện phân biệt 10 nông dân. Nhìn từ SAU (dir 'down'/'up' — tư thế làm việc chính) là
- * nơi người xem thấy nhiều nhất; vài loại cũng lộ ở nhìn ngang ('side'). Tất cả phải BÁM
- * vào thân/đầu (x=5..11, y=5..12), không nét nào bay ra ngoài silhouette. */
+/* Phụ kiện phân biệt 10 nông dân. Nhìn từ SAU ('down'/'up') là nơi người xem thấy nhiều nhất;
+ * vài loại cũng lộ ở nhìn ngang ('side'). Mọi loại có thêm nét sáng/tối để không phải mảng
+ * phẳng; tất cả BÁM vào thân/đầu (x=4..11, y=4..13), không nét nào bay ra silhouette. */
 function farmAcc(g, c, dir) {
   if (!c.acc) return;
   const k = c.acc.kind, col = c.acc.color;
+  const D = darken(col, 0.25), L = lighten(col, 0.25);
   if (dir === 'side') {
-    if (k === 'bandana') { pxF(g, 4, 5, 2, 2, col); }
-    if (k === 'scarf')   { pxF(g, 5, 7, 4, 1, col); pxF(g, 5, 8, 1, 1, darken(col, 0.25)); }
-    if (k === 'satchel') { pxF(g, 4, 8, 2, 1, col); pxF(g, 5, 9, 2, 2, col); }
-    if (k === 'coat')    { pxF(g, 4, 11, 8, 2, col); }
-    if (k === 'overalls'){ pxF(g, 4, 7, 1, 4, col); pxF(g, 11, 7, 1, 4, col); }
+    if (k === 'bandana') { pxF(g, 4, 5, 2, 2, col); pxF(g, 4, 5, 2, 0.6, L); }
+    if (k === 'scarf')   { pxF(g, 5, 9, 4, 1, col); pxF(g, 5, 10, 2, 1, D); }
+    if (k === 'satchel') { pxF(g, 4, 10, 2, 2, col); pxF(g, 5, 12, 2, 1, D); }
+    if (k === 'coat')    { pxF(g, 4, 9, 8, 4, col); pxF(g, 4, 9, 8, 0.6, L); }
+    if (k === 'overalls'){ pxF(g, 4, 10, 1, 4, col); pxF(g, 11, 10, 1, 4, col); }
     return;
   }
   // down / up — nhìn từ sau lưng
-  if (k === 'bandana') { pxF(g, 5, 5, 6, 1, col); pxF(g, 4, 6, 2, 1, col); pxF(g, 10, 6, 2, 1, col); }
-  if (k === 'bun')     { pxF(g, 6, 5, 3, 1, col); pxF(g, 7, 6, 1, 1, col); }
-  if (k === 'ponytail'){ pxF(g, 7, 6, 2, 2, col); pxF(g, 7, 8, 1, 3, col); }
-  if (k === 'scarf')   { pxF(g, 5, 7, 6, 1, col); pxF(g, 7, 8, 2, 1, darken(col, 0.25)); }
-  if (k === 'satchel') { pxF(g, 5, 8, 2, 1, col); pxF(g, 6, 9, 1, 2, col); pxF(g, 9, 9, 2, 2, col); }
-  if (k === 'coat')    { pxF(g, 4, 11, 8, 2, col); }
-  if (k === 'overalls'){ pxF(g, 5, 7, 1, 4, col); pxF(g, 10, 7, 1, 4, col); }
-  if (k === 'waist')   { pxF(g, 5, 10, 6, 1, col); }
-  if (k === 'stripe')  { pxF(g, 7, 7, 2, 4, col); }
-  if (k === 'rim')     { pxF(g, 5, 4, 6, 1, col); }
+  if (k === 'bandana') { pxF(g, 5, 4.4, 6, 1.2, col); pxF(g, 4, 5.6, 3, 1, col); pxF(g, 9, 5.6, 3, 1, col); }
+  if (k === 'bun')     { roundBoxF(g, 5.6, 3.6, 3.2, 1.6, 1.2, col); pxF(g, 7, 5.2, 1.6, 0.8, D); }
+  if (k === 'ponytail'){ pxF(g, 8, 5, 2, 1, col); pxF(g, 8.4, 6, 1.6, 1.6, col); pxF(g, 8, 7.6, 2, 2, col); }
+  if (k === 'scarf')   { pxF(g, 5, 8, 6, 1, col); pxF(g, 7, 9, 2, 1, D); }
+  if (k === 'satchel') { pxF(g, 5, 10, 2, 1, col); pxF(g, 6, 11, 1, 2, col); pxF(g, 9, 11, 2, 2, col); }
+  if (k === 'coat')    { pxF(g, 4, 9, 8, 4, col); pxF(g, 4, 9, 8, 0.6, L); }
+  if (k === 'overalls'){ pxF(g, 5, 10, 1, 4, col); pxF(g, 10, 10, 1, 4, col); }
+  if (k === 'waist')   { pxF(g, 5, 13, 6, 0.7, col); }
+  if (k === 'stripe')  { pxF(g, 7, 10, 2, 4, col); pxF(g, 7, 10, 2, 0.7, L); }
+  if (k === 'rim')     { pxF(g, 5, 3.2, 6, 0.7, col); }
 }
 
 /* Thân áo nhìn xuống / lên / ngang. 4 tông: vai sáng (L), áo chính (S), cạnh tối (D2), gấu
@@ -229,6 +230,7 @@ function propHoe(g, y, pose) {
   } else {
     pxF(g, 13, 11, 1, 4, '#8a5a2b');
     pxF(g, 11, 15, 4, 1, '#b0bec5');
+    pxF(g, 14, 15, 1, 1, darken('#b0bec5', 0.3));       // cạnh tối lưỡi
   }
 }
 function propPlant(g, y, pose) {
@@ -241,6 +243,7 @@ function propPlant(g, y, pose) {
   } else {
     pxF(g, 13, 12, 1, 3, '#6d4c41');
     pxF(g, 12, 15, 3, 1, '#4caf50');
+    pxF(g, 12, 14, 3, 0.5, darken('#4caf50', 0.3));      // tối mép chạm đất
   }
 }
 function propHarvest(g, y, pose) {
@@ -251,6 +254,7 @@ function propHarvest(g, y, pose) {
   } else {
     pxF(g, 13, 11, 1, 4, '#8a5a2b');
     pxF(g, 10, 15, 5, 1, '#b0bec5');
+    pxF(g, 14, 15, 1, 1, darken('#b0bec5', 0.3));       // cạnh tối lưỡi
   }
 }
 function propAxe(g, y, pose) {
@@ -261,16 +265,19 @@ function propAxe(g, y, pose) {
   } else {
     pxF(g, 13, 11, 1, 4, '#8a5a2b');
     pxF(g, 9, 15, 7, 1, '#b0bec5');
+    pxF(g, 14, 15, 1, 1, darken('#b0bec5', 0.3));       // cạnh tối lưỡi
   }
 }
 function propWater(g, y, pose) {
   if (pose === 'A') {
     pxF(g, 11, 8, 5, 5, '#4a90d9');                   // thùng to hơn
     pxF(g, 11, 8, 5, 1, '#9cc9ef');
+    pxF(g, 14.3, 9, 0.7, 4, darken('#4a90d9', 0.3));  // cạnh tối thùng
     pxF(g, 10, 6, 1, 3, '#3d5a80');                   // vòi
     pxF(g, 9, 5, 1, 1, '#9cc9ef');                    // giọt rơi
   } else {
     pxF(g, 10, 11, 4, 4, '#4a90d9');
+    pxF(g, 12.3, 12, 0.7, 3, darken('#4a90d9', 0.3)); // cạnh tối thùng
     pxF(g, 9, 9, 1, 3, '#3d5a80');                    // vòi nghiêng xuống
     pxF(g, 9, 12, 1, 1, '#9cc9ef');
     pxF(g, 8, 14, 1, 1, '#9cc9ef');
@@ -280,6 +287,7 @@ function propWater(g, y, pose) {
 function propFish(g, y, pose) {
   if (pose === 'A') {
     pxF(g, 13, 4, 1, 8, '#8a5a2b');
+    pxF(g, 13, 4, 1, 0.6, lighten('#8a5a2b', 0.15));  // sáng cán
     pxF(g, 13, 12, 1, 3, '#e8e6e0');                  // dây câu
     pxF(g, 13, 15, 1, 1, '#b0bec5');                  // phao
   } else {
@@ -292,11 +300,14 @@ function propFish(g, y, pose) {
 function propInteract(g, y, pose) {
   if (pose === 'A') {
     pxF(g, 11, 7, 5, 5, '#e8c547');                   // bảng ghi to hơn
+    pxF(g, 11, 7, 5, 0.6, lighten('#e8c547', 0.2));   // sáng mép trên
+    pxF(g, 11, 11.4, 5, 0.6, darken('#e8c547', 0.25)); // tối gấu bảng
     pxF(g, 12, 8, 3, 3, '#6d4c41');
     pxF(g, 13, 12, 1, 3, '#8a5a2b');                  // bút chì dài
     pxF(g, 13, 12, 1, 1, '#b0bec5');
   } else {
     pxF(g, 11, 10, 5, 5, '#e8c547');
+    pxF(g, 11, 14.4, 5, 0.6, darken('#e8c547', 0.25)); // tối gấu bảng
     pxF(g, 12, 11, 3, 3, '#6d4c41');
     pxF(g, 13, 15, 1, 1, '#8a5a2b');
   }
@@ -309,6 +320,7 @@ function propCarry(g, y, pose) {
   } else {
     pxF(g, 12, 8, 4, 5, '#d9b26a');                   // sọt xách tay
     pxF(g, 12, 8, 4, 1, '#e8c86a');
+    pxF(g, 14.3, 9, 0.7, 3, darken('#d9b26a', 0.3));  // cạnh tối sọt
     pxF(g, 12, 13, 4, 1, '#8a5a2b');
     pxF(g, 14, 10, 2, 2, '#e0c050');                  // lúa trong sọt
   }
