@@ -395,11 +395,11 @@ function drawChickenFarm(g, pal, c, x, y) {
   px2(g, x + 1, y + 2 + down, 5, 4, t);
   px2(g, x + 1, y + 5 + down, 5, 1, darken(t, 0.25));
   px2(g, x + (c.flip ? 5 : 0), y + 3 + down, 1, 2, darken(t, 0.3));
-  px2(g, hx, y - down, 2, 3, t);                    // đầu hạ xuống đất
-  px2(g, hx, y - 1 - down, 1, 1, '#e05a4e');
-  px2(g, hx + d, y + 1 - down, 1, 1, '#f0b830');
-  if (!c.sleep) px2(g, hx + (c.flip ? 0 : 1), y + 1 - down, 1, 1, INK);
-  else px2(g, hx + (c.flip ? 0 : 1), y + 1 - down, 1, 1, '#c98a55');
+  px2(g, hx, y + down, 2, 3, t);                    // đầu hạ xuống đất
+  px2(g, hx, y - 1 + down, 1, 1, '#e05a4e');
+  px2(g, hx + d, y + 1 + down, 1, 1, '#f0b830');
+  if (!c.sleep) px2(g, hx + (c.flip ? 0 : 1), y + 1 + down, 1, 1, INK);
+  else px2(g, hx + (c.flip ? 0 : 1), y + 1 + down, 1, 1, '#c98a55');
   px2(g, x + 2, y + 6 + down, 1, step ? 2 : 1, '#f0b830');
   px2(g, x + 4, y + 6 + down, 1, step ? 1 : 2, '#f0b830');
 }

@@ -541,7 +541,7 @@ function f2Ambient() {
     { draw: drawChickenFarm, tones: ['#f5efe0'], y: F2_AISLE_Y[1] },   // bồ câu — gà tone trắng hơn
   ];
   animals.forEach((a, ai) => {
-    const x = 30 + ai * 62;
+    const x = Math.min(30 + ai * 62, ROOM_W - 20);
     out.push({
       x, y: a.y, tx: x, ty: a.y, wait: 1 + ai,
       speed: 11, restMin: 2.5, restVar: 4, tone: a.tones[ai % a.tones.length], draw: a.draw,
