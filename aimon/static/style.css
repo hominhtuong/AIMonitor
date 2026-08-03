@@ -503,35 +503,6 @@ body.compact table { display: block; overflow-x: auto; white-space: nowrap; }
   background: var(--dim);
 }
 
-/* ------------------------------------------------------------- cửa sổ nổi (?view=office)
-   Chế độ cho cửa sổ phụ luôn nằm trên của VSCode: bỏ hết mọi thứ trừ căn phòng. Không dùng
-   `display:none` cho cả `.wrap` rồi vẽ canvas ở chỗ khác - canvas phải nằm y nguyên chỗ cũ,
-   nếu không nó rơi vào vùng `morph()` quản lý và cứ mỗi nhịp làm mới lại bị thay mới, mất
-   context và nhân vật nhảy về vị trí đầu. Ở đây chỉ giấu hàng xóm của nó. */
-body.pip { overflow: hidden; }
-body.pip header,
-body.pip .usage,
-body.pip .kpis,
-body.pip .chips,
-body.pip .tabs,
-body.pip .kindbar,
-body.pip #pane-office .h2row,
-body.pip .skinbox,
-body.pip .office-legend,
-body.pip #office-detail,
-body.pip #toast { display: none !important; }
-
-body.pip .wrap { padding: 0; max-width: none; }
-body.pip .office-stage {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  align-items: center;
-  height: 100vh;
-  background: var(--bg);
-}
-body.pip #office-canvas { border-radius: 0; box-shadow: none; cursor: pointer; }
-
 /* ------------------------------------------------- bảng chọn nhân vật
    Gập lại bằng <details> vì đây là thứ chỉnh một lần rồi thôi - mở sẵn thì mười ô chiếm
    mất chỗ của căn phòng, mà phòng mới là cái người ta vào đây để xem. */

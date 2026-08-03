@@ -92,27 +92,7 @@ def collect_roots(procs: dict, kids: dict, pid_map: dict) -> tuple[list[dict], s
     return roots, live_sessions
 
 
-def usage_only() -> dict:
-    """Chỉ hạn mức và tổng token - không `ps`, không `lsof`, không dựng cây tiến trình.
-
-    Đo trên máy thật: 4 ms so với 63 ms của `build()`. Dùng cho thanh trạng thái VSCode,
-    thứ hỏi mỗi 6 giây ở MỖI cửa sổ nhưng chỉ hiện hai con số phần trăm.
-
-    Vẫn phải gọi `C.scan()` chứ không đọc thẳng `C.windows()`: `windows()` chỉ cộng lại
-    những gì `scan()` đã nạp vào `_STATE`, nên bỏ bước đó thì số đứng im mãi ở lần đọc đầu
-    tiên. `scan()` đọc tăng dần nên lần sau chỉ mất 2 ms.
-    """
-    with _lock:
-        C.scan()
-        win = C.windows()
-        return {
-            "ts": time.time(),
-            "usage": U.collect(win),
-            "totals": {"today": win["today"], "h5": win["h5"], "d7": win["d7"]},
-        }
-
-
-def build(want_ports: bool = True) -> dict:
+def build() -> dict:
     with _lock:
         procs = P.snapshot()
         kids = P.children_map(procs)
@@ -202,5 +182,5 @@ def build(want_ports: bool = True) -> dict:
             "orphan_sessions": orphans[:60],
             "totals": totals,
             "processes": top_rows,
-            **(PO.collect() if want_ports else PO.cached()),
+            **PO.collect(),
         }

@@ -87,8 +87,6 @@ jobs:
           Invoke-WebRequest "$url/static/app.js" -TimeoutSec 5 | Out-Null
           Invoke-WebRequest "$url/static/office.js" -TimeoutSec 5 | Out-Null
           Invoke-WebRequest "$url/static/sprites.js" -TimeoutSec 5 | Out-Null
-          Invoke-WebRequest "$url/static/sprites-farm.js" -TimeoutSec 5 | Out-Null
-          Invoke-WebRequest "$url/static/scene-farm-v2.js" -TimeoutSec 5 | Out-Null
           Write-Host "OK - exe chạy được, có đủ tài nguyên"
           Stop-Process -Id $p.Id -Force
 

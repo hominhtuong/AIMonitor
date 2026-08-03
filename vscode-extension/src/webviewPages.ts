@@ -17,53 +17,6 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/**
- * Trang bọc dashboard: một `<iframe>` trỏ về server localhost, cộng cầu nối báo xuống trang
- * biết mình đang hiện hay đang bị giấu.
- *
- * Vì sao cần cầu nối: `retainContextWhenHidden` giữ webview sống khi user thu gọn panel hoặc
- * chuyển sang tab khác - bắt buộc phải giữ, không thì server bị giết rồi spawn lại liên tục.
- * Cái giá là trang bên trong không biết mình bị giấu, vì VSCode giấu bằng `display:none` mà
- * Page Visibility API không tính chuyện đó: `document.hidden` vẫn false, `setInterval` vẫn
- * chạy đủ nhịp, `requestAnimationFrame` vẫn quay 60 fps. Đã đo tận nơi (docs/hieu-nang.md).
- * Không có cầu nối này thì thu gọn panel xong server vẫn bị hỏi mỗi 3 giây, mãi mãi.
- *
- * Hai chặng vì dashboard khác origin với trang webview: extension => webview => iframe.
- * `'*'` làm targetOrigin chấp nhận được, nội dung chỉ là một cờ bật tắt.
- *
- * `fill` khác nhau giữa hai khung nhìn: panel hẹp dùng 100% chiều ngang, tab dùng 100vw.
- *
- * Chiều ngược lại đi cùng đường: cửa sổ nổi (`?view=office`) không có chỗ bày cây tiến trình
- * nên bấm vào một nhân vật thì trang gửi `aimon.openPanel` lên, trang này chuyển tiếp cho
- * extension host mở dashboard đầy đủ ra.
- */
-export function dashboardFramePage(url: string, wide: boolean): string {
-  const size = wide ? 'width:100vw;height:100vh' : 'width:100%;height:100vh';
-  const body = wide ? 'margin:0;padding:0;overflow:hidden' : 'margin:0;padding:0';
-  return `<!DOCTYPE html><html><body style="${body}">` +
-    `<iframe id="f" src="${url}" style="border:0;${size}"></iframe>` +
-    `<script>
-      const f = document.getElementById('f');
-      // acquireVsCodeApi chỉ được gọi ĐÚNG một lần trong đời một webview, gọi lần hai là ném.
-      const api = acquireVsCodeApi();
-      let last = null;
-      window.addEventListener('message', (e) => {
-        const m = e.data;
-        if (!m) return;
-        if (m.command === 'aimon.openPanel') { api.postMessage(m); return; }
-        if (m.command !== 'aimon.visibility') return;
-        last = m;
-        if (f.contentWindow) f.contentWindow.postMessage(m, '*');
-      });
-      // Iframe nạp xong SAU khi webview đã nhận tin thì phải gửi lại, không thì trang không
-      // bao giờ biết mình đang bị giấu.
-      f.addEventListener('load', () => {
-        if (last && f.contentWindow) f.contentWindow.postMessage(last, '*');
-      });
-    </script>` +
-    `</body></html>`;
-}
-
 function page(body: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body { font-family: var(--vscode-font-family); font-size: 13px; padding: 14px;

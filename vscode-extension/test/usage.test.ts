@@ -89,27 +89,6 @@ test('dashboardUrl carries the settings the page reads', () => {
   assert.equal(parsed.searchParams.get('compact'), '1');
 });
 
-test('cửa sổ nổi xin đúng khung nhìn Văn phòng', () => {
-  // Thiếu `view=office` thì cửa sổ nổi hiện nguyên cả dashboard: header, tab, bảng tiến
-  // trình - trong một khung cao chưa tới 300px.
-  const u = dashboardUrl('http://127.0.0.1:8899/', {
-    theme: 'dark',
-    refreshSeconds: 3,
-    compact: false,
-    view: 'office',
-  });
-  assert.equal(new URL(u).searchParams.get('view'), 'office');
-});
-
-test('không xin view thì tham số vắng mặt hẳn', () => {
-  const u = dashboardUrl('http://127.0.0.1:8899/', {
-    theme: 'dark',
-    refreshSeconds: 3,
-    compact: false,
-  });
-  assert.equal(new URL(u).searchParams.has('view'), false);
-});
-
 test('dashboardUrl gửi kèm bộ lọc loại agent', () => {
   const u = dashboardUrl('http://127.0.0.1:8899/', {
     theme: 'dark',
@@ -118,31 +97,6 @@ test('dashboardUrl gửi kèm bộ lọc loại agent', () => {
     aiKinds: ['claude-code', 'codex'],
   });
   assert.equal(new URL(u).searchParams.get('kinds'), 'claude-code,codex');
-});
-
-test('dashboardUrl gửi kèm bối cảnh của khung nhìn Văn phòng', () => {
-  const u = dashboardUrl('http://127.0.0.1:8899/', {
-    theme: 'dark',
-    refreshSeconds: 3,
-    compact: false,
-    officeScene: 'farm',
-    officePack: 'pets',
-  });
-  const q = new URL(u).searchParams;
-  assert.equal(q.get('scene'), 'farm');
-  assert.equal(q.get('pack'), 'pets');
-});
-
-test('bối cảnh để trống thì KHÔNG gửi scene', () => {
-  // Giống `kinds`: đây chỉ là giá trị KHỞI ĐẦU. Gửi chuỗi rỗng thì trang hiểu là bị ép về
-  // một bối cảnh không tồn tại; vắng mặt hẳn thì trang tự lấy lựa chọn người dùng đã lưu.
-  const u = dashboardUrl('http://127.0.0.1:8899/', {
-    theme: 'dark',
-    refreshSeconds: 3,
-    compact: false,
-    officeScene: '',
-  });
-  assert.equal(new URL(u).searchParams.has('scene'), false);
 });
 
 test('không có loại nào thì KHÔNG gửi kinds', () => {

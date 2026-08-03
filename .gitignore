@@ -22,7 +22,7 @@ Thumbs.db
 # Git worktrees (thư mục làm việc tách biệt)
 .worktrees/
 
-# File brainstorm tạm của visual companion (browser mockups)
+# Scratch của các skill superpowers (brainstorm preview, ledger subagent-driven-development...)
 .superpowers/
 
 # Ảnh tham khảo nhân vật: để ở máy làm cảm hứng vẽ, KHÔNG đẩy lên.

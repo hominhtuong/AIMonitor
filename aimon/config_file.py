@@ -41,16 +41,11 @@ DEFAULTS = {
     "port": 0,                # 0 = dùng mặc định của server (8899 rồi lùi dần)
     "ai_kinds": DEFAULT_AI_KINDS,   # loại agent hiện trên dashboard; ["*"] = tất cả
     "office_pack": "",              # bộ nhân vật cho khung nhìn Văn phòng; "" = bộ mặc định
-    "office_scene": "",             # bối cảnh: office | farm | delivery; "" = bối cảnh mặc định
 }
 
 # Các bộ nhân vật nằm ở static/sprites.js (nơi vẽ ra chúng). Ở đây chỉ cần biết chuỗi nào
 # hợp lệ để không ghi rác vào cấu hình; trang web vẫn tự kiểm lại lần nữa.
-OFFICE_PACKS = ("voyage", "ninja", "office", "pets", "slime", "mascot", "crew", "legends")
-
-# Các bối cảnh nằm ở static/office.js (Văn phòng) và static/scene-*.js. Cùng lý do như trên:
-# ở đây chỉ chặn giá trị rác, trang web vẫn tự kiểm lại lần nữa.
-OFFICE_SCENES = ("office", "farm", "delivery", "farm2")
+OFFICE_PACKS = ("voyage", "ninja", "office", "pets", "slime", "mascot", "crew")
 
 _THEMES = ("auto", "dark", "light")
 
@@ -85,10 +80,6 @@ def _clean(raw: dict) -> dict:
     pack = raw.get("office_pack")
     if isinstance(pack, str) and pack.strip() in OFFICE_PACKS:
         out["office_pack"] = pack.strip()
-
-    scene = raw.get("office_scene")
-    if isinstance(scene, str) and scene.strip() in OFFICE_SCENES:
-        out["office_scene"] = scene.strip()
 
     kinds = raw.get("ai_kinds")
     if isinstance(kinds, list):
@@ -136,7 +127,6 @@ def frontend() -> dict:
         "refresh_seconds": cfg["refresh_seconds"],
         "ai_kinds": cfg["ai_kinds"],
         "office_pack": cfg["office_pack"],
-        "office_scene": cfg["office_scene"],
         # Kèm nhãn luôn để trang web khỏi phải giữ bản sao thứ hai của KIND_LABELS. Tên sản
         # phẩm (Claude Code, Codex...) không dịch, nên gửi thẳng bản tiếng Anh là đủ.
         "known_kinds": {k: KIND_LABELS.get(k, k) for k in sorted(AI_ROOT_KINDS)},

@@ -75,29 +75,6 @@ to configure, no settings to fill in.
 
 The dashboard has no dependencies of its own - the server is pure Python standard library.
 
-## Performance: it will not slow your machine down
-
-Measured on an Apple M2 (8 cores, 16 GB) running 500+ processes - not estimated. Full method
-and numbers: [docs/hieu-nang.md](https://github.com/hominhtuong/AIMonitor/blob/main/docs/hieu-nang.md).
-
-| What you are doing | CPU (of the whole machine) | RAM |
-| --- | --- | --- |
-| Installed but never opened | **0%** - no process running | 0 |
-| Status bar only | **0.01%** | 30 MB |
-| Panel open but collapsed / behind another view | **0%** - polling stops | 30 MB |
-| Dashboard open | **0.37%** | 30 MB + ~40 MB page |
-| Dashboard + Office view | **0.70%** | 30 MB + ~47 MB page |
-
-- **Nothing starts until you open the panel.** The status bar item never launches the server;
-  it only displays numbers if one is already running.
-- **Collapse the panel and it goes fully idle** - both the data polling and the animation
-  stop, verified by counting actual requests.
-- **The extension host stays responsive.** The status bar fetches 2.4 KB every 6 seconds, not
-  a full snapshot.
-- **Windows costs more** than macOS/Linux because listing processes there has to spawn
-  PowerShell. Estimated 10-35% of one core while the dashboard is open, not yet measured on
-  real hardware.
-
 ## Privacy
 
 Everything is local. The extension starts a server bound to `127.0.0.1`, and the dashboard

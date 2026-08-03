@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import errno
-import gzip
 import json
 import mimetypes
 import os
@@ -48,7 +47,7 @@ BASE = os.path.join(sys._MEIPASS, "aimon") if getattr(sys, "frozen", False) else
 STATIC_DIR = os.path.join(BASE, "static")
 IS_WINDOWS = sys.platform.startswith("win")
 
-VERSION = "2.2.0"
+VERSION = "2.0.0"
 
 DEFAULT_PORT = 8899
 PORT_SCAN_TRIES = 20  # 8899..8919 rồi mới xin cổng ngẫu nhiên
@@ -171,52 +170,30 @@ class Handler(BaseHTTPRequestHandler):
         if os.environ.get("AIMON_VERBOSE"):
             super().log_message(fmt, *args)
 
-    def _send(self, body: bytes, ctype: str, code: int = 200, level: int = 0):
-        """Gửi một phản hồi, nén gzip nếu client nhận và phần thân đủ to.
-
-        Trên loopback thì nén gần như vô nghĩa, nhưng `extensionKind` để
-        `["workspace", "ui"]` nên qua Remote-SSH iframe đi qua đường port forwarding của
-        VSCode: lúc đó `/api/snapshot` là 197 KB mỗi 3 giây, tức 236 MB mỗi giờ chạy qua
-        SSH. Nén xuống còn 35 KB, tức 42 MB mỗi giờ.
-
-        Ngưỡng 1 KB vì gói nhỏ hơn thế thì phần header gzip ăn hết phần tiết kiệm.
-        Mức nén khác nhau theo loại: JSON gọi mỗi 3 giây nên lấy mức 3 (nhanh gấp đôi mức
-        6, chỉ to hơn 5 KB); file tĩnh chỉ nạp lại khi webview dựng lại nên lấy mức 6.
-        """
-        if level and len(body) >= 1024 and "gzip" in self.headers.get("Accept-Encoding", ""):
-            packed = gzip.compress(body, level)
-            if len(packed) < len(body):
-                body, encoding = packed, "gzip"
-            else:
-                encoding = ""
-        else:
-            encoding = ""
+    def _json(self, payload, code: int = 200):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        if encoding:
-            self.send_header("Content-Encoding", encoding)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
-
-    def _json(self, payload, code: int = 200):
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self._send(body, "application/json; charset=utf-8", code, level=3)
 
     def _file(self, path: str):
         real = os.path.realpath(path)
         if not real.startswith(os.path.realpath(STATIC_DIR)) or not os.path.isfile(real):
             return self._json({"error": "not found"}, 404)
         ctype = mimetypes.guess_type(real)[0] or "application/octet-stream"
-        text = ctype.startswith("text") or "javascript" in ctype or "json" in ctype or "svg" in ctype
-        if text:
+        if ctype.startswith("text") or "javascript" in ctype or "json" in ctype or "svg" in ctype:
             ctype += "; charset=utf-8"
         with open(real, "rb") as f:
             body = f.read()
-        # Chỉ nén thứ nén được. Ảnh và font đã nén sẵn, chạy gzip lên chúng là tốn CPU để
-        # ra file to hơn.
-        self._send(body, ctype, level=6 if text else 0)
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_GET(self):
         u = urlparse(self.path)
@@ -228,22 +205,8 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/favicon.svg":
             return self._file(os.path.join(STATIC_DIR, "favicon.svg"))
         if route == "/api/snapshot":
-            # `?ports=0`: trang đang xem tab không dùng tới dữ liệu cổng. `lsof` chiếm 28 ms
-            # trên tổng 63 ms của một lần build, mà tab Cổng & Docker thì hiếm khi mở - xem
-            # docs/hieu-nang.md. Bỏ tham số đi là hành vi cũ, nên ai gọi API bằng curl vẫn
-            # nhận đủ dữ liệu như trước.
-            want_ports = (parse_qs(u.query).get("ports") or ["1"])[0] != "0"
             try:
-                return self._json(SNAP.build(want_ports=want_ports))
-            except Exception as e:
-                return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
-        if route == "/api/usage":
-            # Chỉ hạn mức và tổng token. Thanh trạng thái của extension VSCode dùng cái này:
-            # nó chỉ cần 2 KB trong 210 KB của /api/snapshot, mà mỗi cửa sổ VSCode lại hỏi
-            # 6 giây một lần - hỏi bằng /api/snapshot là bắt server quét `ps` toàn máy cộng
-            # `lsof` chỉ để in ra một con số phần trăm.
-            try:
-                return self._json(SNAP.usage_only())
+                return self._json(SNAP.build())
             except Exception as e:
                 return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
         if route == "/api/pulse":
@@ -295,13 +258,13 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/config.js":
             # Trả JS chứ không phải JSON, và index.html nạp nó TRƯỚC app.js: nhờ vậy trang
             # biết theme ngay từ lúc dựng, không vẽ nền tối rồi mới nháy sang nền sáng.
-            # `version` là phiên bản của SERVER đang phục vụ trang này, không phải của vỏ đang
-            # nhúng nó. Hai số này lệch nhau được: extension mặc định dùng lại server đang chạy
-            # sẵn (app macOS, .exe, cửa sổ VSCode khác), nên cài extension bản mới mà server cũ
-            # còn sống thì trang vẫn là trang cũ. Footer bày cả hai chính vì ca đó.
-            cfg = dict(CFG.frontend(), version=VERSION)
-            body = ("window.AIMON_CONFIG=" + json.dumps(cfg) + ";").encode("utf-8")
-            return self._send(body, "application/javascript; charset=utf-8")
+            body = ("window.AIMON_CONFIG=" + json.dumps(CFG.frontend()) + ";").encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return self.wfile.write(body)
         return self._json({"error": "not found"}, 404)
 
     def do_POST(self):

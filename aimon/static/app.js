@@ -15,14 +15,7 @@ const S = {
   events: {},
   busy: false,
   modalOpen: false,
-  // Vỏ nhúng (extension VSCode) báo xuống là panel đang bị giấu. Xem pageVisible().
-  embedHidden: false,
-  // `?view=office`: cả trang chỉ còn căn phòng, dùng cho cửa sổ nổi (PIP) của extension.
-  // Xem applyEmbedOptions().
-  pip: false,
   caps: { pause: true, os: 'macos' },
-  // Phiên bản của vỏ đang nhúng trang (`?ext=`). Xem versionLine().
-  extVersion: '',
   // Số vừa đổi thì chữ sáng lên rồi mờ dần về màu cũ trong 1.1s. Chỉ đổi màu chữ,
   // không đụng nền và không đổi kích thước nên không gây giật. Không còn công tắc.
   fx: true,
@@ -276,11 +269,7 @@ async function loadSnapshot() {
   if (S.busy || S.modalOpen) return;
   S.busy = true;
   try {
-    // Chỉ xin dữ liệu cổng khi đang thật sự xem tab Cổng & Docker: `lsof` chiếm 28 ms
-    // trong 63 ms của một lần build, mà bốn tab kia không đọc tới nó. Vừa bấm sang tab đó
-    // thì handler bên dưới gọi loadSnapshot() ngay, nên không phải chờ hết một nhịp.
-    const q = S.tab === 'net' ? '' : '?ports=0';
-    const r = await fetch('/api/snapshot' + q, { cache: 'no-store' });
+    const r = await fetch('/api/snapshot', { cache: 'no-store' });
     const data = await r.json();
     if (data.error) { toast(t('err.snapshot', { msg: data.error }), 'err'); return; }
     S.snap = data;
@@ -351,24 +340,7 @@ function renderAll() {
   setStatus('');   // chạy bình thường thì không cần nhãn nào
   // giờ cập nhật chuyển thành tooltip của nút Làm mới, không chiếm chỗ trên thanh đầu
   $('#refresh').title = t('hdr.updated', { time: clockOf(S.snap.ts) });
-  setText('#ver', versionLine() + (S.caps.pause ? '' : t('hdr.no_pause')));
-}
-
-/** Dòng cuối trang: phiên bản đang chạy THẬT + hệ điều hành.
- *
- * `version` lấy từ `/api/config.js`, tức của SERVER đang phục vụ trang - không phải của vỏ
- * đang nhúng nó. Extension mặc định dùng lại server có sẵn (app macOS, .exe, hay cửa sổ VSCode
- * khác), nên cài extension bản mới mà server cũ còn sống thì trang vẫn là trang cũ. Lệch nhau
- * thì bày cả hai số, vì đó chính là lúc người dùng cần biết. */
-function versionLine() {
-  const cfg = window.AIMON_CONFIG || {};
-  const parts = [];
-  if (cfg.version) parts.push('v' + cfg.version);
-  if (S.extVersion && S.extVersion !== cfg.version) {
-    parts.push(t('foot.ext', { v: S.extVersion }));
-  }
-  if (S.caps.os) parts.push(S.caps.os);
-  return parts.join(' · ');
+  setText('#ver', (S.caps.os || '') + (S.caps.pause ? '' : t('hdr.no_pause')));
 }
 
 function renderHeader() {
@@ -869,21 +841,14 @@ function syncKindBar() {
   if (el) el.hidden = !KIND_TABS.has(S.tab);
 }
 
-/** Bật một tab. Tách riêng khỏi handler của nút vì chế độ cửa sổ nổi (`?view=office`) phải
- *  bật thẳng tab Văn phòng lúc dựng trang, không qua cú bấm nào. */
-function showTab(name) {
-  S.tab = name;
-  document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === name));
-  document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'pane-' + name));
-  syncKindBar();
-  if (name === 'hist') loadHistory();
-  // Tab Cổng dùng dữ liệu mà bốn tab kia không xin, nên vừa sang là phải nạp lại ngay -
-  // không thì người dùng nhìn số cũ tới hết một nhịp làm mới.
-  if (name === 'net') loadSnapshot();
-}
-
 document.querySelectorAll('.tabs button').forEach((b) => {
-  b.addEventListener('click', () => showTab(b.dataset.tab));
+  b.addEventListener('click', () => {
+    S.tab = b.dataset.tab;
+    document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'pane-' + S.tab));
+    syncKindBar();
+    if (S.tab === 'hist') loadHistory();
+  });
 });
 
 $('#hist-range').addEventListener('change', () => loadHistory());
@@ -908,45 +873,12 @@ $('#quit').addEventListener('click', async () => {
   setStatus(t('hdr.stopped'));
 });
 $('#interval').addEventListener('change', () => { S.interval = +$('#interval').value; schedule(); });
-document.addEventListener('visibilitychange', onVisibility);
-
-/* Trang có đang được nhìn không.
- *
- * `document.hidden` KHÔNG đủ, và đây là chỗ đã đo thật: vỏ nhúng của VSCode giấu webview
- * bằng cách cho nó `display:none`, mà Page Visibility API không đếm chuyện đó - thử ra
- * `document.hidden === false`, `setInterval` vẫn chạy đủ nhịp và `requestAnimationFrame`
- * vẫn quay 60 fps trong một cái iframe không ai thấy. Tức là thu gọn panel AI Monitor xong
- * thì server vẫn bị hỏi 207 KB mỗi 3 giây, mãi mãi.
- *
- * Vì vậy vỏ nhúng tự báo xuống qua postMessage; `S.embedHidden` là cờ đó. Mở trang trong
- * browser thường thì không ai gửi gì, cờ nằm im ở false và mọi thứ như cũ. */
-function pageVisible() {
-  return !document.hidden && !S.embedHidden;
-}
-
-function onVisibility() {
-  schedule();
-  if (typeof officeSync === 'function') officeSync();
-}
-
-window.addEventListener('message', (ev) => {
-  const m = ev.data;
-  if (!m || m.command !== 'aimon.visibility') return;
-  const hidden = !m.visible;
-  if (hidden === S.embedHidden) return;
-  S.embedHidden = hidden;
-  onVisibility();
-  // Hiện lại thì nạp ngay một nhịp: chờ hết chu kỳ mới có số là người dùng nhìn thấy dữ
-  // liệu cũ của lúc trước khi ẩn, tưởng tool treo.
-  if (!hidden) loadSnapshot();
-});
+document.addEventListener('visibilitychange', schedule);
 
 function schedule() {
   if (S.timer) { clearInterval(S.timer); S.timer = null; }
-  // Ẩn thì KHÔNG đặt timer nào cả, thay vì đặt rồi bỏ qua trong callback: chi phí một lần
-  // đánh thức mỗi 3 giây thì nhỏ, nhưng nó giữ cả tiến trình renderer khỏi ngủ.
-  if (S.interval > 0 && pageVisible()) {
-    S.timer = setInterval(() => { if (pageVisible()) loadSnapshot(); }, S.interval);
+  if (S.interval > 0) {
+    S.timer = setInterval(() => { if (!document.hidden) loadSnapshot(); }, S.interval);
   }
 }
 
@@ -1022,20 +954,6 @@ function applyEmbedOptions() {
   }
 
   if (q.get('compact') === '1') document.body.classList.add('compact');
-  S.extVersion = q.get('ext') || '';
-
-  /* Chế độ cửa sổ nổi: cả trang chỉ còn đúng căn phòng, không header, không tab, không bảng
-   * chi tiết. Bấm vào một nhân vật thì báo lên vỏ nhúng để nó mở dashboard đầy đủ ra - ở đây
-   * không có chỗ nào bày cây tiến trình cho tử tế.
-   *
-   * Tắt luôn vòng /api/snapshot: căn phòng chỉ sống bằng /api/pulse (2 KB mỗi giây), còn
-   * snapshot là 197 KB mỗi 3 giây cho những bảng biểu mà cửa sổ này không hề vẽ. */
-  if (q.get('view') === 'office') {
-    S.pip = true;
-    S.interval = 0;
-    document.body.classList.add('pip');
-    showTab('office');
-  }
 
   /* Bộ lọc loại agent. Thứ tự KHÁC theme một chỗ, và cố ý: lựa chọn người dùng bấm trên
    * trang đứng TRƯỚC `?kinds=` của extension.
@@ -1059,10 +977,5 @@ function applyEmbedOptions() {
 applyEmbedOptions();
 applyStaticI18n();
 syncKindBar();
-// Số phiên bản không chờ snapshot: trang mở ra mà server hỏng thì đó đúng là lúc người ta
-// cần đọc nó nhất.
-setText('#ver', versionLine());
-// Cửa sổ nổi không vẽ gì lấy từ /api/snapshot, kể cả một lần đầu tiên: 197 KB cho những
-// bảng biểu đang bị CSS giấu đi hết.
-if (!S.pip) loadSnapshot();
+loadSnapshot();
 schedule();

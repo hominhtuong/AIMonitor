@@ -1674,381 +1674,9 @@ function drawCrewFrame(g, p, key) {
   }
 }
 
-/* ============================================================ BỘ 8: DANH THỦ
- *
- * Mười cầu thủ. Cùng bài học đã trả giá ở bộ Năm anh em: ở 16x20 pixel thì KHUÔN MẶT không
- * nói được ai là ai - 8 pixel ngang cho cả cái mặt, hai con mắt đã chiếm 4. Nên bộ này nhận
- * diện bằng đúng ba thứ khán giả thật dùng để nhận ra cầu thủ từ trên khán đài, và cả ba
- * phải khác nhau giữa mọi người:
- *
- * | Ai | Tóc | Bộ đồ | Số |
- * | --- | --- | --- | --- |
- * | Lionel Messi | ngắn, có râu quai nón | sọc DỌC xanh nhạt - trắng (bộ duy nhất có sọc) | 10 |
- * | Cristiano Ronaldo | chỏm vuốt ngược, có vệt gel | đỏ, quần xanh lá | 7 |
- * | Erling Haaland | vàng buộc đuôi + băng đô | xanh da trời trơn, giày vàng chanh | 9 |
- * | Kylian Mbappé | cắt sát (fade), chân tóc thấp | navy, dải ngang trắng viền đỏ | 10 |
- * | Neymar Jr | mohawk vàng | vàng, cổ xanh lá, quần xanh dương | 10 |
- * | Mohamed Salah | xoăn bồng tràn ra hai bên + râu | đỏ trơn từ đầu tới chân | 11 |
- * | Vinícius Júnior | bốn búi xoăn nhỏ trên đỉnh | trắng, viền dọc vàng kim | 7 |
- * | Jude Bellingham | xoăn ngắn gọn trên đỉnh | trắng, dải đỏ, quần navy | 5 |
- * | Kevin De Bruyne | ngắn, TÓC ĐỎ (người duy nhất) | đỏ, dải vàng viền đen | 17 |
- * | Son Heung-min | mái rẽ lệch phủ trán | đen, viền dọc vàng kim | 7 |
- *
- * Hai người tóc ngắn thường (Messi, De Bruyne) không lẫn được vì màu tóc cách nhau hẳn một
- * quãng, và hai bộ đồ trắng (Vinícius, Bellingham) khác nhau ở màu viền, màu quần lẫn số.
- *
- * **Không vẽ huy hiệu hay logo CLB nào**, chỉ màu áo. Huy hiệu là nhãn hiệu có chủ - cùng lý
- * do đã ghi ở đầu file cho phần asset - mà ở 3 pixel thì nó cũng chỉ là một vệt bẩn trên
- * ngực áo, không ai đọc ra.
- *
- * Số áo chỉ vẽ ở LƯNG, không vẽ ở ngực. Đó vừa là chỗ số thật nằm, vừa là mặt người xem
- * nhìn nhiều nhất (ngồi ở bàn là quay lưng ra), còn nhét thêm số vào ngực thì nó chồng lên
- * hoạ tiết áo và cả hai cùng không đọc được.
- */
-
-const FOOTBALL_CHARS = [
-  { id: 'messi', name: 'Lionel Messi', number: '10',
-    skin: '#e8b083', skinDark: '#c78e62', hair: '#3a2b22', hairDark: '#221912',
-    hairType: 'crop', beard: true,
-    jersey: '#79bfe2', jerseyDark: '#4f95ba', trim: '#f3f1e8', kit: 'stripes',
-    shorts: '#eceadf', socks: '#f3f1e8', boots: '#2b2732', numC: '#1f2a3d' },
-
-  { id: 'ronaldo', name: 'Cristiano Ronaldo', number: '7',
-    skin: '#d29a6c', skinDark: '#b17a4e', hair: '#241d1b', hairDark: '#120e0d',
-    hairType: 'quiff',
-    jersey: '#b8253a', jerseyDark: '#8b1a2b', trim: '#1c7a4b', kit: 'plain',
-    sleeve: '#1c7a4b', shorts: '#1c7a4b', socks: '#b8253a', boots: '#2a2630', numC: '#f2d75f' },
-
-  { id: 'haaland', name: 'Erling Haaland', number: '9',
-    skin: '#f2c39c', skinDark: '#d5a077', hair: '#e8c765', hairDark: '#a98c33',
-    hairType: 'ponytail', band: '#f2f0e8',
-    jersey: '#7ecbe8', jerseyDark: '#57a3c2', trim: '#f2f0e8', kit: 'plain',
-    shorts: '#f2f0e8', socks: '#7ecbe8', boots: '#e4d63f', numC: '#1e2d3c' },
-
-  { id: 'mbappe', name: 'Kylian Mbappé', number: '10',
-    skin: '#8d5636', skinDark: '#6d4028', hair: '#241f1e', hairDark: '#131010',
-    hairType: 'fade',
-    jersey: '#26407c', jerseyDark: '#1a2d5b', trim: '#e9e8e2', trim2: '#d1433f', kit: 'band',
-    shorts: '#26407c', socks: '#d1433f', boots: '#e8d63c', numC: '#f0ece0' },
-
-  { id: 'neymar', name: 'Neymar Jr', number: '10',
-    skin: '#b9764e', skinDark: '#94592f', hair: '#dcc272', hairDark: '#8e7433',
-    hairType: 'mohawk',
-    jersey: '#e8cb2c', jerseyDark: '#bda11e', trim: '#2b8a4f', kit: 'plain',
-    sleeve: '#2b8a4f', shorts: '#2f5fa0', socks: '#f0efe6', boots: '#ec7333', numC: '#20603c' },
-
-  { id: 'salah', name: 'Mohamed Salah', number: '11',
-    skin: '#a4653f', skinDark: '#82492a', hair: '#2b201d', hairDark: '#171110',
-    hairType: 'curly', beard: true,
-    jersey: '#c02434', jerseyDark: '#8f1927', trim: '#e9dfc6', kit: 'plain',
-    shorts: '#c02434', socks: '#c02434', boots: '#ece4cd', numC: '#f2eee2' },
-
-  { id: 'vinicius', name: 'Vinícius Júnior', number: '7',
-    skin: '#71412c', skinDark: '#542e1e', hair: '#231f20', hairDark: '#111011',
-    hairType: 'twists',
-    jersey: '#f2efe7', jerseyDark: '#cec9bb', trim: '#d8b24a', kit: 'trim',
-    shorts: '#f2efe7', socks: '#f2efe7', boots: '#ea7c31', numC: '#2a3350' },
-
-  { id: 'bellingham', name: 'Jude Bellingham', number: '5',
-    skin: '#8a5738', skinDark: '#68402a', hair: '#2a2422', hairDark: '#171312',
-    hairType: 'curltop',
-    jersey: '#f1eee7', jerseyDark: '#cdc8ba', trim: '#c0303c', trim2: '#22315c', kit: 'band',
-    shorts: '#22315c', socks: '#f1eee7', boots: '#2b2630', numC: '#22315c' },
-
-  { id: 'debruyne', name: 'Kevin De Bruyne', number: '17',
-    skin: '#f0b98f', skinDark: '#d09468', hair: '#c9853f', hairDark: '#8a5525',
-    hairType: 'crop',
-    jersey: '#b52630', jerseyDark: '#871c24', trim: '#efc94a', trim2: '#26262e', kit: 'band',
-    shorts: '#26262e', socks: '#b52630', boots: '#e6d343', numC: '#f2e6c8' },
-
-  { id: 'son', name: 'Son Heung-min', number: '7',
-    skin: '#e6b189', skinDark: '#c68d63', hair: '#241f1f', hairDark: '#131010',
-    hairType: 'sweep',
-    jersey: '#2f2f39', jerseyDark: '#1f1f27', trim: '#d9b44a', kit: 'trim',
-    sleeve: '#d9b44a', shorts: '#2f2f39', socks: '#2f2f39', boots: '#ece7d8', numC: '#e6c463' },
-];
-
-/* Font 3x5 tự khai cho số áo. Không dùng `fillText`: font hệ thống khác nhau ở mỗi máy nên
- * cùng một bản build ra hình khác nhau, và ở cỡ này chữ do font sinh ra bị khử răng cưa
- * thành một vệt xám nhoè - đúng thứ cả file này đang tránh. */
-const DIGIT_3X5 = {
-  '0': ['111', '101', '101', '101', '111'], '1': ['010', '110', '010', '010', '111'],
-  '2': ['111', '001', '111', '100', '111'], '3': ['111', '001', '111', '001', '111'],
-  '4': ['101', '101', '111', '001', '001'], '5': ['111', '100', '111', '001', '111'],
-  '6': ['111', '100', '111', '101', '111'], '7': ['111', '001', '010', '010', '010'],
-  '8': ['111', '101', '111', '101', '111'], '9': ['111', '101', '111', '001', '111'],
-};
-
-/** Số áo, canh giữa quanh (`cx`, `cy`).
- *
- *  Một chữ số thì mỗi ô font bằng đúng 1 pixel gốc (số cao 5, to hết cỡ lưng áo); hai chữ
- *  số thì nén còn 2/3 pixel để cả cụm vừa 4.3 pixel ngang. Cỡ ô luôn là bội của 1/3 pixel
- *  gốc - tức số nguyên pixel lưới con - nếu không nét chữ chỗ dày 2 chỗ dày 3 pixel lưới
- *  con và con số nhìn như bị mọt ăn.
- *
- *  `shadow` là bản sao lệch xuống-phải đúng một pixel lưới con. Nhờ nó số bật hẳn lên khỏi
- *  áo mà không phải chọn màu số riêng cho từng bộ đồ. */
-function footballNumber(g, text, cx, cy, color, shadow) {
-  const s = String(text).slice(0, 2);
-  const u = s.length > 1 ? 2 / SPRITE_SS : 1;
-  const gap = 1 / SPRITE_SS;
-  const dw = 3 * u;
-  const snap = (v) => Math.round(v * SPRITE_SS) / SPRITE_SS;
-  const x0 = snap(cx - (s.length * dw + (s.length - 1) * gap) / 2);
-  const y0 = snap(cy - 2.5 * u);
-  const paint = (d, c) => {
-    for (let i = 0; i < s.length; i++) {
-      const rows = DIGIT_3X5[s[i]] || DIGIT_3X5['0'];
-      const gx = x0 + i * (dw + gap) + d;
-      for (let ry = 0; ry < 5; ry++) {
-        const row = rows[ry];
-        let run = 0;
-        // Gộp các ô liền nhau thành một nét: vẽ từng ô một thì ở toạ độ lẻ hai ô cạnh nhau
-        // hở ra một khe sáng, đúng lỗi mà chú thích của px() nói tới.
-        for (let rx = 0; rx <= 3; rx++) {
-          if (rx < 3 && row[rx] === '1') { run++; continue; }
-          if (run) px(g, gx + (rx - run) * u, y0 + ry * u + d, run * u, u, c);
-          run = 0;
-        }
-      }
-    }
-  };
-  paint(gap, shadow);
-  paint(0, color);
-}
-
-/** Tóc. Mặt trước dừng ở hàng 3, CHỪA HÀNG 4 LÀM TRÁN - tóc chạm thẳng vào hàng mắt thì hai
- *  mảng tối dính làm một và khuôn mặt mất hẳn đôi mắt (bài học của bộ Năm anh em). Riêng
- *  'fade' cố tình để chân tóc thấp hơn nửa pixel, đó chính là dấu hiệu của kiểu này. */
-function footballHair(g, p, view, dy) {
-  const t = p.hairType, c = p.hair, d = p.hairDark;
-  const back = view === 'back', side = view === 'side';
-  const cap = t === 'fade' ? 3.4 : 4;
-
-  if (back) {
-    headBlock(g, dy, 8, c);
-    px(g, 4, 7.4 + dy, 8, 0.6, d);              // gáy
-  } else {
-    headBlock(g, dy, cap, c);
-    px(g, 4, cap - 0.55 + dy, 8, 0.55, d);      // chân tóc sẫm, tách tóc khỏi trán
-    if (side) px(g, 3, cap - 0.5 + dy, 3.4, 3, c);   // gáy nhìn ngang
-    else { px(g, 3, cap + dy, 1, 2, c); px(g, 12, cap + dy, 1, 2, c); }   // hai mai
-  }
-
-  if (t === 'quiff') {
-    // Chỏm vuốt ngược ra sau, cao hơn khối đầu một pixel.
-    //
-    // Vệt sáng "gel bắt đèn" đã bỏ: tóc người này gần như đen, nâng sáng đủ để thấy là ra
-    // màu ghi, mà nó lại nằm đúng đỉnh đầu nên hậu kỳ nâng sáng mép trên thêm lần nữa - kết
-    // quả là một thanh xám trắng vắt ngang đầu, nhìn hệt cái băng đô của Haaland. Đỉnh chỏm
-    // đã tự sáng sẵn nhờ RIM_LIGHT, không cần vẽ thêm.
-    roundBox(g, side ? 3.4 : 4.2, dy - 1, 6.4, 2.2, 0.9, c);
-  } else if (t === 'fade') {
-    px(g, 3, 2.3 + dy, 10, 1.1, d);             // hai bên và gáy cạo mờ dần
-  } else if (t === 'mohawk') {
-    px(g, 3, 0.8 + dy, 10, (back ? 7 : cap) - 0.8, d);      // hai bên cạo sát
-    px(g, side ? 5.4 : 6.3, dy - 0.2, 3.4, (back ? 7.6 : cap) + 0.2, c);
-    spike(g, side ? 5.2 : 6.1, dy - 1, 3.8, 2, c);          // dải giữa dựng lên
-  } else if (t === 'ponytail') {
-    if (back) { roundBox(g, 6.2, 7.2 + dy, 3.6, 4.2, 1.4, c); px(g, 6.2, 7.2 + dy, 3.6, 0.6, d); }
-    else roundBox(g, side ? 1.5 : 12.4, 3.4 + dy, side ? 2.2 : 1.5, 3.6, 0.7, c);
-    px(g, 2.8, 2.5 + dy, 10.4, 0.9, p.band || '#f2f0e8');   // băng đô
-  } else if (t === 'curly') {
-    // Khối tóc tràn ra RỘNG HƠN đầu - đó là thứ đọc được từ xa, không phải mấy lọn xoăn.
-    roundBox(g, 1.9, dy - 0.6, 12.2, back ? 8.8 : 5.4, 2.3, c);
-    roundBox(g, 1.3, 1.4 + dy, 2.6, 2.6, 1.3, c);
-    roundBox(g, 12.1, 1.4 + dy, 2.6, 2.6, 1.3, c);
-    roundBox(g, 5.2, dy - 1, 2.8, 2.4, 1.2, c);
-    roundBox(g, 8.4, dy - 0.9, 2.6, 2.3, 1.15, c);
-    if (!back) px(g, 4, 4.1 + dy, 8, 0.5, d);
-  } else if (t === 'curltop') {
-    roundBox(g, 3.2, dy - 0.5, 9.6, back ? 8.5 : 4.5, 1.9, c);
-    roundBox(g, 4.5, dy - 1, 2.5, 2.2, 1.1, c);
-    roundBox(g, 8.1, dy - 1, 2.7, 2.3, 1.15, c);
-    px(g, 3, 2.7 + dy, 10, 0.8, d);             // hai bên tỉa sát, chỉ chừa đỉnh
-  } else if (t === 'twists') {
-    const xs = side ? [4.3, 6.7, 9.1] : [3.9, 6.3, 8.7, 11.1];
-    xs.forEach((bx) => roundBox(g, bx, dy - 0.9, 1.9, 2.1, 0.9, c));
-  } else if (t === 'sweep') {
-    // Mái rẽ lệch, phủ xuống hẳn nửa trán bên phải rồi hớt lên - silhouette LỆCH là dấu hiệu
-    // duy nhất tách kiểu này khỏi 'crop', nên nó phải lệch đủ để thấy, không chỉ dày thêm.
-    if (!back) {
-      px(g, side ? 6.4 : 6.8, cap - 1.2 + dy, side ? 6.2 : 6, 1.8, c);
-      px(g, side ? 9.6 : 9.8, cap + 0.6 + dy, side ? 3 : 3.2, 0.8, c);
-      px(g, side ? 6.4 : 6.8, cap - 1.2 + dy, 0.5, 1.8, lighten(c, 0.18));   // đường rẽ ngôi
-    } else px(g, 8.6, 1 + dy, 1, 6.4, d);
-  }
-}
-
-function footballFace(g, p, view, dy) {
-  if (view === 'back') return;
-  const side = view === 'side';
-  if (side) {
-    eye(g, 9, 5 + dy, 2, 2);
-    px(g, 12, 5.9 + dy, 1, 0.9, p.skin);        // mũi
-    px(g, 12, 6.6 + dy, 1, 0.34, p.skinDark);
-    px(g, 10.8, 7 + dy, 1.1, 0.9, BLUSH);
-  } else {
-    eye(g, 4, 5 + dy, 2, 2);
-    eye(g, 10, 5 + dy, 2, 2);
-    px(g, 7.7, 6.6 + dy, 0.7, 0.4, p.skinDark);
-    px(g, 3, 6.9 + dy, 1.1, 0.9, BLUSH);
-    px(g, 11.9, 6.9 + dy, 1.1, 0.9, BLUSH);
-  }
-  if (p.beard) {
-    // Râu = một mảng bo tròn ôm cằm rồi KHOÉT chỗ miệng ra, chứ không phải ghép mấy thanh
-    // thẳng. Bản đầu ghép quai hàm + ria mép + cằm: bốn thanh khép kín thành một cái khung
-    // chữ nhật đen quanh miệng - y hệt cái bẫy gọng kính kín ở bộ Năm anh em, nhìn như đeo
-    // rọ mõm chứ không phải để râu. Mép trên của mảng phải nằm dưới mắt và cách mai tóc một
-    // quãng da, nếu không râu nối liền với tóc thành hai thanh dọc chạy suốt mặt.
-    roundBox(g, side ? 8.3 : 3.9, 7.1 + dy, side ? 4.8 : 8.2, 2.3, 1, p.hair);
-    px(g, side ? 9.5 : 5.1, 7.1 + dy, side ? 3.2 : 5.8, 1.3, p.skin);
-    px(g, side ? 9.5 : 4.5, 8.9 + dy, side ? 3.4 : 7, 0.5, p.hairDark);
-  }
-  px(g, side ? 9.4 : 7, 7.5 + dy, side ? 1.6 : 2, 0.34, p.skinDark);   // miệng
-  if (!side) px(g, 7.3, 7.84 + dy, 1.4, 0.33, p.skinDark);
-}
-
-function footballHead(g, p, view, dy) {
-  headBlock(g, 1 + dy, 9, p.skin);
-  footballHair(g, p, view, dy);
-  footballFace(g, p, view, dy);
-}
-
-/** Áo đấu. `sitting` là dáng ngồi khom nên lưng rộng và dài hơn.
- *
- *  Thân bắt đầu ở y=10, ĐÚNG hàng kết thúc của khối đầu - lệch một hàng là hở một vệt sàn
- *  ngang cổ. */
-function footballJersey(g, p, view, sitting, dy) {
-  const y = 10 + dy;
-  const x0 = sitting ? 3 : 4, w = sitting ? 10 : 8, h = sitting ? 7 : 6;
-  roundBox(g, x0, y, w, h, sitting ? 1 : 0.8, p.jersey);
-  clothShade(g, x0, y, w, h, p.jersey);
-
-  if (p.kit === 'stripes') {
-    // Dừng trước gấu áo một quãng để mảng tối của clothShade còn nhìn thấy, nếu không cái áo
-    // sọc phẳng lì trong khi chín cái áo kia đều có chiều dày.
-    for (let i = 0; i < 3; i++) px(g, x0 + 1 + i * (w - 3.2) / 2.5, y + 0.6, 1.2, h - 1.3, p.trim);
-  } else if (p.kit === 'band') {
-    px(g, x0, y + 2.2, w, 1.3, p.trim);
-    if (p.trim2) px(g, x0, y + 3.5, w, 0.5, p.trim2);
-  } else if (p.kit === 'trim') {
-    px(g, x0, y + 0.6, 0.7, h - 1, p.trim);
-    px(g, x0 + w - 0.7, y + 0.6, 0.7, h - 1, p.trim);
-  }
-
-  px(g, x0, y, w, 0.7, p.trim);                          // viền cổ chạy ngang vai
-  px(g, x0 + w / 2 - 1.2, y, 2.4, view === 'back' ? 0.7 : 1.2, p.jerseyDark);   // hõm cổ
-  if (view === 'back') {
-    // `dy` phải cộng vào đây: tư thế gục xuống hạ cả thân 2 pixel, quên thì con số đứng
-    // nguyên chỗ cũ và trôi lên khỏi lưng áo.
-    footballNumber(g, p.number, x0 + w / 2, (sitting ? 14 : 13.5) + dy, p.numC, darken(p.jersey, 0.42));
-  }
-}
-
-/** Tay áo NGẮN, cẳng tay để trần - đó là chi tiết nói "đây là cầu thủ" chứ không phải một
- *  nhân viên văn phòng mặc áo màu lạ. */
-function footballArms(g, p, view, step) {
-  const sl = p.sleeve || p.jersey;
-  if (view === 'side') {
-    const ax = step === 1 ? 10 : step === 2 ? 4 : 7;
-    // Vạch tối dọc mép trái: cánh tay nằm ĐÈ lên thân, cùng nằm trong silhouette nên hậu kỳ
-    // không viền được cho nó. Thiếu vạch này thì khúc cẳng tay màu da giữa cái áo trông như
-    // một lỗ thủng chứ không phải cánh tay.
-    px(g, ax - 0.34, 11, 0.34, 5, darken(p.jersey, 0.3));
-    roundBox(g, ax, 11, 2, 1.7, 0.5, sl);
-    roundBox(g, ax, 12.7, 2, 2.2, 0.5, p.skin);
-    roundBox(g, ax, 14.9, 2, 1.1, 0.45, p.skinDark);
-    return;
-  }
-  [3, 12].forEach((ax, i) => {
-    px(g, ax, 11, 1, 1.7, i ? darken(sl, 0.1) : lighten(sl, 0.06));
-    px(g, ax, 12.7, 1, 2.2, i ? darken(p.skin, 0.08) : p.skin);
-    roundBox(g, ax, 14.9, 1, 1.1, 0.4, p.skin);
-  });
-}
-
-/** Chân: quần đùi, một quãng da trần, tất cao rồi giày. Bốn mảng chồng lên nhau trong 4
- *  pixel dọc - đó là silhouette nhận ra ngay từ xa, và là lý do bộ này không dùng lại
- *  `legs()` của bộ Văn phòng. */
-function footballLegs(g, p, step) {
-  const off = step === 1 ? 1 : step === 2 ? -1 : 0;
-  [5, 9].forEach((x) => {
-    px(g, x, 16, 2, 1.5, p.shorts);
-    px(g, x, 16, 0.5, 1.5, lighten(p.shorts, 0.1));
-    px(g, x + 1.5, 16, 0.5, 1.5, darken(p.shorts, 0.12));
-    px(g, x + 0.2, 17.5, 1.6, 0.4, p.skin);              // đầu gối để trần
-    px(g, x + 0.2, 17.9, 1.6, 0.95, p.socks);            // tất cao
-    px(g, x + 0.2, 17.9, 0.4, 0.95, lighten(p.socks, 0.12));
-  });
-  roundBox(g, 5 - Math.max(0, off), 18.85, 2, 1.15, 0.45, p.boots);
-  roundBox(g, 9 + Math.max(0, -off), 18.85, 2, 1.15, 0.45, p.boots);
-}
-
-function footballWalk(g, p, view, step) {
-  footballHead(g, p, view, 0);
-  footballJersey(g, p, view, false, 0);
-  footballArms(g, p, view, step);
-  footballLegs(g, p, step);
-}
-
-function footballSit(g, p, arms) {
-  const drop = arms === 'sleep' ? 2 : 0;
-  const turn = arms === 'turn';
-  footballHead(g, p, turn ? 'front' : 'back', drop);
-  footballJersey(g, p, turn ? 'front' : 'back', true, drop);
-  if (!turn) px(g, 7.4, 10.9 + drop, 1.2, 0.9, darken(p.jersey, 0.12));   // rãnh sống lưng
-  const sl = p.sleeve || p.jersey;
-  if (arms === 'sleep') {
-    px(g, 2, 12 + drop, 2, 1.5, sl);
-    px(g, 12, 12 + drop, 2, 1.5, sl);
-    px(g, 2, 13.5 + drop, 2, 1.4, p.skin);
-    px(g, 12, 13.5 + drop, 2, 1.4, p.skin);
-    roundBox(g, 2, 14.9 + drop, 2, 1.1, 0.45, p.skin);
-    roundBox(g, 12, 14.9 + drop, 2, 1.1, 0.45, p.skin);
-    return;
-  }
-  if (arms === 'rest' || turn) {
-    px(g, 2, 12, 2, 1.6, sl);
-    px(g, 12, 12, 2, 1.6, sl);
-    px(g, 2, 13.6, 2, 2.3, p.skin);
-    px(g, 12, 13.6, 2, 2.3, p.skin);
-    roundBox(g, 2, 15.9, 2, 1.1, 0.45, p.skin);
-    roundBox(g, 12, 15.9, 2, 1.1, 0.45, p.skin);
-    return;
-  }
-  const up = arms === 'typeA';
-  px(g, 1, 11, 3, 1.7, sl);
-  px(g, 12, 11, 3, 1.7, sl);
-  px(g, 1, 12.7, 3, up ? 1.3 : 2.3, p.skin);
-  px(g, 12, 12.7, 3, up ? 2.3 : 1.3, p.skin);
-  px(g, 1, up ? 14 : 15, 3, 1, p.skin);
-  px(g, 12, up ? 15 : 14, 3, 1, p.skin);
-}
-
-function drawFootballFrame(g, p, key) {
-  switch (key) {
-    case 'd0': return footballWalk(g, p, 'front', 0);
-    case 'd1': return footballWalk(g, p, 'front', 1);
-    case 'd2': return footballWalk(g, p, 'front', 2);
-    case 'u0': return footballWalk(g, p, 'back', 0);
-    case 'u1': return footballWalk(g, p, 'back', 1);
-    case 'u2': return footballWalk(g, p, 'back', 2);
-    case 's0': return footballWalk(g, p, 'side', 0);
-    case 's1': return footballWalk(g, p, 'side', 1);
-    case 's2': return footballWalk(g, p, 'side', 2);
-    case 'k0': return footballSit(g, p, 'rest');
-    case 'k1': return footballSit(g, p, 'typeA');
-    case 'k2': return footballSit(g, p, 'typeB');
-    case 'k3': return footballSit(g, p, 'sleep');
-    case 'kf': return footballSit(g, p, 'turn');
-    default: return footballWalk(g, p, 'front', 0);
-  }
-}
-
 /* ============================================================ khung dùng chung */
 
-/* Tám bộ. Chọn một bộ thì CẢ PHÒNG theo bộ đó, và mỗi agent nhận một nhân vật khác nhau
+/* Bảy bộ. Chọn một bộ thì CẢ PHÒNG theo bộ đó, và mỗi agent nhận một nhân vật khác nhau
  * trong bộ; hết nhân vật thì quay vòng dùng lại.
  *
  * Tên nhân vật không dịch (giống tên sản phẩm), nhưng tên BỘ thì dịch qua khoá i18n
@@ -2063,7 +1691,6 @@ const BUILTIN_PACKS = [
   { id: 'slime', chars: SLIME_CHARS, draw: drawSlimeFrame },
   { id: 'mascot', chars: MASCOT_CHARS, draw: drawMascotFrame },
   { id: 'crew', chars: CREW_CHARS, draw: drawCrewFrame },
-  { id: 'legends', chars: FOOTBALL_CHARS, draw: drawFootballFrame },
 ];
 
 /* `let` chứ không `const`: người dùng nhập thêm bộ từ ảnh của họ lúc đang chạy (xem
@@ -2074,19 +1701,12 @@ let PACKS = BUILTIN_PACKS.slice();
  * một số nguyên `charIndex` trỏ vào đây, không cần biết bộ nào. */
 let ALL_CHARS = [];
 
-/* Tăng mỗi lần bảng phẳng đổi (nhập thêm bộ, xoá bộ). Atlas đã nướng ghi lại số này và tự
- * coi mình là hết hạn khi lệch: chỉ số phẳng vẫn là mấy con số cũ nhưng nay trỏ sang nhân
- * vật khác, nên không có nó thì xoá một bộ nhập tay là cả phòng đổi mặt lung tung mà atlas
- * vẫn tưởng mình còn đúng. */
-let CHAR_GEN = 0;
-
 function rebuildCharTable() {
   ALL_CHARS = [];
   PACKS.forEach((pack) => {
     pack.start = ALL_CHARS.length;
     pack.chars.forEach((c) => ALL_CHARS.push({ pack, char: c }));
   });
-  CHAR_GEN++;
 }
 rebuildCharTable();
 
@@ -2202,36 +1822,15 @@ function finishCell(data, W, ox, oy, w, h, outline) {
   }
 }
 
-/** Atlas: mỗi nhân vật CẦN VẼ một hàng, mỗi khung hình một cột; con mèo ở hàng cuối.
+/** Atlas: mỗi nhân vật của mỗi bộ một hàng, mỗi khung hình một cột; con mèo ở hàng cuối.
  *
  *  Hàng được xếp thành nhiều CỘT KHỐI khi quá cao: ở lưới con, hơn trăm nhân vật xếp thành
  *  một dải dọc duy nhất là canvas cao hơn 8192 pixel - ngưỡng texture của kha khá GPU, vượt
- *  qua là trình duyệt lặng lẽ bỏ tăng tốc phần cứng và cả khung nhìn giật.
- *
- *  `want` là danh sách chỉ số phẳng cần nướng. **Chỉ nướng những nhân vật thật sự xuất hiện
- *  trong phòng**, không nướng cả tám bộ: đo được 127 nhân vật là 2268x4092 pixel, tức 35.4 MB
- *  vùng nhớ ảnh cộng thêm 35.4 MB nữa cho bản ImageData tạm trong `finishCell()` - đỉnh 71 MB
- *  ngay lúc người dùng vừa bấm vào tab Văn phòng. Mà phòng chỉ có 10 chỗ ngồi và mỗi lúc chỉ
- *  hiện MỘT bộ, nên gần 90% số hàng đó không bao giờ được vẽ ra.
- *
- *  Bỏ `want` đi thì nướng tất - vẫn giữ đường này cho ô xem trước và cho việc đo.
- *
- *  Chỉ số vẫn là **chỉ số phẳng vào `ALL_CHARS`** như cũ, không đánh số lại: `office.js` và
- *  `localStorage` đều giữ số đó, đánh lại là mọi lựa chọn ép riêng của người dùng trỏ sai
- *  người. Bảng `rowOf` lo phần ánh xạ chỉ số phẳng => hàng trong atlas. */
-function buildSpriteAtlas(want) {
+ *  qua là trình duyệt lặng lẽ bỏ tăng tốc phần cứng và cả khung nhìn giật. */
+function buildSpriteAtlas() {
   const S = SPRITE_SS;
   const cols = FRAMES.length;
-  const n = ALL_CHARS.length || 1;
-  const norm = (i) => ((Math.round(i) % n) + n) % n;
-  // Sắp xếp và bỏ trùng: nhờ vậy cùng một tập nhân vật luôn ra cùng một bố cục, và
-  // `covers()` so được bằng phép kiểm tập con đơn giản.
-  const list = want && want.length
-    ? Array.from(new Set(Array.from(want, norm))).sort((a, b) => a - b)
-    : ALL_CHARS.map((_, i) => i);
-  const rowOf = new Map(list.map((idx, r) => [idx, r]));
-  const gen = CHAR_GEN;
-  const rows = list.length + 1;                    // +1 cho hàng con mèo
+  const rows = ALL_CHARS.length + 1;               // +1 cho hàng con mèo
   // Chừa 1 pixel gốc quanh mỗi ô để viền không tràn sang ô bên cạnh - thiếu chỗ này thì nhân
   // vật nào cũng dính một vệt tối của hàng xóm.
   const cw = (SPRITE_W + 2) * S;
@@ -2249,9 +1848,7 @@ function buildSpriteAtlas(want) {
   const originOf = (r, c) => [Math.floor(r / perCol) * cols * cw + c * cw, (r % perCol) * ch];
 
   const cells = [];
-  list.forEach((idx, r) => {
-    const entry = ALL_CHARS[idx];
-    if (!entry) return;
+  ALL_CHARS.forEach((entry, r) => {
     FRAMES.forEach((key, c) => {
       const [ox, oy] = originOf(r, c);
       g.save();
@@ -2266,7 +1863,7 @@ function buildSpriteAtlas(want) {
     });
   });
 
-  const catRow = list.length;
+  const catRow = ALL_CHARS.length;
   for (let i = 0; i < 2; i++) {
     const [ox, oy] = originOf(catRow, i);
     g.save();
@@ -2284,24 +1881,13 @@ function buildSpriteAtlas(want) {
   return {
     canvas: cv,
     cols,
-    rows: list.length,
-    /** Đã nướng đủ những nhân vật này chưa. Đây là thứ `office.js` hỏi trước khi vẽ, thay
-     *  cho việc nướng lại vô điều kiện: cùng một bộ thì lần nào cũng đủ, chỉ lúc đổi bộ hay
-     *  ép riêng cho một agent mới phải dựng lại. */
-    covers(indices) {
-      if (gen !== CHAR_GEN) return false;
-      for (const i of indices) if (!rowOf.has(norm(i))) return false;
-      return true;
-    },
+    rows: ALL_CHARS.length,
     /** Ô của một khung hình => tham số cho drawImage. Kèm luôn 1 pixel gốc viền mỗi bên.
      *  Kích thước trả về tính bằng pixel THẬT của atlas, chia SPRITE_SS ra pixel gốc. */
     cell(charIndex, frameKey) {
       const c = FRAME_INDEX[frameKey] == null ? 0 : FRAME_INDEX[frameKey];
-      // Chỉ số chưa nướng thì rơi về hàng đầu chứ không vẽ ra vùng trống của canvas: vùng
-      // trống là trong suốt nên nhân vật sẽ BIẾN MẤT, mà mất người thì người dùng tưởng
-      // tool hỏng. Đúng ra `covers()` phải chặn từ trước, đây chỉ là lưới an toàn.
-      const r = rowOf.has(norm(charIndex)) ? rowOf.get(norm(charIndex)) : 0;
-      const [ox, oy] = originOf(r, c);
+      const n = ALL_CHARS.length || 1;
+      const [ox, oy] = originOf(((charIndex % n) + n) % n, c);
       return [ox, oy, cw, ch];
     },
     catCell(step) {

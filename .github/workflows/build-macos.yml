@@ -20,7 +20,7 @@ jobs:
       - name: Kiểm tra cú pháp
         run: |
           python3 -m compileall -q aimon
-          find aimon/static -name "*.js" -exec node --check {} \;
+          for f in aimon/static/*.js; do node --check "$f"; done
 
       - name: Chạy được trên Python 3.9 (bản có sẵn của macOS)
         run: /usr/bin/python3 -c "import sys; sys.path.insert(0,'.'); import aimon.server"
