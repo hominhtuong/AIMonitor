@@ -20,6 +20,9 @@ const S = {
   // `?view=office`: cả trang chỉ còn căn phòng, dùng cho cửa sổ nổi (PIP) của extension.
   // Xem applyEmbedOptions().
   pip: false,
+  // Nút "Chỉ hiện sân khấu": cùng bố cục với cửa sổ nổi nhưng vẫn là trang thật, tắt bằng
+  // cách bấm vào một nhân vật. Xem setSolo().
+  solo: false,
   caps: { pause: true, os: 'macos' },
   // Phiên bản của vỏ đang nhúng trang (`?ext=`). Xem versionLine().
   extVersion: '',
@@ -985,6 +988,54 @@ $('#theme').addEventListener('click', () => {
   setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true);
 });
 
+/* ------------------------------------------------- chỉ hiện sân khấu (chế độ solo)
+ *
+ * Dành cho người chỉ muốn nhìn căn phòng: ẩn header, hạn mức, KPI, thanh tab, bảng chọn và
+ * bảng chi tiết, để lại đúng khung hình chiếm trọn cửa sổ. Bố cục dùng lại nguyên cách của
+ * cửa sổ nổi (`body.pip`), khác ở chỗ đây vẫn là trang đầy đủ nên bật/tắt được tại chỗ.
+ *
+ * Ba lối ra, và phải có đủ ba: bấm vào một nhân vật (đường chính, xem onClick ở office.js),
+ * nút nổi ở góc, phím Esc. Phòng trống là chuyện thường - còn lựa chọn này thì được nhớ lại
+ * cho lần mở sau - nên nếu chỉ có đường "bấm nhân vật" thì người dùng kẹt lại vĩnh viễn.
+ *
+ * Tắt luôn vòng /api/snapshot trong lúc bật, cùng lý do với cửa sổ nổi: 197 KB mỗi 3 giây
+ * cho những bảng biểu đang bị CSS giấu hết, trong khi khung hình sống bằng /api/pulse 2 KB
+ * mỗi giây. Thoát ra thì nạp lại ngay một nhịp, không để người dùng nhìn số cũ. */
+const SOLO_KEY = 'aimon.solo';
+
+function setSolo(on, remember) {
+  if (S.pip) return;               // cửa sổ nổi vốn đã chỉ có mỗi khung hình
+  on = !!on;
+  const changed = on !== S.solo;
+  S.solo = on;
+  document.body.classList.toggle('solo', on);
+  const b = $('#office-solo');
+  if (b) b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (remember) {
+    try { localStorage.setItem(SOLO_KEY, on ? '1' : '0'); } catch (e) { /* chế độ riêng tư */ }
+  }
+
+  if (on) {
+    if (S.tab !== 'office') showTab('office');
+    S.interval = 0;
+    schedule();
+  } else if (changed) {
+    S.interval = +$('#interval').value || 0;
+    schedule();
+    loadSnapshot();
+  }
+  // Bố cục vừa đổi nên khung hình phải đo lại chỗ trống. office.js nạp sau file này, lúc
+  // dựng trang hàm này có thể chưa tồn tại - officeInit() tự gọi resize() sau đó.
+  if (typeof officeSync === 'function') officeSync();
+  if (typeof officeResize === 'function') officeResize();
+}
+
+$('#office-solo').addEventListener('click', () => setSolo(!S.solo, true));
+$('#office-solo-exit').addEventListener('click', () => setSolo(false, true));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && S.solo && !S.modalOpen) setSolo(false, true);
+});
+
 /* Tham số do vỏ nhúng truyền vào (extension VSCode): ?theme=, ?refresh=, ?compact=1.
  *
  * Khi có ?theme= thì ẩn nút đổi giao diện: dashboard phải bám theo theme của editor, để hai
@@ -1037,6 +1088,14 @@ function applyEmbedOptions() {
     showTab('office');
   }
 
+  /* Chỉ hiện sân khấu là lựa chọn của người dùng chứ không phải tham số của vỏ nhúng, nên
+   * nhớ ở localStorage và không nhận từ query param: mỗi khung nhìn tự quyết. */
+  if (!S.pip) {
+    let solo = null;
+    try { solo = localStorage.getItem(SOLO_KEY); } catch (e) { /* bỏ qua */ }
+    if (solo === '1') setSolo(true, false);
+  }
+
   /* Bộ lọc loại agent. Thứ tự KHÁC theme một chỗ, và cố ý: lựa chọn người dùng bấm trên
    * trang đứng TRƯỚC `?kinds=` của extension.
    *
@@ -1062,7 +1121,8 @@ syncKindBar();
 // Số phiên bản không chờ snapshot: trang mở ra mà server hỏng thì đó đúng là lúc người ta
 // cần đọc nó nhất.
 setText('#ver', versionLine());
-// Cửa sổ nổi không vẽ gì lấy từ /api/snapshot, kể cả một lần đầu tiên: 197 KB cho những
-// bảng biểu đang bị CSS giấu đi hết.
-if (!S.pip) loadSnapshot();
+// Cửa sổ nổi và chế độ chỉ hiện sân khấu không vẽ gì lấy từ /api/snapshot, kể cả một lần đầu
+// tiên: 197 KB cho những bảng biểu đang bị CSS giấu đi hết. Thoát chế độ solo thì setSolo()
+// nạp ngay một nhịp.
+if (!S.pip && !S.solo) loadSnapshot();
 schedule();

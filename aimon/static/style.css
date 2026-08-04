@@ -532,6 +532,51 @@ body.pip .office-stage {
 }
 body.pip #office-canvas { border-radius: 0; box-shadow: none; cursor: pointer; }
 
+/* --------------------------------------------------- chỉ hiện sân khấu (nút, body.solo)
+   Cùng cách làm với cửa sổ nổi ở trên - và cố ý dùng lại đúng danh sách đó thay vì
+   `display:none` cho cả `.wrap`: canvas phải nằm y nguyên chỗ cũ trong DOM, dời nó đi là rơi
+   vào vùng `morph()` quản lý và cứ mỗi nhịp làm mới lại bị thay canvas mới.
+   Khác cửa sổ nổi ở hai chỗ: `#toast` vẫn hiện (đây là trang thật, còn thao tác chạy được),
+   và có nút thoát nổi ở góc. */
+body.solo { overflow: hidden; }
+body.solo header,
+body.solo .usage,
+body.solo .kpis,
+body.solo .chips,
+body.solo .tabs,
+body.solo .kindbar,
+body.solo #pane-office .h2row,
+body.solo .skinbox,
+body.solo .office-legend,
+body.solo #office-detail,
+body.solo .foot { display: none !important; }
+
+body.solo .wrap { padding: 0; max-width: none; }
+body.solo .office-stage {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  align-items: center;
+  height: 100vh;
+  background: var(--bg);
+}
+body.solo #office-canvas { border-radius: 0; box-shadow: none; cursor: pointer; }
+
+/* Mờ sẵn để không tranh chỗ với khung hình - cả điểm hấp dẫn của chế độ này là không còn
+   thấy gì khác - nhưng vẫn nằm đó cho người tìm đường ra. */
+#office-solo-exit { display: none; }
+body.solo #office-solo-exit {
+  display: inline-flex;
+  position: fixed;
+  top: 10px;
+  right: 12px;
+  z-index: 30;
+  opacity: .28;
+  transition: opacity .15s;
+}
+body.solo #office-solo-exit:hover,
+body.solo #office-solo-exit:focus-visible { opacity: 1; }
+
 /* ------------------------------------------------- bảng chọn nhân vật
    Gập lại bằng <details> vì đây là thứ chỉnh một lần rồi thôi - mở sẵn thì mười ô chiếm
    mất chỗ của căn phòng, mà phòng mới là cái người ta vào đây để xem. */
