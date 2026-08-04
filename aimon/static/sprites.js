@@ -1683,12 +1683,12 @@ function drawCrewFrame(g, p, key) {
  *
  * | Ai | Tóc | Bộ đồ | Số |
  * | --- | --- | --- | --- |
- * | Lionel Messi | ngắn, có râu quai nón | sọc DỌC xanh nhạt - trắng (bộ duy nhất có sọc) | 10 |
+ * | Lionel Messi | nâu vừa, mái rẽ lệch, râu ngắn | sọc DỌC xanh nhạt - trắng (bộ duy nhất có sọc) | 10 |
  * | Cristiano Ronaldo | chỏm vuốt ngược, có vệt gel | đỏ, quần xanh lá | 7 |
  * | Erling Haaland | vàng buộc đuôi + băng đô | xanh da trời trơn, giày vàng chanh | 9 |
  * | Kylian Mbappé | cắt sát (fade), chân tóc thấp | navy, dải ngang trắng viền đỏ | 10 |
  * | Neymar Jr | mohawk vàng | vàng, cổ xanh lá, quần xanh dương | 10 |
- * | Mohamed Salah | xoăn bồng tràn ra hai bên + râu | đỏ trơn từ đầu tới chân | 11 |
+ * | Mohamed Salah | xoăn bồng tràn ra hai bên, râu rậm | đỏ trơn từ đầu tới chân | 11 |
  * | Vinícius Júnior | bốn búi xoăn nhỏ trên đỉnh | trắng, viền dọc vàng kim | 7 |
  * | Jude Bellingham | xoăn ngắn gọn trên đỉnh | trắng, dải đỏ, quần navy | 5 |
  * | Kevin De Bruyne | ngắn, TÓC ĐỎ (người duy nhất) | đỏ, dải vàng viền đen | 17 |
@@ -1701,17 +1701,21 @@ function drawCrewFrame(g, p, key) {
  * do đã ghi ở đầu file cho phần asset - mà ở 3 pixel thì nó cũng chỉ là một vệt bẩn trên
  * ngực áo, không ai đọc ra.
  *
- * Số áo chỉ vẽ ở LƯNG, không vẽ ở ngực. Đó vừa là chỗ số thật nằm, vừa là mặt người xem
- * nhìn nhiều nhất (ngồi ở bàn là quay lưng ra), còn nhét thêm số vào ngực thì nó chồng lên
- * hoạ tiết áo và cả hai cùng không đọc được.
+ * Số áo có ở CẢ hai mặt, nhưng KHÔNG cùng cỡ - đúng như áo thật: số lưng cao 5 pixel (kín
+ * lưng), số ngực chỉ cao 1.67 pixel và đặt lệch sang một bên. Lấy nguyên cỡ số lưng đắp lên
+ * ngực thì nó trùm kín áo, chồng lên sọc lẫn dải ngang và cả hai cùng không đọc được. Khung
+ * nhìn ngang không có số: thân lúc đó chỉ còn vài pixel bề ngang, con số bị ép thành vệt bẩn.
  */
 
 const FOOTBALL_CHARS = [
+  // Tóc nâu vừa (không phải gần đen) và mái rối nhẹ: để nguyên 'crop' thì mảng tóc là một
+  // cái mũ bơi kín đầu, cộng thêm râu là cả khuôn mặt bị hai mảng tối kẹp giữa. Quần ĐEN
+  // theo đúng bộ đồ sân nhà Argentina, cũng là thứ tách chân ra khỏi áo sọc trắng.
   { id: 'messi', name: 'Lionel Messi', number: '10',
-    skin: '#e8b083', skinDark: '#c78e62', hair: '#3a2b22', hairDark: '#221912',
-    hairType: 'crop', beard: true,
+    skin: '#e8b083', skinDark: '#c78e62', hair: '#4b3728', hairDark: '#2c2018',
+    hairType: 'tousle', beard: 'short',
     jersey: '#79bfe2', jerseyDark: '#4f95ba', trim: '#f3f1e8', kit: 'stripes',
-    shorts: '#eceadf', socks: '#f3f1e8', boots: '#2b2732', numC: '#1f2a3d' },
+    shorts: '#23252c', socks: '#f3f1e8', boots: '#2b2732', numC: '#1f2a3d' },
 
   { id: 'ronaldo', name: 'Cristiano Ronaldo', number: '7',
     skin: '#d29a6c', skinDark: '#b17a4e', hair: '#241d1b', hairDark: '#120e0d',
@@ -1739,7 +1743,7 @@ const FOOTBALL_CHARS = [
 
   { id: 'salah', name: 'Mohamed Salah', number: '11',
     skin: '#a4653f', skinDark: '#82492a', hair: '#2b201d', hairDark: '#171110',
-    hairType: 'curly', beard: true,
+    hairType: 'curly', beard: 'full',
     jersey: '#c02434', jerseyDark: '#8f1927', trim: '#e9dfc6', kit: 'plain',
     shorts: '#c02434', socks: '#c02434', boots: '#ece4cd', numC: '#f2eee2' },
 
@@ -1787,10 +1791,14 @@ const DIGIT_3X5 = {
  *  con và con số nhìn như bị mọt ăn.
  *
  *  `shadow` là bản sao lệch xuống-phải đúng một pixel lưới con. Nhờ nó số bật hẳn lên khỏi
- *  áo mà không phải chọn màu số riêng cho từng bộ đồ. */
-function footballNumber(g, text, cx, cy, color, shadow) {
+ *  áo mà không phải chọn màu số riêng cho từng bộ đồ. Truyền `shadow` rỗng thì bỏ hẳn bước
+ *  này - số ngực chỉ cao 5 pixel lưới con, thêm bản sao lệch một pixel nữa là nét dày gấp
+ *  rưỡi và cả con số bết lại thành một cục.
+ *
+ *  `unit` ép cỡ ô, dùng cho số ngực. Vẫn phải là bội của 1/3 pixel gốc. */
+function footballNumber(g, text, cx, cy, color, shadow, unit) {
   const s = String(text).slice(0, 2);
-  const u = s.length > 1 ? 2 / SPRITE_SS : 1;
+  const u = unit || (s.length > 1 ? 2 / SPRITE_SS : 1);
   const gap = 1 / SPRITE_SS;
   const dw = 3 * u;
   const snap = (v) => Math.round(v * SPRITE_SS) / SPRITE_SS;
@@ -1813,7 +1821,7 @@ function footballNumber(g, text, cx, cy, color, shadow) {
       }
     }
   };
-  paint(gap, shadow);
+  if (shadow) paint(gap, shadow);
   paint(0, color);
 }
 
@@ -1823,7 +1831,7 @@ function footballNumber(g, text, cx, cy, color, shadow) {
 function footballHair(g, p, view, dy) {
   const t = p.hairType, c = p.hair, d = p.hairDark;
   const back = view === 'back', side = view === 'side';
-  const cap = t === 'fade' ? 3.4 : 4;
+  const cap = t === 'fade' ? 3.4 : t === 'tousle' ? 3.7 : 4;
 
   if (back) {
     headBlock(g, dy, 8, c);
@@ -1869,6 +1877,24 @@ function footballHair(g, p, view, dy) {
   } else if (t === 'twists') {
     const xs = side ? [4.3, 6.7, 9.1] : [3.9, 6.3, 8.7, 11.1];
     xs.forEach((bx) => roundBox(g, bx, dy - 0.9, 1.9, 2.1, 0.9, c));
+  } else if (t === 'tousle') {
+    // Mái dày rối nhẹ: hai lọn tròn nhô lên khỏi khối tóc, hai bên thái dương tỉa ngắn, và
+    // một mảng mái phủ lệch xuống trán. Ba thứ đó cộng lại mới ra "kiểu đầu"; để nguyên
+    // khối tóc phẳng thì nó là cái mũ bơi. Không vẽ vệt sáng trên đỉnh - xem chú thích của
+    // 'quiff', hậu kỳ đã nâng sáng mép trên rồi.
+    roundBox(g, side ? 4.2 : 4.4, dy - 0.55, 3.4, 1.9, 0.95, c);
+    roundBox(g, side ? 7.8 : 8.2, dy - 0.7, 3.6, 2, 1, c);
+    px(g, 3, 2.4 + dy, 1, 1.7, d);
+    px(g, 12, 2.4 + dy, 1, 1.7, d);
+    // Mái phủ lệch xuống trán: một lớp trùm hết chân tóc rồi một lớp nữa chỉ nửa bên phải,
+    // cộng đường rẽ ngôi. Mái phải TRÙM HẾT vạch chân tóc sẫm của phần chung, đừng để nó
+    // hở ra phía trên - hai vạch song song cách nhau một quãng tóc thì đọc thành cái gờ vắt
+    // ngang trán, nhìn như đội mũ chứ không phải mái tóc.
+    if (!back) {
+      px(g, side ? 4.6 : 4.4, cap - 0.65 + dy, 7.6, 0.85, c);
+      px(g, side ? 7 : 7.2, cap - 0.15 + dy, side ? 5.2 : 4.4, 0.7, c);
+      px(g, side ? 6.8 : 5.4, cap - 0.65 + dy, 0.45, 1.1, d);          // đường rẽ ngôi
+    }
   } else if (t === 'sweep') {
     // Mái rẽ lệch, phủ xuống hẳn nửa trán bên phải rồi hớt lên - silhouette LỆCH là dấu hiệu
     // duy nhất tách kiểu này khỏi 'crop', nên nó phải lệch đủ để thấy, không chỉ dày thêm.
@@ -1880,30 +1906,70 @@ function footballHair(g, p, view, dy) {
   }
 }
 
+/** Râu. Vẽ TRƯỚC tóc và trước mặt.
+ *
+ *  Mảng râu lấy đúng đường bo của khối đầu - tô lại cả khối đầu bằng màu râu rồi trả lại
+ *  phần da phía trên - nên nó ôm sát mép cằm thay vì là một khối chữ nhật lửng lơ bên trong
+ *  khuôn mặt. Vì tô đè cả đầu nên phải chạy TRƯỚC `footballHair`, và phần da trả lại chỉ bắt
+ *  đầu từ y=3.2 (dưới chỗ khối đầu hết bo góc): trả từ hàng 1 thì hai góc vuông của mảng da
+ *  thò ra ngoài silhouette, mà tóc thì bo tròn nên không che kín được.
+ *
+ *  Ba luật rút ra từ bản trước - bản đó bị phản hồi thẳng là "râu chảy lên tới mắt":
+ *
+ *  1. **Mép trên của mảng râu nằm DƯỚI miệng**, không bao giờ chạm hàng mắt. Mắt kết thúc ở
+ *     y=7 mà bản trước đặt mép râu ở 7.1, lại còn hai vệt dọc rộng 1.2 nằm đúng dưới hai con
+ *     mắt - hai mảng tối cách nhau 1/3 pixel thì mắt nhìn ra dính liền với râu.
+ *  2. **Phần nối lên quai hàm là vệt PHA VỚI DA**, mảnh và mờ. Râu ngắn thì chân râu hở da,
+ *     tô nguyên màu tóc là ra hai thanh đen kẻ dọc mặt.
+ *  3. **Râu nhạt hơn tóc một chút** vì cùng lý do. Cùng một màu thì tóc, râu và mắt gộp thành
+ *     một khối đen đặc - đúng cái bẫy gọng kính kín ở bộ Năm anh em. */
+function footballBeard(g, p, view, dy) {
+  if (!p.beard || view === 'back') return;
+  const side = view === 'side';
+  const full = p.beard === 'full';
+  const top = full ? 7.85 : 8.4;              // mép trên mảng râu, luôn ở dưới miệng
+
+  // Hai khối đầu chồng nhau, khối trên nhấc lên 0.4: phần lộ ra ở dưới là một vệt sẫm CHẠY
+  // THEO ĐƯỜNG BO của cằm. Kẻ một thanh ngang thay cho nó thì cái cằm tròn bị chặn ngang bởi
+  // một vạch thẳng, nhìn như đeo quai mũ.
+  headBlock(g, 1 + dy, 9, p.hairDark);
+  headBlock(g, 0.6 + dy, 9, mixC(p.hair, p.skin, 0.14));
+  px(g, 3, 3.2 + dy, 10, top - 3.2, p.skin);
+  // Chân râu thưa dần lên phía mai tóc, sát mép mặt chứ không nằm dưới con mắt.
+  const jaw = mixC(p.hair, p.skin, 0.46), jy = full ? 6.7 : 7.3;
+  px(g, 3, jy + dy, 0.85, top - jy, jaw);
+  px(g, 12.15, jy + dy, 0.85, top - jy, jaw);
+  // Râu rậm trùm qua cả miệng nên phải khoét chỗ cho miệng; râu ngắn thì miệng đã ở trên rồi.
+  if (full) px(g, side ? 9.2 : 5.6, top + dy, side ? 3.6 : 4.8, 0.8, p.skin);
+}
+
 function footballFace(g, p, view, dy) {
   if (view === 'back') return;
   const side = view === 'side';
+  // Có râu thì má hồng phải dâng lên: để nguyên chỗ cũ là chấm hồng đè lên đúng quai hàm.
+  const by = p.beard ? 6.3 : 6.9;
   if (side) {
     eye(g, 9, 5 + dy, 2, 2);
     px(g, 12, 5.9 + dy, 1, 0.9, p.skin);        // mũi
     px(g, 12, 6.6 + dy, 1, 0.34, p.skinDark);
-    px(g, 10.8, 7 + dy, 1.1, 0.9, BLUSH);
+    px(g, 10.8, by + 0.1 + dy, 1.1, 0.9, BLUSH);
   } else {
     eye(g, 4, 5 + dy, 2, 2);
     eye(g, 10, 5 + dy, 2, 2);
     px(g, 7.7, 6.6 + dy, 0.7, 0.4, p.skinDark);
-    px(g, 3, 6.9 + dy, 1.1, 0.9, BLUSH);
-    px(g, 11.9, 6.9 + dy, 1.1, 0.9, BLUSH);
+    px(g, 3, by + dy, 1.1, 0.9, BLUSH);
+    px(g, 11.9, by + dy, 1.1, 0.9, BLUSH);
   }
   if (p.beard) {
-    // Râu = một mảng bo tròn ôm cằm rồi KHOÉT chỗ miệng ra, chứ không phải ghép mấy thanh
-    // thẳng. Bản đầu ghép quai hàm + ria mép + cằm: bốn thanh khép kín thành một cái khung
-    // chữ nhật đen quanh miệng - y hệt cái bẫy gọng kính kín ở bộ Năm anh em, nhìn như đeo
-    // rọ mõm chứ không phải để râu. Mép trên của mảng phải nằm dưới mắt và cách mai tóc một
-    // quãng da, nếu không râu nối liền với tóc thành hai thanh dọc chạy suốt mặt.
-    roundBox(g, side ? 8.3 : 3.9, 7.1 + dy, side ? 4.8 : 8.2, 2.3, 1, p.hair);
-    px(g, side ? 9.5 : 5.1, 7.1 + dy, side ? 3.2 : 5.8, 1.3, p.skin);
-    px(g, side ? 9.5 : 4.5, 8.9 + dy, side ? 3.4 : 7, 0.5, p.hairDark);
+    // Ria mép: hai nét ngắn CHỪA KHE NHÂN TRUNG ở giữa. Một thanh liền thì nó dài đúng bằng
+    // cái miệng ngay dưới, và hai vạch song song đọc ra thành cái miệng kẻ bằng bút dạ. Nét
+    // cũng hẹp hơn hẳn khoảng cách hai con mắt (mắt ở x 4..6 và 10..12) nên không dính mắt.
+    const mc = mixC(p.hair, p.skin, 0.08);
+    if (side) px(g, 10.5, 7.25 + dy, 2.3, 0.45, mc);
+    else { px(g, 6.3, 7.25 + dy, 1.5, 0.45, mc); px(g, 8.2, 7.25 + dy, 1.5, 0.45, mc); }
+    // Miệng phải sẫm hơn `skinDark`: nằm giữa hai mảng râu nên tương phản với da không đủ.
+    px(g, side ? 9.7 : 7.2, 8 + dy, side ? 1.4 : 1.6, 0.32, mixC(p.skinDark, p.hair, 0.5));
+    return;
   }
   px(g, side ? 9.4 : 7, 7.5 + dy, side ? 1.6 : 2, 0.34, p.skinDark);   // miệng
   if (!side) px(g, 7.3, 7.84 + dy, 1.4, 0.33, p.skinDark);
@@ -1911,6 +1977,7 @@ function footballFace(g, p, view, dy) {
 
 function footballHead(g, p, view, dy) {
   headBlock(g, 1 + dy, 9, p.skin);
+  footballBeard(g, p, view, dy);
   footballHair(g, p, view, dy);
   footballFace(g, p, view, dy);
 }
@@ -1943,6 +2010,25 @@ function footballJersey(g, p, view, sitting, dy) {
     // `dy` phải cộng vào đây: tư thế gục xuống hạ cả thân 2 pixel, quên thì con số đứng
     // nguyên chỗ cũ và trôi lên khỏi lưng áo.
     footballNumber(g, p.number, x0 + w / 2, (sitting ? 14 : 13.5) + dy, p.numC, darken(p.jersey, 0.42));
+  } else if (view === 'front') {
+    // Số ngực. Ô font còn 1/3 pixel gốc, tức số cao 1.67 pixel - bằng đúng một phần ba số
+    // lưng, và đó là tỷ lệ của áo thật. Lấy nguyên cỡ số lưng thì nó trùm kín ngực, chồng
+    // lên sọc lẫn dải ngang và cả hai cùng không đọc được.
+    //
+    // Đặt LỆCH sang ngực trái (phía người xem là bên phải) như áo thật, cũng để tránh hõm cổ
+    // ở giữa. Không vẽ ở khung nhìn ngang: ở đó thân chỉ còn vài pixel bề ngang, con số bị
+    // ép lại thành một vệt bẩn.
+    // Chỗ đặt phải tính theo LƯỚI CON, và kit 'band' phải khác. Ngực cao 18 hàng lưới con:
+    // viền cổ chiếm 30..32, dải ngang chiếm 37..42, gấu áo sẫm bắt đầu ở 43. Số cao đúng 5
+    // hàng nên khe trên (32..37) vừa khít KHÔNG CÒN LỀ - với kit trơn/sọc thì không sao vì
+    // dưới nó vẫn là màu áo, còn kit 'band' thì hàng cuối của chữ số áp thẳng vào dải ngang.
+    // Chữ số nào cũng có hàng đáy đặc nên nó dính luôn vào dải, và với bộ đồ mà `numC` cùng
+    // tông với dải (Mbappé: số kem, dải trắng) thì mất hẳn chân chữ số.
+    //
+    // Vì vậy kit 'band' đẩy số xuống dưới dải, nằm trên nền gấu áo sẫm - vẫn là màu áo nên
+    // tương phản với `numC` giữ nguyên như số lưng.
+    const nx = x0 + w - (String(p.number).length > 1 ? 2.1 : 1.6);
+    footballNumber(g, p.number, nx, y + (p.kit === 'band' ? 4.83 : 1.5), p.numC, null, 1 / SPRITE_SS);
   }
 }
 
