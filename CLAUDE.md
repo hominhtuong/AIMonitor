@@ -841,9 +841,15 @@ màu quần lẫn số.
 Số áo vẽ bằng font 3x5 khai trong file, **không dùng `fillText`**: font hệ thống mỗi máy một
 khác, và ở cỡ này chữ do font sinh ra bị khử răng cưa thành vệt xám. Ô font luôn là bội của
 1/3 pixel gốc (một chữ số dùng ô 1 pixel, hai chữ số nén còn 2/3) - lấy cỡ lẻ thì nét chữ chỗ
-dày 2 chỗ dày 3 pixel lưới con, con số nhìn như bị mọt ăn. Số chỉ vẽ ở **lưng**: đó vừa là
-chỗ số thật nằm, vừa là mặt người xem nhìn nhiều nhất vì ngồi ở bàn là quay lưng ra. Nhớ cộng
-`dy` vào toạ độ số, không thì tư thế gục xuống hạ thân 2 pixel mà số đứng nguyên chỗ cũ.
+dày 2 chỗ dày 3 pixel lưới con, con số nhìn như bị mọt ăn. Nhớ cộng `dy` vào toạ độ số, không
+thì tư thế gục xuống hạ thân 2 pixel mà số đứng nguyên chỗ cũ.
+
+Số có ở **cả hai mặt** nhưng khác cỡ: lưng cao 5 pixel, ngực chỉ 1.67 (ô font 1/3 pixel) và
+lệch sang một bên, đúng tỷ lệ áo thật. Chỗ đặt số ngực phải tính theo **lưới con**: ngực cao
+18 hàng, viền cổ chiếm 30..32, dải ngang của kit `band` chiếm 37..42, nên khe trên vừa đúng
+5 hàng - KHÔNG CÒN LỀ. Chữ số nào cũng có hàng đáy đặc, để nó áp thẳng vào dải ngang là chân
+chữ dính vào dải và mất hẳn với bộ đồ có `numC` cùng tông với dải (Mbappé: số kem, dải trắng).
+Vì thế riêng kit `band` đẩy số xuống dưới dải. Khung nhìn ngang không vẽ số.
 
 Chân phải đủ **bốn mảng chồng lên nhau trong 4 pixel dọc**: quần đùi, một quãng da trần, tất
 cao, rồi giày. Đó là silhouette nói "cầu thủ" từ xa, và là lý do bộ này không dùng lại
