@@ -103,12 +103,22 @@
     <div class="h2row">
       <h2 data-i18n="office.title"></h2>
       <span class="tag" id="office-count"></span>
+      <!-- Chỉ hiện sân khấu: ẩn hết phần còn lại của trang, để lại đúng khung hình. Trở về
+           bằng cách bấm vào một nhân vật, bấm nút nổi ở góc, hoặc phím Esc. -->
+      <button id="office-solo" class="mini" aria-pressed="false"
+              data-i18n="office.solo" data-i18n-title="office.solo_hint"></button>
       <span class="hint" style="margin:0" data-i18n="office.hint"></span>
     </div>
     <!-- Canvas phải nằm NGOÀI mọi vùng do render()/morph() cập nhật. Nếu không thì cứ mỗi
          lần làm mới nó bị thay bằng canvas mới: mất context, nhân vật nhảy về vị trí đầu.
          Chỉ #office-detail bên dưới là vùng động. -->
     <div class="office-stage"><canvas id="office-canvas"></canvas></div>
+    <!-- Lối ra dự phòng của chế độ chỉ hiện sân khấu. Bấm nhân vật mới là đường chính, nhưng
+         phòng có lúc không có ai - không có nút này thì người dùng kẹt lại, mà lựa chọn đó
+         còn được nhớ qua lần mở sau. Nằm NGOÀI .office-stage và position:fixed nên không
+         dính vào cuộn ngang của khung hình. -->
+    <button id="office-solo-exit" data-i18n="office.solo_exit"
+            data-i18n-title="office.solo_exit_hint"></button>
     <!-- Bảng chọn nhân vật. Mỗi ô là một canvas nhỏ vẽ thẳng từ sprites.js, không phải ảnh -
          xem mẫu phải là chính hình sẽ dùng, không phải một bản mô phỏng dễ lệch. Nằm ngoài
          vùng morph() giống canvas chính, vì mỗi ô giữ context riêng. -->

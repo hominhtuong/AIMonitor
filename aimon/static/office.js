@@ -1532,7 +1532,14 @@ function resize() {
   // Sàn dưới là 1 chứ không phải 2: panel ở activity bar của VSCode chỉ rộng ~300px, ép
   // tối thiểu 2 thì phòng rộng 520px và người dùng phải cuộn ngang mới thấy hết. Nhỏ mà
   // thấy trọn căn phòng vẫn hơn to mà mất một nửa - ai cần nhìn rõ thì mở tab trong editor.
-  OF.scale = Math.max(1, Math.min(6, Math.floor(avail / ROOM_W)));
+  let sc = Math.floor(avail / ROOM_W);
+  // Hai chế độ "cả trang chỉ có khung hình" (cửa sổ nổi, và nút chỉ hiện sân khấu) thì trang
+  // KHÔNG cuộn được, nên phải kẹp bậc phóng theo cả chiều cao. Chỉ nhìn chiều rộng thì kéo
+  // cửa sổ bè ra là mất nửa dưới khung hình dưới mép màn hình, không có cách nào thấy lại.
+  if (S.pip || S.solo) {
+    sc = Math.min(sc, Math.floor(Math.max(120, host.clientHeight - 4) / ROOM_H));
+  }
+  OF.scale = Math.max(1, Math.min(6, sc));
   OF.dpr = Math.max(1, Math.round(window.devicePixelRatio || 1));
   OF.canvas.width = ROOM_W * OF.scale * OF.dpr;
   OF.canvas.height = ROOM_H * OF.scale * OF.dpr;
@@ -1653,6 +1660,13 @@ function onClick(ev) {
     } catch (err) { /* mở thẳng trong browser thì không có ai nghe, kệ */ }
     return;
   }
+
+  // Chế độ chỉ hiện sân khấu: bấm vào một nhân vật là quay lại trang đầy đủ, rồi mở luôn chi
+  // tiết của chính người vừa bấm - đó là thứ người ta bấm vào để xem. Xoá `OF.sel` trước để
+  // nhánh "bấm lại thì đóng" ngay dưới không nuốt mất cú bấm này: người được chọn từ trước
+  // lúc bật chế độ vẫn còn nguyên trong `OF.sel`, và đóng bảng chi tiết ngay lúc vừa hiện lại
+  // cả trang thì trông như bấm không ăn.
+  if (S.solo) { setSolo(false, true); OF.sel = null; }
 
   if (id === OF.sel) { OF.sel = null; renderDetail(); return; }   // bấm lại thì đóng
 
@@ -1935,6 +1949,12 @@ document.addEventListener('visibilitychange', officeSync);
  *  thấy đúng cảnh mấy người đó rời khung hình. */
 function officeKindsChanged() {
   if (OF.on) loadPulse();
+}
+
+/** app.js gọi sau khi bật/tắt chế độ chỉ hiện sân khấu: bố cục vừa đổi nên khung hình phải đo
+ *  lại chỗ trống. Không gọi thẳng resize() từ app.js vì nó là hàm nội bộ của file này. */
+function officeResize() {
+  if (OF.ready) resize();
 }
 
 /** app.js gọi khi đổi ngôn ngữ hoặc đổi theme, để khung hình vẽ lại đúng bảng màu / câu chữ. */

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.2.2
+
+- **Stage only.** A button next to the Stage title hides everything else - header, usage,
+  KPIs, tabs, pickers, the detail panel - and leaves the room alone, filling the window. For
+  people who keep the panel open just to watch their agents work. Click any character to come
+  back to the full dashboard, with that character's process tree already open; the small
+  button in the corner and the Esc key do the same. The choice is remembered.
+
+  While it is on, the dashboard stops asking for the 197 KB snapshot every three seconds - the
+  room runs on its own 2 KB pulse - so the panel is cheaper to leave open this way than the
+  full view.
+
+## 2.2.1
+
+- **Legends set redrawn.** Messi is easier to tell apart, and the jersey number is now on the
+  front of the shirt as well as the back.
+
 ## 2.2.0
 
 - **The Office view is now the Stage, and it has three scenes.** Same ten agents, three very

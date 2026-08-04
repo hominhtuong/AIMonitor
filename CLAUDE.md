@@ -469,13 +469,34 @@ quản lý và cứ 3 giây bị thay canvas mới. Chế độ này **tắt h�
 (`S.interval = 0`, kể cả lần nạp đầu): căn phòng sống bằng `/api/pulse` 2 KB mỗi giây, còn
 snapshot là 197 KB mỗi 3 giây cho những bảng biểu đang bị CSS giấu hết.
 
-`resize()` phải kẹp bậc phóng theo **cả chiều cao** khi `S.pip` - trang không cuộn được, kéo
-cửa sổ bè ra là mất nửa căn phòng dưới mép dưới mà không có cách nào nhìn thấy.
+`resize()` phải kẹp bậc phóng theo **cả chiều cao** khi `S.pip` hoặc `S.solo` - trang không
+cuộn được, kéo cửa sổ bè ra là mất nửa căn phòng dưới mép dưới mà không có cách nào nhìn thấy.
 
 Bấm nhân vật thì tin đi **ba chặng**: `office.js` => `parent.postMessage` => trang bọc
 (`dashboardFramePage`) => `vscodeApi.postMessage` => extension. Chặng giữa có unit test chạy
 đoạn `<script>` thật trong `vm` (`test/webviewPages.test.ts`) - HTML sinh lúc chạy thì
 TypeScript không kiểm được gì bên trong, hỏng là hỏng trên máy người dùng.
+
+### Chỉ hiện sân khấu (`body.solo`, nút trong tab Sân khấu)
+
+Cùng bố cục với cửa sổ nổi nhưng bật/tắt ngay trong trang: nút "Chỉ hiện sân khấu" ở hàng tiêu
+đề ẩn header, hạn mức, KPI, thanh tab, bảng chọn, chú giải và bảng chi tiết, để lại đúng khung
+hình chiếm trọn cửa sổ. `setSolo()` trong `app.js` là chỗ duy nhất bật/tắt.
+
+Dùng lại **nguyên** danh sách selector của `body.pip` chứ không `display:none` cho cả `.wrap`:
+canvas phải nằm y nguyên chỗ cũ trong DOM, dời đi là rơi vào vùng `morph()` quản lý. Cũng tắt
+hẳn vòng `/api/snapshot` như cửa sổ nổi, và bật lại kèm một nhịp `loadSnapshot()` lúc thoát -
+không có nhịp đó thì trang hiện lại với số liệu của lúc trước khi bật, tưởng tool treo.
+
+**Phải có đủ ba lối ra**, và đây là chỗ dễ làm thiếu nhất: bấm vào một nhân vật (đường chính,
+xử lý ở `onClick` của `office.js` - xoá `OF.sel` trước để không rơi vào nhánh bấm-lại-thì-đóng),
+nút nổi ở góc, và phím Esc. Lựa chọn này được nhớ ở `localStorage` (`aimon.solo`) mà phòng thì
+có lúc **không có ai** - chỉ để mỗi đường "bấm nhân vật" là người dùng mở lại VSCode lần sau
+thấy một căn phòng trống không có cách nào thoát.
+
+Không nhận từ query param như `?theme=` / `?compact=`: đây là sở thích của người xem chứ không
+phải tham số của vỏ nhúng, mỗi khung nhìn tự quyết. Cửa sổ nổi (`S.pip`) bỏ qua hẳn cờ này -
+nó vốn đã chỉ có mỗi khung hình.
 
 ### Tự dò và tự điền ba ô đường dẫn (autoConfig.ts + settingsPlan.ts)
 

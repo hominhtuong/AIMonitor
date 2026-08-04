@@ -2,7 +2,7 @@
   "name": "aimonitor",
   "displayName": "AI Monitor",
   "description": "See every AI process, token, and account limit on your machine, inside VSCode. Runs fully offline.",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "publisher": "mituultra",
   "license": "MIT",
   "icon": "images/icon.png",
