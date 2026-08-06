@@ -154,18 +154,20 @@
         "aimon.statusBar.metric": {
           "type": "string",
           "enum": [
+            "all",
             "both",
             "session",
             "weekly",
             "cost"
           ],
           "enumDescriptions": [
+            "Session, Weekly, today's tokens and cost — all four",
             "Session and Weekly limits",
             "Session (5 hour) limit only",
             "Weekly (7 day) limit only",
             "Today's cost"
           ],
-          "default": "both",
+          "default": "all",
           "order": 6,
           "markdownDescription": "What the status bar item shows while a server is running."
         },
