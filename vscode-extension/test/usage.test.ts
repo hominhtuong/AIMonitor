@@ -50,8 +50,10 @@ test('statusText per metric', () => {
   assert.equal(statusText(u, 'session'), '$(pulse) ~44%');
   assert.equal(statusText(u, 'weekly'), '$(pulse) ~54% tuần');
   assert.equal(statusText(u, 'cost'), '$(pulse) $76.04');
+  assert.equal(statusText(u, 'all'), '$(pulse) 5h ~44% · 7d ~54% · 128K tok · $76.04');
   // Chưa có server nào chạy thì chỉ là cái nhãn, không có số bịa ra.
   assert.equal(statusText(null, 'both'), '$(pulse) AI Monitor');
+  assert.equal(statusText(null, 'all'), '$(pulse) AI Monitor');
 });
 
 test('pctText shows -- rather than 0% when there is no number', () => {

@@ -5,7 +5,7 @@
  * dựng cả môi trường extension host.
  */
 
-export type StatusMetric = 'both' | 'session' | 'weekly' | 'cost';
+export type StatusMetric = 'all' | 'both' | 'session' | 'weekly' | 'cost';
 
 /** Ngưỡng đổi màu nền của nút. */
 export const WARN_PCT = 70;
@@ -72,6 +72,8 @@ export function statusText(u: UsageSummary | null, metric: StatusMetric): string
       return `$(pulse) ${mark}${pctText(u.weeklyPct)} tuần`;
     case 'cost':
       return `$(pulse) $${(u.todayCost ?? 0).toFixed(2)}`;
+    case 'all':
+      return `$(pulse) 5h ${mark}${pctText(u.sessionPct)} · 7d ${mark}${pctText(u.weeklyPct)} · ${fmtTokens(u.todayTokens)} tok · $${(u.todayCost ?? 0).toFixed(2)}`;
     default:
       return `$(pulse) ${mark}${pctText(u.sessionPct)} · ${mark}${pctText(u.weeklyPct)}`;
   }
