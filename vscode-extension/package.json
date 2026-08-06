@@ -47,6 +47,7 @@
     "virtualWorkspaces": true
   },
   "main": "./dist/extension.js",
+  "activationEvents": ["onStartupFinished"],
   "contributes": {
     "viewsContainers": {
       "activitybar": [

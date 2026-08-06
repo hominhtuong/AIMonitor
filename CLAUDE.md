@@ -399,9 +399,11 @@ Bốn nơi cùng cần server nên có `AimonServerSession` **đếm người gi
 và thanh trạng thái đều `acquire`/`release`, server chỉ tắt khi không còn ai. Trước đây
 provider của sidebar tự giữ tiến trình, thêm tab vào là ai đóng trước cũng giết nó.
 
-**Thanh trạng thái không bao giờ tự bật server.** Nó gọi `peek()` - chỉ đọc instance.json rồi
-probe - nên mở VSCode lên không phát sinh tiến trình Python nào. Có server sẵn (app macOS,
-.exe, hay cửa sổ VSCode khác) thì hiện số, chưa có thì nằm im; bấm vào mới bật.
+**Thanh trạng thái tự bật server nếu chưa có ai chạy.** `tick()` đầu tiên gọi `acquire('statusbar')`
+chứ không chỉ `peek()` - nhờ vậy mở VSCode lên là có số ngay, không cần bấm mở dashboard trước.
+Có server sẵn (app macOS, .exe, hay cửa sổ VSCode khác) thì dùng chung qua `reuseRunningInstance`,
+không bật thêm bản thứ hai. Tắt `aimon.statusBar.enabled` thì `apply()` nhả chỗ giữ ngay, không
+giữ server sống chỉ vì một thanh trạng thái đang ẩn.
 
 Ba khung nhìn khác nhau ở đúng một tham số: panel hẹp chạy `?compact=1`, tab rộng thì không,
 cửa sổ nổi chạy `?view=office`. Đừng nhân đôi frontend - `body.compact` và `body.pip` trong
