@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as http from 'node:http';
 import { AimonServerSession } from './serverSession';
 import { AimonConfig } from './config';
-import { summarize, statusText, severityOf, formatDuration, pctText, UsageSummary } from './usage';
+import { summarize, statusText, severityOf, formatDuration, pctText, fmtTokens, UsageSummary } from './usage';
 
 function getJson(host: string, port: number, path: string, timeoutMs = 4000): Promise<unknown> {
   return new Promise((resolve) => {
@@ -109,6 +109,7 @@ export class AimonStatusBar {
     const left = formatDuration(u.resetsInSec);
     tip.appendMarkdown(left ? ` · còn ${left}\n` : '\n');
     tip.appendMarkdown(`- Weekly (7 ngày): ${pctText(u.weeklyPct)}\n`);
+    tip.appendMarkdown(`- Token hôm nay: ${fmtTokens(u.todayTokens)}\n`);
     tip.appendMarkdown(`- Chi phí hôm nay: $${(u.todayCost ?? 0).toFixed(2)}\n`);
     if (u.estimated) tip.appendMarkdown(`\n_Số ước lượng từ transcript, không phải số chính thức._`);
     this.item.tooltip = tip;
