@@ -7,6 +7,7 @@ import {
   formatDuration,
   pctText,
   dashboardUrl,
+  fmtTokens,
 } from '../src/usage';
 
 /** Rút gọn từ payload thật của /api/snapshot. */
@@ -15,7 +16,7 @@ const SNAPSHOT = {
     five_hour: { pct: 44.1, source: 'estimate', resets_in: 5827 },
     seven_day: { pct: 54.3, source: 'estimate', resets_in: 269834 },
   },
-  totals: { today: { cost: 76.0393 } },
+  totals: { today: { cost: 76.0393, total: 128000 } },
 };
 
 test('summarize reads the numbers the status bar needs', () => {
@@ -23,6 +24,7 @@ test('summarize reads the numbers the status bar needs', () => {
   assert.equal(u.sessionPct, 44.1);
   assert.equal(u.weeklyPct, 54.3);
   assert.equal(u.todayCost, 76.0393);
+  assert.equal(u.todayTokens, 128000);
   assert.equal(u.estimated, true);
   assert.equal(u.resetsInSec, 5827);
 });
@@ -32,6 +34,7 @@ test('summarize survives a snapshot with nothing in it', () => {
     const u = summarize(bad);
     assert.equal(u.sessionPct, null);
     assert.equal(u.todayCost, null);
+    assert.equal(u.todayTokens, null);
   }
 });
 
@@ -59,7 +62,7 @@ test('pctText shows -- rather than 0% when there is no number', () => {
 
 test('severity thresholds', () => {
   const at = (session: number, weekly: number) =>
-    severityOf({ sessionPct: session, weeklyPct: weekly, todayCost: 0, estimated: true, resetsInSec: null });
+    severityOf({ sessionPct: session, weeklyPct: weekly, todayCost: 0, todayTokens: null, estimated: true, resetsInSec: null });
   assert.equal(at(10, 10), 'ok');
   assert.equal(at(69.9, 0), 'ok');
   assert.equal(at(70, 0), 'warn');
@@ -174,4 +177,16 @@ test('dashboardUrl keeps a forwarded host and port intact', () => {
     compact: false,
   });
   assert.ok(u.startsWith('https://abc-8899.euw.devtunnels.ms/?'));
+});
+
+test('fmtTokens rút gọn K/M', () => {
+  assert.equal(fmtTokens(null), '--');
+  assert.equal(fmtTokens(0), '0');
+  assert.equal(fmtTokens(420), '420');
+  assert.equal(fmtTokens(999), '999');
+  assert.equal(fmtTokens(128000), '128K');
+  assert.equal(fmtTokens(999500), '999.5K');
+  assert.equal(fmtTokens(1000), '1K');
+  assert.equal(fmtTokens(1250000), '1.2M');
+  assert.equal(fmtTokens(2000000), '2M');
 });

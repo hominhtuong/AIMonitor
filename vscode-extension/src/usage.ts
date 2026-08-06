@@ -15,6 +15,7 @@ export interface UsageSummary {
   sessionPct: number | null;
   weeklyPct: number | null;
   todayCost: number | null;
+  todayTokens: number | null;
   /** true khi % là ước lượng từ transcript, không phải số chính thức của Anthropic. */
   estimated: boolean;
   resetsInSec: number | null;
@@ -32,6 +33,7 @@ export function summarize(snapshot: unknown): UsageSummary {
     sessionPct: num(five.pct),
     weeklyPct: num(seven.pct),
     todayCost: num(d.totals?.today?.cost),
+    todayTokens: num(d.totals?.today?.total),
     estimated: five.source !== 'official',
     resetsInSec: num(five.resets_in),
   };
@@ -46,6 +48,16 @@ export function formatDuration(sec: number | null): string {
   const h = Math.floor(sec / 3600);
   const m = Math.round((sec % 3600) / 60);
   return h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m}m`;
+}
+
+export function fmtTokens(n: number | null): string {
+  if (n === null) return '--';
+  const abs = Math.abs(n);
+  if (abs < 1000) return String(n);
+  const unit = abs < 1_000_000 ? 1000 : 1_000_000;
+  const suffix = abs < 1_000_000 ? 'K' : 'M';
+  const v = Math.floor((n / unit) * 10) / 10;
+  return `${v}${suffix}`;
 }
 
 /** `~` đứng trước số ước lượng - cùng quy ước dashboard đang dùng, để không ai tưởng đó là
