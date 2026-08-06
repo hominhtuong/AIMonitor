@@ -34,7 +34,7 @@ export function readConfig(): AimonConfig {
     reuseRunningInstance: c.get<boolean>('reuseRunningInstance') ?? true,
     openIn: (c.get<OpenTarget>('openIn') ?? 'tab'),
     statusBarEnabled: c.get<boolean>('statusBar.enabled') ?? true,
-    statusBarMetric: (c.get<StatusMetric>('statusBar.metric') ?? 'both'),
+    statusBarMetric: (c.get<StatusMetric>('statusBar.metric') ?? 'all'),
     statusBarAlignment: (c.get<'left' | 'right'>('statusBar.alignment') ?? 'right'),
     refreshSeconds: c.get<number>('refreshSeconds') ?? 3,
     theme: (c.get<ThemeChoice>('theme') ?? 'auto'),
