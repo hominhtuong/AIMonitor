@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1
+
+- **Status bar now shows everything at once.** The default for `aimon.statusBar.metric` is now
+  `all`: session 5h %, weekly 7d %, today's tokens, and today's cost, all in one line, instead
+  of just session + weekly. If you already picked a specific metric in Settings, nothing
+  changes for you.
+
 ## 2.0.0
 
 - **Every character redrawn at three times the resolution.** Heads are round instead of
