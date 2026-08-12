@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import * as http from 'node:http';
 import { AimonServerSession } from './serverSession';
+import { AimonInstance } from './instanceFile';
 import { AimonConfig } from './config';
-import { summarize, statusText, severityOf, formatDuration, pctText, UsageSummary } from './usage';
+import { summarize, statusText, severityOf, formatDuration, pctText, fmtTokens, UsageSummary } from './usage';
 
 function getJson(host: string, port: number, path: string, timeoutMs = 4000): Promise<unknown> {
   return new Promise((resolve) => {
@@ -26,17 +27,21 @@ function getJson(host: string, port: number, path: string, timeoutMs = 4000): Pr
   });
 }
 
+const HOLDER = 'statusbar';
+
 /**
  * Nút ở thanh trạng thái dưới cùng cửa sổ.
  *
- * Nguyên tắc: **không bao giờ tự bật server**. Nó chỉ hỏi xem đã có AI Monitor nào đang chạy
- * chưa (app macOS, bản .exe, hay cửa sổ VSCode khác) rồi hiện số; chưa có thì nằm im ở dạng
- * nhãn mờ. Bấm vào mới bật. Nhờ vậy mở VSCode lên không phát sinh thêm tiến trình Python nào.
+ * Tự bật server nếu chưa có ai chạy (giữ chỗ qua `AimonServerSession.acquire`, cùng cơ chế
+ * đếm người giữ với panel/tab/cửa sổ nổi) - đổi lại là mở VSCode lên đã có số ngay, không cần
+ * bấm vào mở dashboard trước. Có server sẵn (app macOS, .exe, cửa sổ VSCode khác) thì dùng
+ * chung, không bật thêm bản thứ hai.
  */
 export class AimonStatusBar {
   private item: vscode.StatusBarItem;
   private timer: NodeJS.Timeout | undefined;
   private disposed = false;
+  private held = false;
 
   constructor(
     private readonly session: AimonServerSession,
@@ -50,7 +55,7 @@ export class AimonStatusBar {
     );
     this.item.command = 'aimon.openDashboard';
     this.item.text = '$(pulse) AI Monitor';
-    this.item.tooltip = 'AI Monitor - bấm để mở dashboard';
+    this.item.tooltip = 'AI Monitor - đang bật server...';
   }
 
   start(): void {
@@ -60,8 +65,15 @@ export class AimonStatusBar {
 
   apply(config: AimonConfig): void {
     this.config = config;
-    if (config.statusBarEnabled) this.item.show();
-    else this.item.hide();
+    if (config.statusBarEnabled) {
+      this.item.show();
+    } else {
+      this.item.hide();
+      if (this.held) {
+        this.held = false;
+        void this.session.release(HOLDER);
+      }
+    }
     this.schedule();
   }
 
@@ -77,7 +89,21 @@ export class AimonStatusBar {
   private async tick(): Promise<void> {
     if (this.disposed) return;
     try {
-      const instance = await this.session.peek();
+      if (!this.config.statusBarEnabled) {
+        this.render(null);
+        return;
+      }
+      let instance: AimonInstance | null | undefined;
+      if (!this.held) {
+        this.held = true;
+        try {
+          instance = await this.session.acquire(HOLDER);
+        } catch {
+          this.held = false; // bật hỏng thì bỏ giữ chỗ, tick sau thử lại
+        }
+      } else {
+        instance = await this.session.peek();
+      }
       if (!instance) {
         this.render(null);
         return;
@@ -114,6 +140,7 @@ export class AimonStatusBar {
     const left = formatDuration(u.resetsInSec);
     tip.appendMarkdown(left ? ` · còn ${left}\n` : '\n');
     tip.appendMarkdown(`- Weekly (7 ngày): ${pctText(u.weeklyPct)}\n`);
+    tip.appendMarkdown(`- Token hôm nay: ${fmtTokens(u.todayTokens)}\n`);
     tip.appendMarkdown(`- Chi phí hôm nay: $${(u.todayCost ?? 0).toFixed(2)}\n`);
     if (u.estimated) tip.appendMarkdown(`\n_Số ước lượng từ transcript, không phải số chính thức._`);
     this.item.tooltip = tip;
@@ -122,6 +149,10 @@ export class AimonStatusBar {
   dispose(): void {
     this.disposed = true;
     if (this.timer) clearTimeout(this.timer);
+    if (this.held) {
+      this.held = false;
+      void this.session.release(HOLDER);
+    }
     this.item.dispose();
   }
 }

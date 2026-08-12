@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.3
+
+- **Status bar defaults to the 'all' metric.** Shows session/weekly/tokens/cost together
+  instead of just session %, and the tooltip now includes today's token count.
+
 ## 2.2.2
 
 - **Stage only.** A button next to the Stage title hides everything else - header, usage,
