@@ -1708,6 +1708,9 @@ function renderDetail() {
   const act = currentAction(e);
 
   const badges = [];
+  if (root && root.session_name) {
+    badges.push(`<span class="badge peer" title="${esc(t(root.peer_ready ? 'copy.badge_hint' : 'copy.badge_hint_off', { name: root.session_name }))}">@${esc(root.session_name)}</span>`);
+  }
   if (d.model) badges.push(`<span class="badge model">${esc(d.model)}</span>`);
   if (d.branch) badges.push(`<span class="badge branch">${esc(d.branch)}</span>`);
   if (d.mode && d.mode !== 'default') badges.push(`<span class="badge warn">${esc(d.mode)}</span>`);
@@ -1743,10 +1746,12 @@ function renderDetail() {
       ${badges.join(' ')}
       <span class="badge dim">PID ${d.pid}</span>
       <span class="acts">
+        ${root && hasCard(root) ? `<button class="mini info${S.openInfo.has(d.pid) ? ' on' : ''}" data-act="info" data-pid="${d.pid}" title="${esc(t('copy.one_hint'))}" aria-expanded="${S.openInfo.has(d.pid)}">${S.openInfo.has(d.pid) ? '−' : 'i'}</button>` : ''}
         <button class="mini" data-act="of-close">${t('office.close')}</button>
         <button class="mini danger" data-act="kill_tree" data-pid="${d.pid}" data-label="${esc(d.title || d.name || '')}"${d.supervisor ? ` data-sup="${esc(d.supervisor)}"` : ''}>${t('btn.kill_tree')}</button>
       </span>
     </div>
+    ${root && hasCard(root) && S.openInfo.has(d.pid) ? infoBlock(root) : ''}
     <div class="grid">${cells.map((c) =>
       `<div class="cell"><div class="v" data-flash="1">${esc(c.v)}</div><div class="k">${esc(c.k)}</div></div>`).join('')}</div>
     ${doing}${subs}

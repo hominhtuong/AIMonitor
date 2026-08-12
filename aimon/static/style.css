@@ -40,6 +40,9 @@
   --hot: #f87171;
   --heavy: #fca5a5;
   --sess-active: #3f4c86;
+  --peer-fg: #c4b5fd;
+  --peer-line: #6d28d9;
+  --peer-bg: #241a4d;
   --info-line: #3f3f9e;
   --ok-line: #14532d;
   --doing-bg: #1a2436;
@@ -117,6 +120,9 @@
   --hot: #dc2626;
   --heavy: #b91c1c;
   --sess-active: #a5b4fc;
+  --peer-fg: #5b21b6;
+  --peer-line: #c4b5fd;
+  --peer-bg: #f3f0ff;
   --info-line: #c7d2fe;
   --ok-line: #a7f3d0;
   --doing-bg: #f8fafc;
@@ -335,7 +341,33 @@ h2:first-child { margin-top: 0; }
 .badge.branch { color: var(--ok-fg); border-color: var(--ok-line); }
 .badge.warn { color: var(--warn-fg); border-color: var(--warn-line); }
 .badge.dim { color: var(--dim); }
+/* Tên phiên dùng để nhắn tin. Tô nền riêng chứ không chỉ đổi màu chữ như mấy badge kia: đây
+ * là thứ người dùng phải nhặt ra giữa một hàng badge, thấy được từ xa mới có ích. */
+.badge.peer {
+  color: var(--peer-fg); border-color: var(--peer-line); background: var(--peer-bg);
+  font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 .sess .acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+/* Nút bung thông tin phiên. Vuông, một ký tự, đứng đầu hàng nút - nó chỉ mở một khối chữ nên
+ * không được to ngang bằng mấy nút có tác động thật như Tạm dừng hay Kill. */
+.mini.info {
+  width: 26px; padding: 4px 0; text-align: center; font-style: italic; font-weight: 700;
+  font-family: ui-serif, Georgia, serif;
+}
+.mini.info.on { color: var(--peer-fg); border-color: var(--peer-line); background: var(--peer-bg); font-style: normal; }
+.sessinfo {
+  margin: 8px 0 2px; padding: 10px 12px; border: 1px solid var(--peer-line);
+  border-radius: 8px; background: var(--peer-bg);
+}
+.sessinfo .row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.sessinfo .cap { font-size: 12px; font-weight: 600; color: var(--peer-fg); }
+.sessinfo .row .mini { margin-left: auto; }
+/* `user-select` mở sẵn vì đây là đường lui khi clipboard bị chặn: bôi đen rồi copy tay. */
+.sessinfo pre {
+  margin: 0; white-space: pre-wrap; word-break: break-word; user-select: text;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  line-height: 1.6; color: var(--fg);
+}
 
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 2px 14px; padding: 0 16px 12px; }
 .cell .v { font-size: 15px; font-variant-numeric: tabular-nums; border-radius: 4px; }

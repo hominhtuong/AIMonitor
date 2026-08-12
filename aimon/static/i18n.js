@@ -231,6 +231,27 @@ const DICT = {
     'ai.show_tree': 'Child tree ({n})',
     'ai.no_events': 'No timeline data yet.',
 
+    /* --- danh thiếp phiên: copy sang một phiên Claude Code khác --- */
+    'copy.one': 'Copy',
+    'copy.one_hint': 'Session info: show the name, project and ID of this session, ready to copy into another AI session so that one can message it.',
+    'copy.title': 'Session info - paste this into another AI session',
+    'copy.ok_one': 'Copied the info for {name}. Paste it into another session.',
+    'copy.fail': 'Could not reach the clipboard. Select the text below and copy it by hand.',
+    'copy.gone': 'That session just ended.',
+    'copy.badge_hint': 'Messaging name of this session. Another Claude Code session reaches it with SendMessage to "{name}".',
+    'copy.badge_hint_off': 'Session name "{name}". This session did not register a messaging socket, so it cannot receive SendMessage.',
+    /* Nội dung khối chữ được dán đi. Nó rời khỏi trang này nên phải tự đứng vững:
+     * phiên nhận không thấy màn hình, không thấy repo bên kia. */
+    'copy.head': 'Claude Code session "{name}"',
+    'copy.no_name': 'unnamed',
+    'copy.target': 'Messaging name (SendMessage target): {name}',
+    'copy.project': 'Project: {proj} - {cwd}',
+    'copy.sid': 'Session ID: {id}',
+    'copy.branch': 'branch {b}',
+    'copy.model': 'model {m}',
+    'copy.howto': 'To reach it: call ListAgents to confirm it is listed, then SendMessage with to="{name}". Say who you are and which repo you are in, because it sees neither.',
+    'copy.no_peer': 'This session has no messaging name, so SendMessage cannot reach it. The ID above still identifies it (resume, transcript).',
+
     /* --- bảng phiên đã đóng --- */
     'closed.none_today': 'No sessions closed today (since 00:00).',
     'closed.none_7d': 'No sessions closed in the last 7 days.',
@@ -572,6 +593,27 @@ const DICT = {
     'ai.hide_tree': 'Ẩn cây',
     'ai.show_tree': 'Cây con ({n})',
     'ai.no_events': 'Chưa có dữ liệu dòng thời gian.',
+
+    /* --- danh thiếp phiên: copy sang một phiên Claude Code khác --- */
+    'copy.one': 'Copy',
+    'copy.one_hint': 'Thông tin phiên: hiện tên, dự án và ID của phiên này để copy gửi sang phiên làm việc khác của AI, cho phiên đó nhắn tin sang được.',
+    'copy.title': 'Thông tin phiên - dán khối này sang phiên AI khác',
+    'copy.ok_one': 'Đã copy thông tin của {name}. Dán sang phiên khác là dùng được.',
+    'copy.fail': 'Không dùng được clipboard. Bôi đen khối chữ bên dưới rồi copy tay giúp em.',
+    'copy.gone': 'Phiên đó vừa kết thúc.',
+    'copy.badge_hint': 'Tên nhắn tin của phiên này. Phiên Claude Code khác gọi sang bằng SendMessage tới "{name}".',
+    'copy.badge_hint_off': 'Tên phiên "{name}". Phiên này không đăng ký socket nhắn tin nên không nhận được SendMessage.',
+    /* Nội dung khối chữ được dán đi. Nó rời khỏi trang này nên phải tự đứng vững:
+     * phiên nhận không thấy màn hình, không thấy repo bên kia. */
+    'copy.head': 'Phiên Claude Code "{name}"',
+    'copy.no_name': 'chưa đặt tên',
+    'copy.target': 'Tên để nhắn tin (đích của SendMessage): {name}',
+    'copy.project': 'Dự án: {proj} - {cwd}',
+    'copy.sid': 'Session ID: {id}',
+    'copy.branch': 'nhánh {b}',
+    'copy.model': 'model {m}',
+    'copy.howto': 'Cách liên hệ: gọi ListAgents để xác nhận phiên này có trong danh sách, rồi SendMessage với to="{name}". Nhớ nói rõ mình là ai và đang ở repo nào, vì bên kia không thấy cả hai.',
+    'copy.no_peer': 'Phiên này không có tên nhắn tin nên SendMessage không gọi tới được. ID ở trên vẫn dùng để nhận diện (resume, đọc transcript).',
 
     /* --- bảng phiên đã đóng --- */
     'closed.none_today': 'Không có phiên đã đóng trong hôm nay (tính từ 00:00).',
