@@ -85,6 +85,15 @@ def collect_roots(procs: dict, kids: dict, pid_map: dict) -> tuple[list[dict], s
                 "session_id": sid,
                 "session_name": meta.get("name"),
                 "entrypoint": meta.get("entrypoint"),
+                # Ba trường dưới chỉ phục vụ khối "thông tin phiên" người dùng copy sang phiên
+                # khác. `cwd` lấy từ state file chứ không từ transcript: phiên vừa mở chưa có
+                # transcript nào mà vẫn phải nói được nó đang đứng ở dự án nào.
+                "session_cwd": meta.get("cwd"),
+                "cc_version": meta.get("version"),
+                # Có socket + peerProtocol nghĩa là phiên này nhận được SendMessage. Thiếu là
+                # bản cũ hoặc nền tảng không hỗ trợ - phải nói thẳng thay vì để người dùng gửi
+                # vào hư không.
+                "peer_ready": bool(meta.get("messagingSocketPath") and meta.get("peerProtocol")),
                 "supervisor": supervisor,
                 "children": node.get("children", []),
             }

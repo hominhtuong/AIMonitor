@@ -12,6 +12,7 @@ const S = {
   timer: null,
   openKids: new Set(),
   openEvents: new Set(),
+  openInfo: new Set(),   // PID đang bung khối danh thiếp phiên
   events: {},
   busy: false,
   modalOpen: false,
@@ -247,6 +248,108 @@ function toast(msg, kind) {
   el.textContent = msg;
   $('#toast').appendChild(el);
   setTimeout(() => el.remove(), 4600);
+}
+
+/* --------------------------------------------- danh thiếp phiên (copy sang phiên khác)
+ *
+ * Claude Code từ 2.1.224 cho hai phiên nhắn tin cho nhau qua `SendMessage`, địa chỉ là TÊN
+ * phiên (`~/.claude/sessions/<pid>.json` -> `name`). Nhưng người ngồi ở phiên A không có cách
+ * nào biết phiên B tên gì: tên do Claude Code tự sinh từ tên thư mục và chỉ hiện trong chính
+ * phiên đó. Khối chữ dưới đây là để dán thẳng sang phiên A - dán xong là phiên đó biết bên
+ * kia tên gì, đang ở dự án nào và gọi sang bằng cách nào.
+ *
+ * Vì vậy khối chữ phải TỰ ĐỨNG VỮNG: phiên nhận không thấy màn hình này, không thấy repo bên
+ * kia. Thiếu đường dẫn tuyệt đối hay thiếu câu chỉ cách gọi thì nó chỉ là một mớ chữ.
+ */
+
+/** Tên dự án suy từ đường dẫn. Người dùng nhớ "AIMonitor" chứ không nhớ cả đường dẫn. */
+function projOf(cwd) {
+  if (!cwd) return '';
+  const parts = String(cwd).replace(/[\\/]+$/, '').split(/[\\/]/);
+  return parts[parts.length - 1] || '';
+}
+
+/** Đường dẫn cho khối copy. Lấy `session_cwd` (state file) TRƯỚC `session.cwd` (transcript) vì
+ *  hai lý do, cả hai đều làm hỏng khối chữ nếu lấy ngược:
+ *  - `session.cwd` đã bị rút gọn `HOME` thành `~` để hiện cho đẹp, mà khối này dán sang phiên
+ *    khác thì cần đường dẫn tuyệt đối dùng được ngay.
+ *  - transcript ghi thư mục HIỆN TẠI, đổi theo `cd` giữa phiên; tên nhắn tin lại suy từ thư mục
+ *    LÚC MỞ trong state file. Lấy transcript thì gặp cảnh tên `qabutler-b0` mà dự án ghi
+ *    `handover` - người đọc không nối được hai thứ vào nhau. */
+function sessCwd(r) {
+  return r.session_cwd || (r.session && r.session.cwd) || '';
+}
+
+/** Khối thông tin một phiên. `t()` lo phần ngôn ngữ, nội dung là chữ thuần để dán đi đâu cũng được. */
+function sessionInfoText(r) {
+  const s = r.session || {};
+  const name = r.session_name || '';
+  const cwd = sessCwd(r);
+  const proj = projOf(cwd);
+  const lines = [];
+
+  lines.push(t('copy.head', { name: name || t('copy.no_name') }));
+  if (name) lines.push('- ' + t('copy.target', { name }));
+  lines.push('- ' + t('copy.project', { proj: proj || '?', cwd: cwd || '?' }));
+  if (r.session_id) lines.push('- ' + t('copy.sid', { id: r.session_id }));
+
+  const meta = ['PID ' + r.pid];
+  if (r.cc_version) meta.push('Claude Code ' + r.cc_version);
+  if (r.entrypoint) meta.push(r.entrypoint);
+  lines.push('- ' + meta.join(' · '));
+
+  const extra = [];
+  if (s.git_branch) extra.push(t('copy.branch', { b: s.git_branch }));
+  if ((s.models || []).length) extra.push(t('copy.model', { m: s.models.join(', ') }));
+  if (extra.length) lines.push('- ' + extra.join(' · '));
+
+  lines.push('');
+  lines.push(name && r.peer_ready ? t('copy.howto', { name }) : t('copy.no_peer'));
+  return lines.join('\n');
+}
+
+/** Khối bung ra dưới tiêu đề thẻ: bày ĐÚNG chữ sẽ được copy, kèm nút copy.
+ *
+ *  Bày ra chứ không copy thẳng vì hai lẽ: người dùng thấy trước mình sắp dán cái gì sang phiên
+ *  khác, và khi clipboard bị chặn (webview, trang không secure context) thì vẫn còn đường bôi
+ *  đen copy tay - nút bấm không có gì để nhìn thì hỏng là mất trắng. */
+function infoBlock(r) {
+  return `<div class="sessinfo">
+    <div class="row">
+      <span class="cap">${t('copy.title')}</span>
+      <button class="mini" data-act="copyinfo" data-pid="${r.pid}">${t('copy.one')}</button>
+    </div>
+    <pre>${esc(sessionInfoText(r))}</pre>
+  </div>`;
+}
+
+/** Copy có đường lui. Trong webview VSCode trang nằm trong iframe khác origin, đã gặp ca
+ *  `navigator.clipboard` bị từ chối vì document không được coi là đang focus. */
+async function copyText(str) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(str);
+      return true;
+    }
+  } catch (e) { /* rơi xuống nhánh dưới */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = str;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Phiên có danh thiếp để copy hay không. Copilot/Codex không đăng ký tên nên không có gì để dán. */
+function hasCard(r) {
+  return !!(r.session_name || r.session_id);
 }
 
 let _modalResolve = null;
@@ -547,8 +650,14 @@ function sessionCard(r) {
   const path = s ? (s.cwd || '') : '';
   const kidsOpen = S.openKids.has(r.pid);
   const evOpen = !!(s && S.openEvents.has(s.session_id));
+  const infoOpen = S.openInfo.has(r.pid);
 
   const badges = [];
+  // Tên phiên đứng TRƯỚC mọi badge khác: đó là thứ người dùng cần lấy để nhắn sang phiên này,
+  // chôn nó sau model với nhánh git thì phải đi tìm mới thấy.
+  if (r.session_name) {
+    badges.push(`<span class="badge peer" title="${esc(t(r.peer_ready ? 'copy.badge_hint' : 'copy.badge_hint_off', { name: r.session_name }))}">@${esc(r.session_name)}</span>`);
+  }
   if (s) (s.models || []).forEach((m) => badges.push(`<span class="badge model">${esc(m)}</span>`));
   if (s && s.git_branch) badges.push(`<span class="badge branch">${esc(s.git_branch)}</span>`);
   if (s && s.mode && s.mode !== 'default') badges.push(`<span class="badge warn">${esc(s.mode)}</span>`);
@@ -620,12 +729,14 @@ function sessionCard(r) {
       ${badges.join(' ')}
       <span class="badge dim">PID ${r.pid}</span>
       <span class="acts">
+        ${hasCard(r) ? `<button class="mini info${infoOpen ? ' on' : ''}" data-act="info" data-pid="${r.pid}" title="${esc(t('copy.one_hint'))}" aria-expanded="${infoOpen}">${infoOpen ? '−' : 'i'}</button>` : ''}
         ${s ? `<button class="mini" data-act="events" data-sid="${esc(s.session_id)}">${evOpen ? t('ai.hide') : t('ai.timeline')}</button>` : ''}
         ${r.children.length ? `<button class="mini" data-act="kids" data-pid="${r.pid}">${kidsOpen ? t('ai.hide_tree') : t('ai.show_tree', { n: r.children.length })}</button>` : ''}
         ${pauseBtn(r.pid, r.paused, true)}
         <button class="mini danger" data-act="kill_tree" data-pid="${r.pid}" data-label="${esc(title)}"${r.supervisor ? ` data-sup="${esc(r.supervisor)}"` : ''}>${t('btn.kill_tree')}</button>
       </span>
     </div>
+    ${infoOpen && hasCard(r) ? infoBlock(r) : ''}
     ${stats}${doingBlock}${kidsBlock}${evBlock}
   </div>`;
 }
@@ -858,6 +969,24 @@ document.addEventListener('click', (ev) => {
     const sid = btn.dataset.sid;
     if (S.openEvents.has(sid)) { S.openEvents.delete(sid); renderLive(); }
     else { S.openEvents.add(sid); loadEvents(sid); renderLive(); }
+    return;
+  }
+  if (a === 'info') {
+    const pid = +btn.dataset.pid;
+    S.openInfo.has(pid) ? S.openInfo.delete(pid) : S.openInfo.add(pid);
+    renderLive();
+    // Bảng chi tiết của tab Sân khấu bày cùng khối này, nên phải vẽ lại theo - không thì bấm
+    // ở đó xong chẳng thấy gì mở ra.
+    if (typeof renderDetail === 'function') renderDetail();
+    return;
+  }
+  // Nội dung dựng lại từ S.snap theo PID chứ không nhét sẵn vào thuộc tính data-*: khối chữ
+  // dài và có xuống dòng, mà `patch()` lại xoá mọi thuộc tính không có trong HTML mới.
+  if (a === 'copyinfo') {
+    const row = ((S.snap && S.snap.ai) || []).filter(hasCard).find((r) => r.pid === +btn.dataset.pid);
+    if (!row) { toast(t('copy.gone'), 'err'); return; }
+    copyText(sessionInfoText(row)).then((ok) =>
+      toast(ok ? t('copy.ok_one', { name: row.session_name || ('PID ' + row.pid) }) : t('copy.fail'), ok ? '' : 'err'));
     return;
   }
   act(a, +btn.dataset.pid, btn.dataset.label, btn.dataset.sup);

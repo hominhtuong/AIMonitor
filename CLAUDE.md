@@ -530,6 +530,40 @@ Trong bảng Settings, mỗi ô có một dòng `[$(search) Detect again](comman
 `markdownDescription` - VSCode render `command:` link thành nút bấm được ngay tại chỗ, không
 phải mở Command Palette.
 
+## Danh thiếp phiên - copy sang một phiên AI khác
+
+Claude Code từ 2.1.224 cho hai phiên nhắn tin cho nhau bằng `SendMessage`, mà **địa chỉ là TÊN
+phiên**, không phải session ID. Chỗ hỏng: tên đó do Claude Code tự sinh từ tên thư mục và chỉ
+hiện trong chính phiên đó, nên người ngồi ở phiên A không có cách nào biết phiên B tên gì. AI
+Monitor nhìn thấy hết cả năm phiên nên là chỗ đúng để bày ra.
+
+Nút `i` ở hàng nút của thẻ (và của bảng chi tiết tab Sân khấu) bung ra khối chữ, kèm nút Copy.
+**Bày ra rồi mới copy, không copy thẳng**: người dùng thấy trước mình sắp dán cái gì sang phiên
+khác, và khi clipboard bị chặn thì còn đường bôi đen copy tay - nút bấm không có gì để nhìn thì
+hỏng là mất trắng. Từng có thêm nút "Copy tất cả phiên", đã gỡ: người dùng bác vì thừa.
+
+Nguồn dữ liệu là `~/.claude/sessions/<pid>.json` (`claude.pid_sessions()` vốn đã đọc sẵn), ba
+trường thêm vào `collect_roots`: `session_cwd`, `cc_version`, `peer_ready`.
+
+Bốn chỗ dễ sai:
+
+1. **Đường dẫn phải lấy `session_cwd` (state file), KHÔNG lấy `session.cwd` (transcript).**
+   `claude.py` rút gọn `HOME` thành `~` cho đẹp, mà khối này dán sang phiên khác nên cần đường
+   dẫn tuyệt đối dùng được ngay. Thêm nữa transcript ghi thư mục HIỆN TẠI (đổi theo `cd`), còn
+   tên nhắn tin suy từ thư mục LÚC MỞ - lấy transcript thì gặp cảnh tên `qabutler-b0` mà dự án
+   ghi `handover`, người đọc không nối được hai thứ vào nhau.
+2. **Khối chữ phải TỰ ĐỨNG VỮNG.** Phiên nhận không thấy màn hình này, không thấy repo bên kia,
+   không nhận được lịch sử hội thoại - `SendMessage` chỉ chuyển text. Thiếu câu chỉ cách gọi
+   (`ListAgents` rồi `SendMessage to="..."`) thì nó chỉ là một mớ chữ.
+3. **`peer_ready` phải nói thẳng khi false.** Bản Claude Code cũ hoặc Windows native không đăng
+   ký socket, gửi vào đó là gửi vào hư không. Lúc đó khối chữ đổi câu cuối, không hứa hão.
+4. **Nội dung dựng lại từ `S.snap` theo PID, đừng nhét sẵn vào `data-*`.** Khối chữ dài và có
+   xuống dòng, mà `patch()` xoá mọi thuộc tính không có trong HTML mới - cùng cái bẫy đã ghi ở
+   mục frontend. Trạng thái bung/thu để ở `S.openInfo`, không để trên DOM.
+
+Nút `i` bấm ở tab Sân khấu thì phải gọi cả `renderLive()` lẫn `renderDetail()`: hai khung nhìn
+dùng chung `S.openInfo`, quên một chỗ là bấm xong không thấy gì mở ra.
+
 ## Số phiên bản ở chân trang
 
 Footer bày **hai** số và đó là chủ ý: `version` trong `/api/config.js` là của SERVER đang phục
