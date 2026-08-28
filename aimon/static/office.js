@@ -1395,12 +1395,13 @@ function drawAmbient(g) {
   });
 }
 
-const BUBBLE_W = 88;             // cỡ màn hình cố định - phải nhỏ hơn khoảng cách hai bàn ở
-                                  // bậc phóng thấp nhất còn vẽ chữ (2), nếu không hai bong
-                                  // bóng cạnh nhau đè lên nhau.
-const BUBBLE_FONT = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
-const BUBBLE_MSG_FONT = '9px system-ui, -apple-system, Segoe UI, sans-serif';
-const BUBBLE_LINE_H = 10;
+// Cỡ màn hình cố định - phải nhỏ hơn khoảng cách hai bàn ở bậc phóng thấp nhất còn vẽ chữ
+// (2): pitch bàn 48 pixel gốc * 2 = 96 màn hình, để dư 2 mỗi bên nên chặn ở 94 - vượt quá thì
+// hai bong bóng cạnh nhau đè lên nhau đúng lúc phóng nhỏ nhất.
+const BUBBLE_W = 94;
+const BUBBLE_FONT = '600 12px ui-monospace, SFMono-Regular, Menlo, monospace';
+const BUBBLE_MSG_FONT = '11px system-ui, -apple-system, Segoe UI, sans-serif';
+const BUBBLE_LINE_H = 13;
 const BUBBLE_PAD = 3;
 const BUBBLE_MSG_LINES = 2;      // dòng trạng thái + tối đa 2 dòng tin nhắn = 3 dòng
 
@@ -1447,7 +1448,9 @@ function wrapText(g, text, maxWidth, maxLines) {
 function drawStatusBlock(g, e, d) {
   const act = currentAction(e);
   const busy = d.state === 'busy';
-  const statusRaw = busy ? (d.brief || d.tool || t('office.state_busy')) : t('office.bubble_' + (d.state || 'idle'));
+  const statusRaw = busy
+    ? (d.brief || d.tool || (d.thinking ? t('office.bubble_thinking') : t('office.state_busy')))
+    : t('office.bubble_' + (d.state || 'idle'));
   const textW = BUBBLE_W - 14;
 
   g.font = BUBBLE_FONT;
@@ -1517,7 +1520,7 @@ function drawBubbles(g) {
     const cx = (e.x + SPRITE_W / 2) * OF.scale;
     const top = (e.y - 3) * OF.scale;
     const w = g.measureText(label).width + 10;
-    const h = 15;
+    const h = 17;
     const x = Math.max(2, Math.min(ROOM_W * OF.scale - w - 2, cx - w / 2));
 
     g.globalAlpha = 0.92;
@@ -1809,7 +1812,7 @@ function renderDetail() {
 
   const badges = [];
   if (root && root.session_name) {
-    badges.push(`<span class="badge peer" title="${esc(t(root.peer_ready ? 'copy.badge_hint' : 'copy.badge_hint_off', { name: root.session_name }))}">@${esc(root.session_name)}</span>`);
+    badges.push(`<button type="button" class="badge peer" data-act="copyname" data-name="${esc(root.session_name)}" title="${esc(t(root.peer_ready ? 'copy.badge_hint' : 'copy.badge_hint_off', { name: root.session_name }))}">@${esc(root.session_name)}</button>`);
   }
   if (d.model) badges.push(`<span class="badge model">${esc(d.model)}</span>`);
   if (d.branch) badges.push(`<span class="badge branch">${esc(d.branch)}</span>`);
@@ -1827,6 +1830,8 @@ function renderDetail() {
 
   const doing = d.state === 'busy' && d.brief
     ? `<div class="doing run">${t('ai.doing')}<code>${esc(d.brief)}</code> <span class="el">${fmtDur(d.elapsed)}${d.in_subagent ? t('ai.in_subagent') : ''}</span></div>`
+    : d.state === 'busy' && d.thinking
+    ? `<div class="doing run">${t('ai.thinking')}</div>`
     : `<div class="doing"><span class="idle">${t('office.state_' + (d.state || 'idle'))}${d.idle != null ? ' · ' + fmtDur(d.idle) : ''}</span></div>`;
 
   const subs = (d.subagents || []).length

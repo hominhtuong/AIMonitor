@@ -93,6 +93,11 @@ def _state_of(root: dict, sess: dict | None) -> str:
     idle = sess["idle"]
     if idle is None or idle >= WANDER_AFTER:
         return "wander"
+    # Chưa gọi tool nào nhưng bóng vẫn đang bên Claude (mới nhận prompt/tool_result, còn
+    # đang nghĩ hoặc soạn chữ) - kẹp theo `idle < WANDER_AFTER` ở trên nên phiên treo/máy
+    # đứng không bị mắc mãi ở "busy".
+    if sess["awaiting"]:
+        return "busy"
     return "idle"
 
 
@@ -100,6 +105,9 @@ def _agent(root: dict) -> dict:
     sess = root.get("session")
     state = _state_of(root, sess)
     doing = sess["pending"][0] if (sess and sess["pending"]) else None
+    # Busy mà không có tool nào đang chạy = đang nghĩ/soạn phản hồi (xem _state_of). Frontend
+    # tự dịch cờ này ra chữ theo ngôn ngữ đang chọn, backend không gửi câu hoàn chỉnh.
+    thinking = state == "busy" and doing is None
 
     out = {
         # Định danh phải ổn định qua các lần đọc, nếu không nhân vật sẽ nhảy chỗ mỗi giây.
@@ -110,6 +118,7 @@ def _agent(root: dict) -> dict:
         "label": root["label"],
         "name": root["name"],
         "state": state,
+        "thinking": thinking,
         "action": action_of(doing["name"]) if doing else ("rest" if state != "busy" else "work"),
         "tool": doing["name"] if doing else "",
         "brief": doing["brief"] if doing else "",

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.2.5
+
+- **Fixed a bug that was hiding most tool calls from the status system.** The transcript writer
+  in this environment splits one logical turn into several JSONL lines (thinking, then each
+  tool call) sharing the same message id - the old duplicate-message guard treated every line
+  after the first as a repeat and silently dropped it. Measured on real transcripts: 66-76% of
+  tool calls never reached "what's running" tracking. Fixed, and tool tallies are now accurate
+  too.
+- **New "Thinking…" status.** Between a prompt (or tool result) landing and the next tool call,
+  the agent now shows as thinking/composing instead of falling back to idle - on the card, the
+  Stage detail panel, and the status bubble.
+- **Shorter session hand-off text.** The block an `i` button copies for pasting into another AI
+  session is now two lines - just the messaging name, project, and how to reach it. PID,
+  branch, model, session ID were dropped; they're already on the card's badge row.
+- Click the `@name` badge on a card to copy just that name, with a toast confirming it.
+- Bigger, more legible text in the Stage status bubble.
+
 ## 2.2.4
 
 - **Live status and last message on the Stage.** Every agent sitting at their desk now carries
