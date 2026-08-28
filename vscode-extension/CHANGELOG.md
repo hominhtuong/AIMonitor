@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.4
+
+- **Live status and last message on the Stage.** Every agent sitting at their desk now carries
+  a status card above their head: what they're doing right now (or idle/paused/away), plus
+  their last prompt - up to three lines, wrapping and trimming as needed. Glance at the room
+  and know what everyone is working on without opening each session. All three scenes got a
+  taller layout to make room for it.
+
+## 2.2.3
+
+- **Session card - hand off to another AI session.** An `i` button on each card (and in the
+  Stage detail panel) unfolds a self-contained block with everything another Claude Code
+  session needs to reach this one through `SendMessage` - absolute path, session name, PID.
+  Shown before copying, not copied straight away, so you see what you're about to paste.
+
 ## 2.2.2
 
 - **Stage only.** A button next to the Stage title hides everything else - header, usage,
