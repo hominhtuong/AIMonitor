@@ -50,6 +50,12 @@ PRICING_FILE = os.environ.get("AIMON_PRICING") or _CFG["pricing_file"] or os.pat
 
 MAX_EVENTS = 60
 AGENT_TOOLS = {"Agent", "Task"}
+# Trần cho cờ "awaiting" - phiên treo hoặc máy đứng thì last_ts không nhích nữa, mà "user" là
+# dòng CUỐI xử lý được thì awaiting kẹt mãi ở True. 90s khớp WANDER_AFTER của office.py (lúc
+# đó nhân vật cũng đứng dậy đi vòng vòng) nhưng khai riêng ở đây - claude.py không nên biết gì
+# về hoạt cảnh Văn phòng, và mọi nơi đọc `awaiting` (kể cả tab AI & Agents, không qua office.py)
+# đều cần bản đã kẹp trần này.
+_AWAITING_MAX_S = 90.0
 
 # Đọc theo khối thay vì nuốt cả file: transcript có file tới 50 MB, đọc một phát
 # làm RAM tiến trình phình lên hàng trăm MB và không trả lại cho OS. Đo trên 800 MB
@@ -157,6 +163,11 @@ def _new_state(path: str, st: os.stat_result) -> dict:
         "user_turns": 0,
         "tools": {},
         "pending": {},
+        # Bóng đang ở sân ai: True vừa qua một dòng "user" (prompt mới hoặc tool_result) mà
+        # chưa thấy assistant trả lời xong lượt - Claude đang nghĩ/soạn chữ, chưa kịp gọi tool
+        # nào nên `pending` vẫn rỗng. Xem `_state_of` ở office.py: chỉ tin cờ này khi vẫn còn
+        # mới (idle < WANDER_AFTER), phòng ca máy đứng hoặc phiên treo làm nó kẹt mãi ở "busy".
+        "awaiting": False,
         "agents": {},
         "events": [],
         "seen_msgs": set(),   # (message.id, requestId) - chống đếm trùng partial message
@@ -232,61 +243,80 @@ def _process(state: dict, d: dict, light: bool) -> None:
         if model.startswith("<"):
             return  # '<synthetic>': CLI tự sinh, không gọi API
 
-        # Claude Code chạy với --include-partial-messages ghi CÙNG một message
-        # nhiều lần (cùng message.id + requestId, usage y hệt nhau). Nếu cộng hết
-        # thì token và chi phí phồng lên gấp ~2 lần so với thực tế (đối chiếu
-        # `npx ccusage`). Chỉ tính bản ghi đầu tiên của mỗi message.
+        # Bộ khung này (Claude Agent SDK / Code Helper Plugin) không ghi một message hoàn
+        # chỉnh rồi lặp lại như `--include-partial-messages` của CLI thường mô tả - nó tách
+        # MỖI khối nội dung đã xong (thinking, rồi từng tool_use) thành MỘT dòng JSONL riêng,
+        # tất cả dùng chung message.id + requestId + usage (usage là số CUỐI CÙNG của cả
+        # message, giống hệt ở mọi dòng). Đo trên transcript thật: 66-76% số tool_use nằm ở
+        # dòng thứ hai trở đi. Bản trước `return` ngay khi thấy lại (msg_id, requestId) đã đọc
+        # - nghĩ đó là bản lặp toàn phần - nên bỏ luôn phần nội dung MỚI của các dòng sau,
+        # mất phần lớn tool_use (agent đứng ngồi ở bàn dù đang chạy `Bash`, `ExitPlanMode` chờ
+        # duyệt plan cũng không hiện). Sửa: `seen_msgs` chỉ còn chặn CỘNG TRÙNG usage/token
+        # (đúng lý do nó sinh ra, đối chiếu khớp `npx ccusage`), khối vòng lặp tool_use bên
+        # dưới luôn chạy - an toàn vì mỗi tool_use có `id` riêng, khối trong `pending` là
+        # dict-theo-id nên xử lại một khối đã thấy chỉ ghi đè cùng dữ liệu, không đếm trùng.
         msg_id = msg.get("id")
+        first_time = True
         if msg_id:
             key = (msg_id, d.get("requestId"))
-            if key in state["seen_msgs"]:
-                return
+            first_time = key not in state["seen_msgs"]
             state["seen_msgs"].add(key)
 
-        usage = msg.get("usage") or {}
-        inp = int(usage.get("input_tokens") or 0)
-        outp = int(usage.get("output_tokens") or 0)
-        cread = int(usage.get("cache_read_input_tokens") or 0)
-        cwrite = int(usage.get("cache_creation_input_tokens") or 0)
-        cc = usage.get("cache_creation") or {}
-        w1h = int(cc.get("ephemeral_1h_input_tokens") or 0)
-        w5m = int(cc.get("ephemeral_5m_input_tokens") or 0)
-        if w1h + w5m == 0:
-            w5m = cwrite
+        # `stop_reason` là thuộc tính của CẢ message, giống usage: có mặt y hệt ở mọi dòng con
+        # của cùng message.id, kể cả dòng chỉ có `thinking`. Nên biết ngay TỪ DÒNG ĐẦU TIÊN
+        # message này có gọi tool hay không, không cần đợi bản ghi có tool_use.
+        # != 'tool_use' nghĩa là message đã kết thúc lượt mà không gọi thêm tool nào - quả
+        # bóng đã chuyền lại cho người dùng, agent hết việc để "đang nghĩ".
+        stop_reason = msg.get("stop_reason")
+        if stop_reason and stop_reason != "tool_use":
+            state["awaiting"] = False
 
-        b = _bucket(state, model)
-        b["input"] += inp
-        b["output"] += outp
-        b["cache_read"] += cread
-        b["cache_write_5m"] += w5m
-        b["cache_write_1h"] += w1h
+        if first_time:
+            usage = msg.get("usage") or {}
+            inp = int(usage.get("input_tokens") or 0)
+            outp = int(usage.get("output_tokens") or 0)
+            cread = int(usage.get("cache_read_input_tokens") or 0)
+            cwrite = int(usage.get("cache_creation_input_tokens") or 0)
+            cc = usage.get("cache_creation") or {}
+            w1h = int(cc.get("ephemeral_1h_input_tokens") or 0)
+            w5m = int(cc.get("ephemeral_5m_input_tokens") or 0)
+            if w1h + w5m == 0:
+                w5m = cwrite
 
-        hb = state["hourly"].setdefault(int((ts or time.time()) // _HOUR), _empty_bucket())
-        hb["input"] += inp
-        hb["output"] += outp
-        hb["cache_read"] += cread
-        hb["cache_write"] += w5m + w1h
-        hb["cost"] += _msg_cost(model, inp, outp, cread, w5m, w1h)
-        hb["msgs"] += 1
+            b = _bucket(state, model)
+            b["input"] += inp
+            b["output"] += outp
+            b["cache_read"] += cread
+            b["cache_write_5m"] += w5m
+            b["cache_write_1h"] += w1h
 
-        # Bucket giờ quá thô để trả lời "đã dùng thêm bao nhiêu từ 13:51:44 tới giờ" - thứ cần
-        # để bù phần % trôi kể từ lần Claude Code làm mới hạn mức. Giữ thêm mốc từng message
-        # trong RECENT_KEEP giờ gần nhất; cắt bớt ngay tại đây nên danh sách luôn bị chặn.
-        state["recent"].append((ts or time.time(), inp + outp + cread + w5m + w1h))
-        if len(state["recent"]) > _RECENT_MAX:
-            floor = time.time() - RECENT_KEEP
-            state["recent"] = [r for r in state["recent"] if r[0] >= floor][-_RECENT_MAX:]
+            hb = state["hourly"].setdefault(int((ts or time.time()) // _HOUR), _empty_bucket())
+            hb["input"] += inp
+            hb["output"] += outp
+            hb["cache_read"] += cread
+            hb["cache_write"] += w5m + w1h
+            hb["cost"] += _msg_cost(model, inp, outp, cread, w5m, w1h)
+            hb["msgs"] += 1
 
-        if side:
-            s = state["side_tokens"]
-            s["input"] += inp
-            s["output"] += outp
-            s["cache_read"] += cread
-            s["cache_write"] += w5m + w1h
-        else:
-            state["assistant_msgs"] += 1
-            state["context"] = inp + cread + cwrite
-            state["context_model"] = model
+            # Bucket giờ quá thô để trả lời "đã dùng thêm bao nhiêu từ 13:51:44 tới giờ" - thứ
+            # cần để bù phần % trôi kể từ lần Claude Code làm mới hạn mức. Giữ thêm mốc từng
+            # message trong RECENT_KEEP giờ gần nhất; cắt bớt ngay tại đây nên danh sách luôn
+            # bị chặn.
+            state["recent"].append((ts or time.time(), inp + outp + cread + w5m + w1h))
+            if len(state["recent"]) > _RECENT_MAX:
+                floor = time.time() - RECENT_KEEP
+                state["recent"] = [r for r in state["recent"] if r[0] >= floor][-_RECENT_MAX:]
+
+            if side:
+                s = state["side_tokens"]
+                s["input"] += inp
+                s["output"] += outp
+                s["cache_read"] += cread
+                s["cache_write"] += w5m + w1h
+            else:
+                state["assistant_msgs"] += 1
+                state["context"] = inp + cread + cwrite
+                state["context_model"] = model
 
         if light or not isinstance(content, list):
             return
@@ -314,6 +344,9 @@ def _process(state: dict, d: dict, light: bool) -> None:
         return
 
     if typ == "user" and not light:
+        # Prompt mới hay tool_result vừa xong đều là chuyền bóng sang Claude - cả hai đều đặt
+        # cờ này, vì cả hai đều nghĩa "giờ tới lượt agent làm việc".
+        state["awaiting"] = True
         if isinstance(content, list):
             texts, had_result = [], False
             for blk in content:
@@ -436,6 +469,7 @@ def _summary(state: dict) -> dict:
     api_total = sum(tot.values())
 
     now = time.time()
+    awaiting = state["awaiting"] and bool(state["last_ts"]) and (now - state["last_ts"]) < _AWAITING_MAX_S
     pending = [
         {"name": p["name"], "brief": p["brief"], "elapsed": round(now - p["ts"], 1), "side": p["side"]}
         for p in sorted(state["pending"].values(), key=lambda x: x["ts"])
@@ -470,6 +504,7 @@ def _summary(state: dict) -> dict:
         "user_turns": state["user_turns"],
         "sidechain_tokens": state["side_tokens"],
         "pending": pending,
+        "awaiting": awaiting,
         "agents_running": agents_running,
         "agents_total": len(state["agents"]),
         "top_tools": [{"name": n, "count": c} for n, c in top_tools],

@@ -347,6 +347,9 @@ h2:first-child { margin-top: 0; }
   color: var(--peer-fg); border-color: var(--peer-line); background: var(--peer-bg);
   font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+/* Giờ là <button> (bấm để copy tên), không còn <span> - viền đậm hơn lúc rê chuột để thấy nó
+ * bấm được, vì background:hover mặc định của button bị .badge.peer đè do đặc hiệu cao hơn. */
+.badge.peer:hover { border-color: var(--peer-fg); }
 .sess .acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 /* Nút bung thông tin phiên. Vuông, một ký tự, đứng đầu hàng nút - nó chỉ mở một khối chữ nên
  * không được to ngang bằng mấy nút có tác động thật như Tạm dừng hay Kill. */

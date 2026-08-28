@@ -280,30 +280,14 @@ function sessCwd(r) {
   return r.session_cwd || (r.session && r.session.cwd) || '';
 }
 
-/** Khối thông tin một phiên. `t()` lo phần ngôn ngữ, nội dung là chữ thuần để dán đi đâu cũng được. */
+/** Khối thông tin một phiên - CỐ TÌNH ngắn: chỉ đủ để phiên nhận biết gọi ai và bằng cách nào.
+ *  PID, branch, model, session ID... đã hiện sẵn ở hàng badge trên thẻ cho NGƯỜI đọc; khối này
+ *  là để dán sang một AI khác, càng dài càng tốn ngữ cảnh của phiên nhận mà không thêm được gì
+ *  nó cần để gọi `SendMessage`. `t()` lo phần ngôn ngữ, nội dung là chữ thuần để dán đi đâu cũng được. */
 function sessionInfoText(r) {
-  const s = r.session || {};
   const name = r.session_name || '';
-  const cwd = sessCwd(r);
-  const proj = projOf(cwd);
-  const lines = [];
-
-  lines.push(t('copy.head', { name: name || t('copy.no_name') }));
-  if (name) lines.push('- ' + t('copy.target', { name }));
-  lines.push('- ' + t('copy.project', { proj: proj || '?', cwd: cwd || '?' }));
-  if (r.session_id) lines.push('- ' + t('copy.sid', { id: r.session_id }));
-
-  const meta = ['PID ' + r.pid];
-  if (r.cc_version) meta.push('Claude Code ' + r.cc_version);
-  if (r.entrypoint) meta.push(r.entrypoint);
-  lines.push('- ' + meta.join(' · '));
-
-  const extra = [];
-  if (s.git_branch) extra.push(t('copy.branch', { b: s.git_branch }));
-  if ((s.models || []).length) extra.push(t('copy.model', { m: s.models.join(', ') }));
-  if (extra.length) lines.push('- ' + extra.join(' · '));
-
-  lines.push('');
+  const proj = projOf(sessCwd(r)) || '?';
+  const lines = [t('copy.head', { name: name || t('copy.no_name'), proj })];
   lines.push(name && r.peer_ready ? t('copy.howto', { name }) : t('copy.no_peer'));
   return lines.join('\n');
 }
@@ -565,7 +549,7 @@ function renderUsage() {
 function renderKpis() {
   const s = S.snap, tot = s.totals, sys = s.system;
   const mcp = s.groups.find((g) => g.kind === 'mcp') || { count: 0, rss_kb: 0 };
-  const running = s.ai.filter((r) => r.session && r.session.pending.length).length;
+  const running = s.ai.filter((r) => r.session && (r.session.pending.length || r.session.awaiting)).length;
   const cards = [
     { k: 'live', n: tot.live, l: t('kpi.live'),
       s: running ? t('kpi.live_busy', { n: running }) : t('kpi.live_idle') },
@@ -656,7 +640,7 @@ function sessionCard(r) {
   // Tên phiên đứng TRƯỚC mọi badge khác: đó là thứ người dùng cần lấy để nhắn sang phiên này,
   // chôn nó sau model với nhánh git thì phải đi tìm mới thấy.
   if (r.session_name) {
-    badges.push(`<span class="badge peer" title="${esc(t(r.peer_ready ? 'copy.badge_hint' : 'copy.badge_hint_off', { name: r.session_name }))}">@${esc(r.session_name)}</span>`);
+    badges.push(`<button type="button" class="badge peer" data-act="copyname" data-name="${esc(r.session_name)}" title="${esc(t(r.peer_ready ? 'copy.badge_hint' : 'copy.badge_hint_off', { name: r.session_name }))}">@${esc(r.session_name)}</button>`);
   }
   if (s) (s.models || []).forEach((m) => badges.push(`<span class="badge model">${esc(m)}</span>`));
   if (s && s.git_branch) badges.push(`<span class="badge branch">${esc(s.git_branch)}</span>`);
@@ -697,6 +681,8 @@ function sessionCard(r) {
     if (doing) {
       const more = s.pending.length > 1 ? ` <span class="el">${esc(t('ai.more_pending', { n: s.pending.length - 1 }))}</span>` : '';
       doingBlock = `<div class="doing run">${t('ai.doing')}<code>${esc(doing.brief)}</code> <span class="el">${fmtDur(doing.elapsed)}${doing.side ? t('ai.in_subagent') : ''}</span>${more}</div>`;
+    } else if (s.awaiting) {
+      doingBlock = `<div class="doing run">${t('ai.thinking')}</div>`;
     } else {
       doingBlock = `<div class="doing"><span class="idle">${t('ai.idle')}${s.idle != null ? ' ' + fmtDur(s.idle) : ''}${s.last_prompt ? t('ai.last_prompt') + esc(s.last_prompt.slice(0, 90)) : ''}</span></div>`;
     }
@@ -987,6 +973,13 @@ document.addEventListener('click', (ev) => {
     if (!row) { toast(t('copy.gone'), 'err'); return; }
     copyText(sessionInfoText(row)).then((ok) =>
       toast(ok ? t('copy.ok_one', { name: row.session_name || ('PID ' + row.pid) }) : t('copy.fail'), ok ? '' : 'err'));
+    return;
+  }
+  // Bấm thẳng vào cái tên (@name) ở hàng badge: copy đúng tên đó, không mở khối chữ dài.
+  if (a === 'copyname') {
+    const name = btn.dataset.name;
+    if (!name) return;
+    copyText(name).then((ok) => toast(ok ? t('copy.name_ok', { name }) : t('copy.fail'), ok ? '' : 'err'));
     return;
   }
   act(a, +btn.dataset.pid, btn.dataset.label, btn.dataset.sup);
