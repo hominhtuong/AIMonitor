@@ -32,7 +32,9 @@
  * giữ chung thì resize(), bậc phóng, spriteSmooth, ô xem trước và hit test không phải biết
  * bối cảnh nào đang chạy, mà nền tĩnh cũng nướng được ở pixel gốc. */
 const ROOM_W = 260;
-const ROOM_H = 176;
+// Cao hơn hẳn bản trước (176) để chừa chỗ cho khối trạng thái 3 dòng phía trên dãy bàn thứ
+// hai - xem hằng số ROW_Y/AISLE_Y bên dưới, chỗ tính khoảng đó ra.
+const ROOM_H = 240;
 const WALL_H = 26;
 
 const WALK_SPEED = 26;              // pixel gốc / giây
@@ -79,7 +81,7 @@ const OF = {
   canvas: null,
   ctx: null,
   atlas: null,
-  bg: null,              // nền tĩnh đã nướng, ở PIXEL GỐC (260x176)
+  bg: null,              // nền tĩnh đã nướng, ở PIXEL GỐC (260x240)
   bgKey: '',             // chữ ký của nền đã nướng: bối cảnh + kiểu nền + bảng màu
   freeTimer: null,       // hẹn giờ trả lại vùng nhớ ảnh sau khi rời tab
   scale: 3,
@@ -529,7 +531,7 @@ function renderRooms() {
 /** Vẽ thu nhỏ một bối cảnh + kiểu nền vào canvas xem trước. Dùng chính hàm vẽ thật nên xem
  *  trước không bao giờ lệch khỏi cái sẽ nhận, kể cả sau này sửa hình.
  *
- *  Vẽ ở PIXEL GỐC rồi để CSS thu lại: canvas 260x176 chỉ tốn 183 KB, mà thu bằng transform
+ *  Vẽ ở PIXEL GỐC rồi để CSS thu lại: canvas 260x240 chỉ tốn ~244 KB, mà thu bằng transform
  *  thì các nét 1 pixel biến mất lỗ chỗ. */
 function paintPreview(cv, sc, roomId, tag) {
   if (!cv) return;
@@ -1259,7 +1261,7 @@ function potPlant(g, p, x, y) {
  *  khoảng 350 lệnh fillRect cho kiểu Cổ điển, mà nông trại còn nhiều hơn hẳn. Nướng sẵn thì
  *  còn đúng một lệnh.
  *
- *  Nướng ở PIXEL GỐC (260x176 = 183 KB) chứ không ở bậc phóng hiện tại, và điều đó KHÔNG mất
+ *  Nướng ở PIXEL GỐC (260x240 = ~244 KB) chứ không ở bậc phóng hiện tại, và điều đó KHÔNG mất
  *  một chút nét nào: bậc phóng luôn là số nguyên, dpr cũng đã làm tròn về số nguyên, còn nền
  *  thì toàn fillRect căn theo toạ độ nguyên - phóng gần nhất một ảnh nguyên lần cho ra đúng
  *  từng pixel giống như vẽ thẳng ở bậc đó. Nướng ở bậc phóng thì ở bậc 5 với dpr 2 sẽ tốn
@@ -1393,6 +1395,96 @@ function drawAmbient(g) {
   });
 }
 
+const BUBBLE_W = 88;             // cỡ màn hình cố định - phải nhỏ hơn khoảng cách hai bàn ở
+                                  // bậc phóng thấp nhất còn vẽ chữ (2), nếu không hai bong
+                                  // bóng cạnh nhau đè lên nhau.
+const BUBBLE_FONT = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+const BUBBLE_MSG_FONT = '9px system-ui, -apple-system, Segoe UI, sans-serif';
+const BUBBLE_LINE_H = 10;
+const BUBBLE_PAD = 3;
+const BUBBLE_MSG_LINES = 2;      // dòng trạng thái + tối đa 2 dòng tin nhắn = 3 dòng
+
+/** Bọc `text` xuống dòng theo `maxWidth`, tối đa `maxLines` dòng - dòng cuối bị cắt kèm "…"
+ *  nếu còn chữ dư ra. Chạy sau khi đã set `g.font` đúng cỡ chữ cần đo. */
+function wrapText(g, text, maxWidth, maxLines) {
+  const words = (text || '').trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = '';
+  let idx = 0;
+  while (idx < words.length) {
+    const test = cur ? cur + ' ' + words[idx] : words[idx];
+    if (cur && g.measureText(test).width > maxWidth) {
+      lines.push(cur);
+      cur = '';
+      if (lines.length === maxLines) break;
+    } else {
+      cur = test;
+      idx++;
+    }
+  }
+  const more = idx < words.length;
+  if (cur && lines.length < maxLines) lines.push(cur);
+  if (more && lines.length) {
+    let last = lines[lines.length - 1];
+    while (last.length > 1 && g.measureText(last + '…').width > maxWidth) last = last.slice(0, -1);
+    lines[lines.length - 1] = last + '…';
+  }
+  // Lưới an toàn: một "từ" tự nó đã dài hơn maxWidth (URL, đường dẫn không khoảng trắng) thì
+  // các bước trên không cắt được vì không có khoảng trắng nào để ngắt dòng.
+  return lines.map((line) => {
+    if (g.measureText(line).width <= maxWidth) return line;
+    let s = line;
+    while (s.length > 1 && g.measureText(s + '…').width > maxWidth) s = s.slice(0, -1);
+    return s + '…';
+  });
+}
+
+/** Khối trạng thái + tin nhắn của một người đang ngồi, treo phía trên chỗ của họ. Dòng 1 là
+ *  việc đang làm (brief tool khi bận, tên trạng thái khi rảnh); tối đa 2 dòng dưới là tin
+ *  nhắn/yêu cầu gần nhất của người dùng - để nắm được tiến trình mà không cần mở IDE. Không
+ *  có tin nhắn thì chỉ còn đúng 1 dòng, khối thấp lại.
+ */
+function drawStatusBlock(g, e, d) {
+  const act = currentAction(e);
+  const busy = d.state === 'busy';
+  const statusRaw = busy ? (d.brief || d.tool || t('office.state_busy')) : t('office.bubble_' + (d.state || 'idle'));
+  const textW = BUBBLE_W - 14;
+
+  g.font = BUBBLE_FONT;
+  const statusLine = wrapText(g, statusRaw, textW, 1)[0] || '';
+
+  g.font = BUBBLE_MSG_FONT;
+  const msgLines = wrapText(g, d.last_prompt || '', textW, BUBBLE_MSG_LINES);
+
+  const lineCount = 1 + msgLines.length;
+  const h = lineCount * BUBBLE_LINE_H + BUBBLE_PAD * 2;
+  const cx = e.station.labelX * OF.scale;
+  const top = e.station.bubbleY * OF.scale;
+  const x = Math.max(2, Math.min(ROOM_W * OF.scale - BUBBLE_W - 2, cx - BUBBLE_W / 2));
+
+  g.globalAlpha = 0.92;
+  g.fillStyle = OF.pal.bubble;
+  roundRect(g, x, top - h, BUBBLE_W, h, 4);
+  g.fill();
+  g.globalAlpha = 1;
+
+  let ly = top - h + BUBBLE_PAD + BUBBLE_LINE_H / 2;
+  g.fillStyle = ACTION_COLOR[busy ? act : 'rest'] || OF.pal.bubbleFg;
+  g.fillRect(x + 3, ly - 2, 3, 3);
+  g.font = BUBBLE_FONT;
+  g.fillStyle = OF.pal.bubbleFg;
+  g.fillText(statusLine, x + 9, ly);
+  ly += BUBBLE_LINE_H;
+
+  g.font = BUBBLE_MSG_FONT;
+  g.globalAlpha = 0.85;
+  msgLines.forEach((line) => {
+    g.fillText(line, x + 5, ly);
+    ly += BUBBLE_LINE_H;
+  });
+  g.globalAlpha = 1;
+}
+
 /** Bong bóng + tên chỗ. Cả hai là chữ ở cỡ MÀN HÌNH cố định, còn cảnh vật thì co theo bậc
  *  phóng - nên ở bậc 1 (panel hẹp của VSCode) một cái tên rộng gấp đôi cái bàn và cả khung
  *  hình thành một đống chữ chồng nhau. Bậc đó bỏ chữ đi: màu màn hình đã nói đủ ai đang làm
@@ -1402,20 +1494,28 @@ function drawBubbles(g) {
   g.save();
   g.setTransform(OF.dpr, 0, 0, OF.dpr, 0, 0);
   g.textBaseline = 'middle';
-  g.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
 
   OF.ents.forEach((e) => {
     const d = e.data || {};
+
+    // Người đang NGỒI Ở BÀN thì luôn có khối trạng thái + tin nhắn, kể cả lúc rảnh - đây là
+    // chỗ để "nắm được toàn bộ tiến trình mà không cần mở từng IDE". Người đi vòng vòng hay
+    // sub-agent đứng cạnh bàn không có chỗ cố định để neo khối 3 dòng, nên vẫn dùng bong bóng
+    // 1 dòng cũ, chỉ hiện lúc đang bận.
+    if (e.mode === 'sit' && e.station) {
+      if (e.path.length) return;   // đang bước ngang vào/ra ghế - đợi yên chỗ mới vẽ
+      drawStatusBlock(g, e, d);
+      return;
+    }
+
     const act = currentAction(e);
     if (act === 'rest' || e.path.length) return;
     const label = e.kind === 'sub' ? (d.type || 'agent') : (d.tool || '');
     if (!label) return;
 
-    // Người đang ở chỗ của mình thì treo bong bóng lên phía trên chỗ đó. Neo theo đầu nhân
-    // vật như lúc đứng thì nó đúng vào vùng màn hình và che mất mấy dòng chữ đang chạy.
-    const seated = e.mode === 'sit' && e.station;
-    const cx = (seated ? e.station.labelX : e.x + SPRITE_W / 2) * OF.scale;
-    const top = (seated ? e.station.bubbleY : e.y - 3) * OF.scale;
+    g.font = BUBBLE_FONT;
+    const cx = (e.x + SPRITE_W / 2) * OF.scale;
+    const top = (e.y - 3) * OF.scale;
     const w = g.measureText(label).width + 10;
     const h = 15;
     const x = Math.max(2, Math.min(ROOM_W * OF.scale - w - 2, cx - w / 2));
@@ -1989,10 +2089,13 @@ const DESK_H = 11;
 const MON_W = 18;
 const MON_H = 13;
 
-const ROW_Y = [46, 104];            // mép trên hai dãy bàn
-// Lối đi phải nằm THẤP HƠN dòng tên của dãy bàn ngay trên nó (tên ở ROW_Y + 42), nếu không
-// người đi vòng vòng cứ đứng chồng lên tên đồng nghiệp đang ngồi.
-const AISLE_Y = [78, 148];
+// Mép trên hai dãy bàn. Giãn xa hơn bản trước (46, 104) để khối trạng thái 3 dòng của dãy 2
+// (neo phía trên MÀN HÌNH của dãy đó, cao tối đa 36px màn hình) có chỗ mà không đè lên tên
+// hay lối đi của dãy 1: dãy 2 phải nằm dưới AISLE_Y[0] ít nhất 14 + 36 + 4 pixel.
+const ROW_Y = [78, 176];
+// Lối đi phải nằm THẤP HƠN dòng tên của dãy bàn ngay trên nó, nếu không người đi vòng vòng cứ
+// đứng chồng lên tên đồng nghiệp đang ngồi.
+const AISLE_Y = [121, 219];
 const CORRIDOR_X = [1, 243];        // hai lối dọc sát tường, không cắt qua bàn nào
 // 5 bàn mỗi dãy chứ không phải 6: khe giữa hai bàn phải đủ rộng cho sub-agent đứng cạnh
 // người gọi nó (14 pixel, vừa một nhân vật vẽ ở tỷ lệ 0.8). Nhồi 6 bàn thì khe còn 4 pixel

@@ -20,8 +20,8 @@
  *   rung bần bật quanh bàn tay. Cùng lấy một gốc đã làm tròn thì chúng dính chặt vào nhau.
  */
 
-const FARM_ROW_Y = [46, 104];         // mép trên hai dãy thửa - y hệt Văn phòng
-const FARM_AISLE_Y = [78, 148];       // bờ ruộng ngang
+const FARM_ROW_Y = [78, 176];         // mép trên hai dãy thửa - y hệt Văn phòng
+const FARM_AISLE_Y = [121, 219];      // bờ ruộng ngang
 const FARM_CORRIDOR_X = [1, 243];     // hai bờ dọc sát mép, không cắt qua thửa nào
 const FARM_PLOT_X = [16, 64, 112, 160, 208];
 const FARM_PLOT_W = 34;

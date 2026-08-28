@@ -5,16 +5,19 @@
  * bài kiểm tra thật cho lớp SCENE: chỗ nào tách chưa sạch sẽ lộ ra ở đây chứ không phải ở
  * Nông trại.
  *
- * Bố cục: hai tầng, mỗi tầng một hàng nhà và một con đường ngay dưới hàng nhà đó.
+ * Bố cục: hai tầng, mỗi tầng một hàng nhà và một con đường ngay dưới hàng nhà đó. Giãn xa hơn
+ * bản đầu (từng cao 176) để khối trạng thái 3 dòng (neo ở seatY-1, phía trên đầu người) có
+ * chỗ phía trên hàng nhà dưới mà không đè lên vỉa hè/con đường của hàng trên.
  *
- *     0..22    trời, đường chân trời
- *    22..50    HÀNG NHÀ TRÊN (5 địa chỉ)
- *    50..58    vỉa hè trên
- *    58..86    ĐƯỜNG TRÊN, làn cơ sở y=62
- *    86..114   HÀNG NHÀ DƯỚI (5 địa chỉ)
- *   114..122   vỉa hè dưới
- *   122..150   ĐƯỜNG DƯỚI, làn cơ sở y=126
- *   150..176   sân trước, dải sinh vật nền
+ *     0..34    trời, đường chân trời
+ *    34..62    HÀNG NHÀ TRÊN (5 địa chỉ)
+ *    62..70    vỉa hè trên
+ *    70..98    ĐƯỜNG TRÊN, làn cơ sở y=72
+ *    98..104   vỉa hè phụ - khe chừa cho khối trạng thái của hàng dưới
+ *   104..132   HÀNG NHÀ DƯỚI (5 địa chỉ)
+ *   132..140   vỉa hè dưới
+ *   140..168   ĐƯỜNG DƯỚI, làn cơ sở y=142
+ *   168..240   sân trước, dải sinh vật nền
  *
  * Vì sao HAI con đường chứ không phải một: chiều sâu trong khung hình này là trục y, ai ở
  * dưới thì gần người xem hơn và phải được vẽ đè lên. Nếu chỉ có một con đường ở giữa thì
@@ -36,21 +39,25 @@
 const DLV_HOUSE_X = [40, 82, 124, 166, 208];
 const DLV_HOUSE_W = 34;
 const DLV_HOUSE_H = 28;
-const DLV_HOUSE_Y = [22, 86];         // mép trên hai hàng nhà
+// Mép trên hai hàng nhà. Giãn xa hơn bản trước (22, 86) - cùng lý do với ROW_Y ở Văn phòng:
+// khối trạng thái 3 dòng treo trên đầu người (bubbleY = seatY-1) cần thêm chỗ phía trên hàng
+// nhà thứ hai mà không đè lên tên/con đường của hàng thứ nhất.
+const DLV_HOUSE_Y = [34, 104];
 /* Làn cơ sở của hai con đường. Chọn sao cho nhân vật (cao 20) CỘNG bóng đổ dưới gầm xe
- * (thêm ~1) nằm trọn trong mặt đường 28 pixel: 60 + 20 + 1 = 81 < 86 là mép trên hàng nhà
- * dưới. Đặt thấp hơn thì bánh xe của người chạy trên đường TRÊN thò xuống đè lên mái hàng
- * nhà DƯỚI - mà nhà nằm trong nền đã nướng nên vẽ trước, tức là cái xe đè lên ngôi nhà lẽ ra
- * phải che nó. Đúng kiểu lỗi thứ tự vẽ đã trả giá với cái ghế ở Văn phòng. */
-const DLV_LANE_Y = [60, 124];
-const DLV_ROAD_Y = [58, 122];         // mép trên mặt đường
+ * (thêm ~1) nằm trọn trong mặt đường 28 pixel, vẫn giữ đúng khoảng lệch (+12/+2) so với mép
+ * trên hàng nhà như bản gốc - chỉ dịch cả cụm xuống theo DLV_HOUSE_Y. Đặt thấp hơn thì bánh
+ * xe của người chạy trên đường TRÊN thò xuống đè lên mái hàng nhà DƯỚI - mà nhà nằm trong nền
+ * đã nướng nên vẽ trước, tức là cái xe đè lên ngôi nhà lẽ ra phải che nó. Đúng kiểu lỗi thứ tự
+ * vẽ đã trả giá với cái ghế ở Văn phòng. */
+const DLV_LANE_Y = [72, 142];
+const DLV_ROAD_Y = [70, 140];         // mép trên mặt đường
 const DLV_ROAD_H = 28;
 const DLV_SEAT_DY = 14;               // chỗ đứng trước nhà, tính từ mép trên nhà
 const DLV_DEPOT_X = 34;               // mép phải của kho - điểm quay đầu của mọi chuyến
 /* Lệch làn giữa các địa chỉ, để xe không chồng khít nhau. Ba mức x 2 pixel là trần, và cái
  * chặn không phải thân nhân vật mà là BÓNG ĐỔ dưới gầm xe: nó là hình bầu dục tâm ở y+19.4
- * bán trục 1.8, tức chạm tới y+21.2. Làn thấp nhất 64 + 21.2 = 85.2, vừa lọt mép trên hàng
- * nhà dưới ở 86. Lệch 3 pixel là bóng tràn sang mái nhà, mà bóng thì mờ nên lỗi đó chỉ lộ ra
+ * bán trục 1.8, tức chạm tới y+21.2. Làn thấp nhất 76 + 21.2 = 97.2, vẫn lọt mép trên hàng
+ * nhà dưới ở 104. Lệch 3 pixel là bóng tràn sang mái nhà, mà bóng thì mờ nên lỗi đó chỉ lộ ra
  * khi soi kỹ - đúng loại lỗi ở lại lâu nhất. */
 const DLV_LANE_STAGGER = 2;
 const DLV_TURN_DX = 40;               // chặng rẽ chéo dài bao nhiêu theo trục ngang
