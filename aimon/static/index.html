@@ -59,6 +59,15 @@
         <option value="vi">&#127483;&#127475;&nbsp; Tiếng Việt</option>
       </select>
     </div>
+
+    <!-- Ba chế độ xem. Nằm trong header (sticky) để đổi được ở bất cứ đâu trên trang, kể cả
+         lúc đang cuộn tận dưới. Mặc định là Gọn: mở panel ra là thấy ngay tên phiên để copy,
+         không phải kéo qua hạn mức, KPI, chip rồi mới tới. Xem setView() trong app.js. -->
+    <nav class="views" id="views" data-i18n-title="view.label">
+      <button data-view="brief" data-i18n="view.brief" data-i18n-title="view.brief_hint"></button>
+      <button data-view="stage" data-i18n="view.stage" data-i18n-title="view.stage_hint"></button>
+      <button data-view="full" data-i18n="view.full" data-i18n-title="view.full_hint"></button>
+    </nav>
   </div>
 </header>
 
@@ -82,6 +91,12 @@
        tách làm hai giá trị riêng thì đổi ở tab này xong sang tab kia thấy số khác, không ai
        hiểu vì sao. Nội dung do app.js dựng. -->
   <div class="kindbar" id="kindbar" hidden></div>
+
+  <!-- Chế độ Gọn: mỗi phiên một dòng (tiêu đề, tên nhắn tin, thư mục), bấm vào dòng mới bung
+       ra thẻ chi tiết. Không có nút nào trên thanh tab trỏ tới đây - chỉ setView() bật nó. -->
+  <section class="pane" id="pane-brief">
+    <div id="brief"></div>
+  </section>
 
   <section class="pane on" id="pane-ai">
     <h2 data-i18n="ai.title"></h2>

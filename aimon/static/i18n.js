@@ -38,6 +38,16 @@ const DICT = {
     'tab.hist': 'Session history',
     'tab.res': 'Resources',
     'tab.net': 'Ports & Docker',
+    'view.label': 'View',
+    'view.brief': 'Compact',
+    'view.stage': 'Stage',
+    'view.full': 'Full',
+    'view.brief_hint': 'Only the running sessions: title, messaging name and folder. Click the name to copy it.',
+    'view.stage_hint': 'Only the stage with the characters.',
+    'view.full_hint': 'Everything: quotas, KPIs, every tab.',
+    'brief.expand': 'Show details',
+    'brief.collapse': 'Hide details',
+    'brief.copy_path': 'Full path: {path}',
 
     /* --- chung --- */
     'common.range': 'Time range',
@@ -402,6 +412,16 @@ const DICT = {
     'tab.hist': 'Lịch sử phiên',
     'tab.res': 'Tài nguyên',
     'tab.net': 'Cổng & Docker',
+    'view.label': 'Chế độ xem',
+    'view.brief': 'Gọn',
+    'view.stage': 'Sân khấu',
+    'view.full': 'Đầy đủ',
+    'view.brief_hint': 'Chỉ các phiên đang chạy: tiêu đề, tên nhắn tin và thư mục. Bấm vào tên để copy.',
+    'view.stage_hint': 'Chỉ có sân khấu với các nhân vật.',
+    'view.full_hint': 'Tất cả: hạn mức, KPI, mọi tab.',
+    'brief.expand': 'Xem chi tiết',
+    'brief.collapse': 'Thu gọn',
+    'brief.copy_path': 'Đường dẫn đầy đủ: {path}',
 
     /* --- chung --- */
     'common.range': 'Khoảng thời gian',

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.6
+
+- **Three views: Compact, Stage, Full.** A switcher at the top of the dashboard picks how much
+  you see. Compact is the new default: each running session is two lines (title, then its
+  messaging name and folder), so the name you want to copy is visible the moment the panel
+  opens - no scrolling past quotas and KPIs. Click the name to copy it; click the row to expand
+  the full session card.
+- Stage shows only the stage; Full is the dashboard as before and returns to the tab you were on.
+  The sidebar panel and the editor tab remember their view separately.
+
 ## 2.2.5
 
 - **Fixed a bug that was hiding most tool calls from the status system.** The transcript writer

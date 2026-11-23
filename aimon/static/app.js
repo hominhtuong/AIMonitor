@@ -13,6 +13,10 @@ const S = {
   openKids: new Set(),
   openEvents: new Set(),
   openInfo: new Set(),   // PID đang bung khối danh thiếp phiên
+  openBrief: new Set(),  // PID đang bung thẻ chi tiết trong chế độ Gọn
+  // Chế độ xem: 'brief' (Gọn), 'stage' (Sân khấu), 'full' (Đầy đủ). Xem setView().
+  view: 'brief',
+  fullTab: 'ai',         // tab đang xem ở chế độ Đầy đủ, để quay lại đúng chỗ cũ
   events: {},
   busy: false,
   modalOpen: false,
@@ -625,7 +629,9 @@ function kidRow(node, depth) {
     </div>` + (node.children || []).map((c) => kidRow(c, depth + 1)).join('');
 }
 
-function sessionCard(r) {
+/** Thẻ đầy đủ của một phiên. `embedded` = đang nằm trong một dòng của chế độ Gọn: dòng đó đã
+ *  bày tiêu đề, đường dẫn và tên nhắn tin rồi, lặp lại lần nữa ngay bên dưới chỉ tốn chỗ. */
+function sessionCard(r, embedded) {
   const s = r.session;
   const doing = s && s.pending.length ? s.pending[0] : null;
   const active = !!doing && !r.paused;
@@ -639,7 +645,7 @@ function sessionCard(r) {
   const badges = [];
   // Tên phiên đứng TRƯỚC mọi badge khác: đó là thứ người dùng cần lấy để nhắn sang phiên này,
   // chôn nó sau model với nhánh git thì phải đi tìm mới thấy.
-  if (r.session_name) {
+  if (r.session_name && !embedded) {
     badges.push(`<button type="button" class="badge peer" data-act="copyname" data-name="${esc(r.session_name)}" title="${esc(t(r.peer_ready ? 'copy.badge_hint' : 'copy.badge_hint_off', { name: r.session_name }))}">@${esc(r.session_name)}</button>`);
   }
   if (s) (s.models || []).forEach((m) => badges.push(`<span class="badge model">${esc(m)}</span>`));
@@ -707,11 +713,11 @@ function sessionCard(r) {
       : `<div class="ev"><span class="x">${t('ai.no_events')}</span></div>`) + '</div>';
   }
 
-  return `<div class="sess ${cls}" data-key="sess-${r.pid}">
+  return `<div class="sess ${cls}${embedded ? ' embedded' : ''}" data-key="sess-${r.pid}">
     <div class="top">
-      <span class="st"></span>
+      ${embedded ? '' : `<span class="st"></span>
       <span class="ttl">${esc(title)}</span>
-      <span class="path">${esc(path)}</span>
+      <span class="path">${esc(path)}</span>`}
       ${badges.join(' ')}
       <span class="badge dim">PID ${r.pid}</span>
       <span class="acts">
@@ -737,10 +743,102 @@ function renderLive() {
         <button class="mini" data-kind="*">${t('filter.all')}</button></div>`
     : '';
   render('#live', (list.length
-    ? list.map(sessionCard).join('')
+    ? list.map((r) => sessionCard(r)).join('')
     : `<div class="empty" data-key="live-empty">${t(hidden > 0 ? 'filter.all_hidden' : 'ai.none')}</div>`
   ) + note);
+  // Mọi chỗ gọi renderLive() (mở cây, timeline, danh thiếp, đổi bộ lọc) đều đổi trạng thái mà
+  // thẻ bung ra trong chế độ Gọn cũng dùng - vẽ luôn ở đây thì không sót chỗ nào.
+  renderBrief();
 }
+
+/* ------------------------------------------------------- chế độ Gọn
+ *
+ * Lý do tồn tại: người dùng mở panel chủ yếu để COPY TÊN PHIÊN sang một phiên khác. Ở chế độ
+ * Đầy đủ, tên đó nằm dưới hai ô hạn mức, hai ô token/chi phí, bốn KPI và hàng chip - panel hẹp
+ * của VSCode phải cuộn gần hai màn hình mới thấy thẻ đầu tiên, rồi lại phải dò tên giữa cả hàng
+ * badge. Ở đây mỗi phiên đúng hai dòng: tiêu đề, rồi tên + thư mục. Bấm vào dòng mới bung thẻ.
+ *
+ * Trạng thái bung/thu để ở `S.openBrief` theo PID, KHÔNG để trên DOM - cùng lý do với
+ * `S.openInfo`: `patch()` xoá mọi thuộc tính không có trong HTML mới. */
+
+/** Rút gọn thư mục nhà thành `~` (đủ cả macOS, Linux, Windows), rồi cắt giữa nếu vẫn dài.
+ *  Cắt GIỮA chứ không cắt đuôi: phần người ta nhận ra là tên dự án ở cuối, cắt đuôi bằng
+ *  `text-overflow` là mất đúng phần đó. */
+function shortPath(p, max) {
+  if (!p) return '';
+  let out = String(p)
+    .replace(/^\/(Users|home)\/[^/]+(?=\/|$)/, '~')
+    .replace(/^[A-Za-z]:\\Users\\[^\\]+(?=\\|$)/i, '~');
+  max = max || 40;
+  if (out.length <= max) return out;
+  const sep = out.includes('\\') && !out.includes('/') ? '\\' : '/';
+  const parts = out.split(sep);
+  if (parts.length <= 3) return out;
+  const tail = parts.slice(-2).join(sep);
+  return parts[0] + sep + '...' + sep + tail;
+}
+
+function briefRow(r) {
+  const s = r.session;
+  const doing = s && s.pending.length;
+  const active = (!!doing || !!(s && s.awaiting)) && !r.paused;
+  const cls = r.paused ? 'paused' : active ? 'active' : '';
+  const title = s ? (s.title || r.session_name || t('ai.untitled')) : (r.session_name || kindLabel(r));
+  const full = sessCwd(r);
+  const open = S.openBrief.has(r.pid);
+  const name = r.session_name
+    ? `<button type="button" class="badge peer" data-act="copyname" data-name="${esc(r.session_name)}" title="${esc(t(r.peer_ready ? 'copy.badge_hint' : 'copy.badge_hint_off', { name: r.session_name }))}">${esc(r.session_name)}</button>`
+    : '';
+  return `<div class="brow ${cls}${open ? ' open' : ''}" data-key="br-${r.pid}">
+    <div class="bhead" data-pid="${r.pid}" role="button" tabindex="0" aria-expanded="${open}"
+         title="${esc(t(open ? 'brief.collapse' : 'brief.expand'))}">
+      <span class="st"></span>
+      <div class="bmain">
+        <div class="ttl">${esc(title)}</div>
+        <div class="bsub">${name}<span class="path" title="${esc(full ? t('brief.copy_path', { path: full }) : '')}">${esc(shortPath(full))}</span></div>
+      </div>
+      <span class="chev" aria-hidden="true"></span>
+    </div>
+    ${open ? sessionCard(r, true) : ''}
+  </div>`;
+}
+
+function renderBrief() {
+  if (!S.snap) return;
+  const list = visibleAi();
+  const hidden = (S.snap.ai || []).length - list.length;
+  const note = hidden > 0
+    ? `<div class="hint filtered" data-key="brief-hidden">${esc(t('filter.hidden', { n: hidden }))}
+        <button class="mini" data-kind="*">${t('filter.all')}</button></div>`
+    : '';
+  render('#brief', (list.length
+    ? list.map(briefRow).join('')
+    : `<div class="empty" data-key="brief-empty">${t(hidden > 0 ? 'filter.all_hidden' : 'ai.none')}</div>`
+  ) + note);
+}
+
+function toggleBrief(head) {
+  const pid = +head.dataset.pid;
+  S.openBrief.has(pid) ? S.openBrief.delete(pid) : S.openBrief.add(pid);
+  renderBrief();
+}
+
+// Bấm vào dòng thì bung/thu - trừ khi bấm trúng một nút bên trong (tên để copy, nút trong thẻ).
+document.addEventListener('click', (ev) => {
+  const head = ev.target.closest('.bhead');
+  if (!head || ev.target.closest('button, a')) return;
+  // Đang bôi đen để copy tay đường dẫn thì đừng thu dòng lại dưới tay người ta.
+  const sel = window.getSelection && window.getSelection();
+  if (sel && !sel.isCollapsed && head.contains(sel.anchorNode)) return;
+  toggleBrief(head);
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  const head = ev.target.closest && ev.target.closest('.bhead');
+  if (!head || ev.target !== head) return;
+  ev.preventDefault();
+  toggleBrief(head);
+});
 
 function renderClosed() {
   const range = $('#closed-range').value;
@@ -998,6 +1096,7 @@ function syncKindBar() {
  *  bật thẳng tab Văn phòng lúc dựng trang, không qua cú bấm nào. */
 function showTab(name) {
   S.tab = name;
+  if (S.view === 'full') S.fullTab = name;
   document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === name));
   document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'pane-' + name));
   syncKindBar();
@@ -1158,6 +1257,43 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && S.solo && !S.modalOpen) setSolo(false, true);
 });
 
+/* ------------------------------------------------- ba chế độ xem (Gọn / Sân khấu / Đầy đủ)
+ *
+ * Gọn chỉ là một "tab ẩn" (`#pane-brief`, không có nút trên thanh tab), Sân khấu là tab
+ * Sân khấu, Đầy đủ là trang như cũ. Nhờ vậy mọi thứ đang treo theo `S.tab` - vòng vẽ của
+ * office.js (officeSync nhìn `.pane.on`), bộ lọc loại, nạp lười Lịch sử - tự đúng mà không
+ * phải dạy thêm gì. Phần ẩn/hiện còn lại là CSS theo `body.v-<chế độ>`.
+ *
+ * Nhớ riêng cho panel hẹp (`?compact=1`) và khung rộng: cùng một server nên localStorage dùng
+ * chung, để chung một khoá thì chọn Đầy đủ ở tab editor xong panel bên cạnh cũng nhảy theo. */
+const VIEWS = ['brief', 'stage', 'full'];
+
+function viewKey() {
+  return 'aimon.view' + (document.body.classList.contains('compact') ? '.compact' : '');
+}
+
+function setView(v, remember) {
+  if (S.pip) return;                     // cửa sổ nổi chỉ có mỗi khung hình
+  if (!VIEWS.includes(v)) v = 'brief';
+  S.view = v;
+  VIEWS.forEach((x) => document.body.classList.toggle('v-' + x, x === v));
+  document.querySelectorAll('#views button').forEach((b) =>
+    b.setAttribute('aria-pressed', b.dataset.view === v ? 'true' : 'false'));
+  if (remember) { try { localStorage.setItem(viewKey(), v); } catch (e) { /* chế độ riêng tư */ } }
+
+  // "Chỉ hiện sân khấu" là một nấc bên trong chế độ Sân khấu. Rời chế độ đó mà để nó bật thì
+  // trang vẫn chỉ còn khung hình, nút vừa bấm coi như không ăn.
+  if (v !== 'stage' && S.solo) setSolo(false, true);
+  showTab(v === 'brief' ? 'brief' : v === 'stage' ? 'office' : (S.fullTab || 'ai'));
+  if (typeof officeSync === 'function') officeSync();
+  if (typeof officeResize === 'function') officeResize();
+  if (S.snap) renderAll();
+  window.scrollTo(0, 0);
+}
+
+document.querySelectorAll('#views button').forEach((b) =>
+  b.addEventListener('click', () => setView(b.dataset.view, true)));
+
 /* Tham số do vỏ nhúng truyền vào (extension VSCode): ?theme=, ?refresh=, ?compact=1.
  *
  * Khi có ?theme= thì ẩn nút đổi giao diện: dashboard phải bám theo theme của editor, để hai
@@ -1213,6 +1349,14 @@ function applyEmbedOptions() {
   /* Chỉ hiện sân khấu là lựa chọn của người dùng chứ không phải tham số của vỏ nhúng, nên
    * nhớ ở localStorage và không nhận từ query param: mỗi khung nhìn tự quyết. */
   if (!S.pip) {
+    let view = null;
+    try { view = localStorage.getItem(viewKey()); } catch (e) { /* bỏ qua */ }
+    setView(VIEWS.includes(view) ? view : 'brief', false);
+  }
+
+  /* Chỉ hiện sân khấu chỉ có nghĩa trong chế độ Sân khấu: lần trước bật nó rồi chuyển sang
+   * Gọn thì lần này mở lên phải là Gọn, không phải một khung hình chiếm trọn cửa sổ. */
+  if (!S.pip && S.view === 'stage') {
     let solo = null;
     try { solo = localStorage.getItem(SOLO_KEY); } catch (e) { /* bỏ qua */ }
     if (solo === '1') setSolo(true, false);
