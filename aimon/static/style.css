@@ -679,3 +679,70 @@ body.compact .skins .skin { min-width: 54px; padding: 5px 6px 4px; }
 .agent-skins button.pick[aria-pressed="true"] {
   background: var(--info-bg); border-color: var(--accent-2);
 }
+
+/* ------------------------------------------------- ba chế độ xem (body.v-brief/stage/full)
+   Thanh chọn chiếm trọn một hàng ở đáy header (sticky), nên đang cuộn ở đâu cũng đổi được.
+   Kiểu segmented control: ba nút dính nhau, nút đang chọn tô nền - nhìn lướt là biết mình
+   đang ở chế độ nào, khác hẳn thanh tab nội dung bên dưới. */
+.views {
+  flex: 1 0 100%; display: flex; gap: 0; padding: 2px;
+  background: var(--inset); border: 1px solid var(--line); border-radius: 9px;
+  max-width: 420px;
+}
+.views button {
+  flex: 1; border: 0; border-radius: 7px; background: none; color: var(--muted);
+  padding: 5px 10px; font-size: 13px;
+}
+.views button:hover { background: none; color: var(--text); }
+.views button[aria-pressed="true"] {
+  background: var(--card); color: var(--text); font-weight: 600;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+body.compact .views { max-width: none; }
+
+/* Gọn và Sân khấu bỏ hết phần tổng quan của trang. Thanh tab cũng bỏ: hai chế độ này mỗi
+   cái chỉ có đúng một khung, bày năm cái tab ra là hứa thứ không bấm được. */
+body.v-brief .usage, body.v-brief .kpis, body.v-brief .chips, body.v-brief .tabs,
+body.v-brief .kindbar,
+body.v-stage .usage, body.v-stage .kpis, body.v-stage .chips, body.v-stage .tabs { display: none; }
+body.v-stage .kindbar { margin-top: 14px; }
+body.v-brief .wrap, body.v-stage .wrap { padding-top: 12px; }
+body.pip .views, body.solo .views { display: none; }
+
+/* Mỗi phiên hai dòng: tiêu đề, rồi tên nhắn tin + thư mục. Cả dòng bấm được để bung thẻ. */
+.brow {
+  background: var(--card); border: 1px solid var(--line); border-radius: 11px;
+  margin-bottom: 8px; overflow: hidden;
+}
+.brow.active { border-color: var(--sess-active); }
+.brow.paused { border-color: var(--warn-line); }
+.bhead {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer;
+  outline: none;
+}
+.bhead:hover { background: var(--hover); }
+.bhead:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-2); }
+.brow .st { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; align-self: flex-start; margin-top: 7px; }
+.brow.active .st { background: var(--green); box-shadow: 0 0 0 3px var(--ring-green); }
+.brow.paused .st { background: var(--amber); }
+.bmain { flex: 1; min-width: 0; }
+.bmain .ttl {
+  font-weight: 600; font-size: 13.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bsub { display: flex; align-items: center; gap: 8px; margin-top: 3px; min-width: 0; }
+.bsub .badge.peer { flex: none; cursor: copy; font-size: 11.5px; }
+.bsub .path {
+  color: var(--muted); font-size: 12px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Mũi tên vẽ bằng viền, không dùng ký tự: font mỗi máy một khác, ký tự tam giác lúc to lúc nhỏ. */
+.chev {
+  flex: none; width: 7px; height: 7px; margin: 0 4px;
+  border-right: 1.5px solid var(--dim); border-bottom: 1.5px solid var(--dim);
+  transform: rotate(-45deg); transition: transform .15s;
+}
+.brow.open .chev { transform: rotate(45deg); }
+/* Thẻ bung ra nằm trong dòng: bỏ khung riêng, chỉ một đường kẻ ngăn với phần đầu. */
+.sess.embedded { border: 0; border-top: 1px solid var(--line); border-radius: 0; margin: 0; background: none; }
+.sess.embedded > .top { padding-top: 10px; }

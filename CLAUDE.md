@@ -564,6 +564,35 @@ Bốn chỗ dễ sai:
 Nút `i` bấm ở tab Sân khấu thì phải gọi cả `renderLive()` lẫn `renderDetail()`: hai khung nhìn
 dùng chung `S.openInfo`, quên một chỗ là bấm xong không thấy gì mở ra.
 
+## Ba chế độ xem: Gọn / Sân khấu / Đầy đủ (`setView()` trong app.js)
+
+Thanh chọn `#views` nằm ở đáy header (sticky). **Mặc định là Gọn.** Lý do: người dùng mở panel
+VSCode chủ yếu để copy tên phiên sang phiên khác, mà ở bố cục đầy đủ tên đó nằm dưới hạn mức,
+KPI, chip - panel hẹp phải cuộn gần hai màn hình mới tới thẻ đầu tiên.
+
+| Chế độ | Hiện gì | Cách làm |
+| --- | --- | --- |
+| Gọn (`brief`) | mỗi phiên hai dòng: tiêu đề, rồi tên nhắn tin + thư mục; bấm dòng mới bung thẻ | tab ẩn `#pane-brief`, không có nút trên thanh tab |
+| Sân khấu (`stage`) | chỉ tab Sân khấu, kèm bộ lọc loại | `showTab('office')` |
+| Đầy đủ (`full`) | trang như cũ, quay lại đúng tab đang xem (`S.fullTab`) | - |
+
+Gọn và Sân khấu **dùng lại cơ chế tab** chứ không dựng đường riêng: mọi thứ treo theo `S.tab` /
+`.pane.on` (vòng vẽ office.js, bộ lọc loại, nạp lười Lịch sử) tự đúng. Phần còn lại là CSS theo
+`body.v-<chế độ>`.
+
+- Lựa chọn nhớ ở `localStorage` với khoá **riêng cho panel hẹp** (`aimon.view.compact`) và khung
+  rộng (`aimon.view`): cùng server nên localStorage dùng chung, chung khoá thì chọn Đầy đủ ở tab
+  editor xong panel bên cạnh cũng nhảy theo.
+- "Chỉ hiện sân khấu" là một nấc **bên trong** Sân khấu: rời chế độ đó thì `setView()` tắt solo,
+  và lúc dựng trang chỉ khôi phục solo khi chế độ đã lưu là Sân khấu. Không thì chọn Gọn xong
+  mở lại vẫn ra một khung hình chiếm trọn cửa sổ.
+- Thẻ bung ra trong dòng Gọn là `sessionCard(r, true)` - cùng hàm với Đầy đủ, chỉ bỏ tiêu đề,
+  đường dẫn và tên (dòng đã có). `renderLive()` gọi luôn `renderBrief()` vì mọi nút trong thẻ
+  (cây con, timeline, danh thiếp) đều kết thúc bằng `renderLive()`.
+- Trạng thái bung/thu ở `S.openBrief`, không để trên DOM (cùng cái bẫy `patch()` ở mục frontend).
+- Đường dẫn trong dòng Gọn lấy `session_cwd` (cùng lý do với danh thiếp phiên), rút `HOME` thành
+  `~` rồi **cắt giữa** (`shortPath`): cắt đuôi bằng `text-overflow` là mất đúng tên dự án.
+
 ## Số phiên bản ở chân trang
 
 Footer bày **hai** số và đó là chủ ý: `version` trong `/api/config.js` là của SERVER đang phục
