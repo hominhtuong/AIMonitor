@@ -13,7 +13,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14        # runner Apple Silicon, có sẵn Xcode nên có swiftc
+    # Runner Apple Silicon, có sẵn Xcode nên có swiftc. Không ghim số: macos-14 đã bị gỡ.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
