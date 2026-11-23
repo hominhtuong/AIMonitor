@@ -22,7 +22,10 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Ghim 24.04, KHÔNG dùng ubuntu-latest: từ 11/2026 ubuntu-latest là 26.04 và
+    # actions/python-versions không dựng 3.9 cho nó - setup-python fail ngay, cả bản phát
+    # hành bị chặn ở job đầu tiên. 3.9 có bản dựng sẵn cho 22.04 và 24.04.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: vscode-extension
@@ -308,10 +311,11 @@ jobs:
   # Cùng một file .vsix, chạy trên macOS. KHÔNG dùng setup-python ở đây: bản Python quan
   # trọng với repo này là /usr/bin/python3 (3.9.6) - thứ duy nhất chắc chắn có mặt trên máy
   # người dùng macOS, và cũng là thứ app macOS dùng. setup-python sẽ cài một Python khác rồi
-  # kiểm tra nhầm sang nó. macos-14 là runner Apple Silicon.
+  # kiểm tra nhầm sang nó. macos-latest là runner Apple Silicon; đừng ghim một số cụ thể
+  # (macos-14 bị GitHub gỡ, job báo "configuration not supported" và bị huỷ sau 1 giây).
   macos-check:
     needs: build
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
